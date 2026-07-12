@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# قاعدة البيانات الحقيقية وملفات مرتبطة بيها - بيانات حقيقية/حساسة، منفعش تتحط في git
+TemoStoreDB.db
+TemoStoreDB.db-shm
+TemoStoreDB.db-wal
+license.dat
+remote_server_log.txt
