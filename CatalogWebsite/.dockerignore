@@ -1,0 +1,5 @@
+bin/
+obj/
+catalog.db
+catalog.db-shm
+catalog.db-wal
