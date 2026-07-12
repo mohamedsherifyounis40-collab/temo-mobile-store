@@ -20,3 +20,6 @@ remote_server_log.txt
 CatalogWebsite/catalog.db
 CatalogWebsite/catalog.db-shm
 CatalogWebsite/catalog.db-wal
+
+# سيكرت التشغيل المحلي (SYNC_SECRET/ADMIN_PASSWORD الحقيقية) - منفعش تتحط في git خالص
+CatalogWebsite/secrets.local.json
