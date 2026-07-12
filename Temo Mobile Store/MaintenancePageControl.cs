@@ -3,7 +3,6 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
-using Microsoft.Data.Sqlite;
 
 namespace Temo_Mobile_Store
 {
@@ -126,41 +125,13 @@ namespace Temo_Mobile_Store
         {
             if (dgvMaintenanceTickets == null) return;
 
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("TicketId"), new DataColumn("العميل"), new DataColumn("التليفون"), new DataColumn("الجهاز"),
-                new DataColumn("العطل"), new DataColumn("تاريخ الاستلام"), new DataColumn("التقديري"), new DataColumn("الفعلي"), new DataColumn("الحالة"), new DataColumn("تاريخ التسليم") });
-
             string statusFilter = cmbMaintStatusFilter?.SelectedItem?.ToString() ?? "الكل";
-            string query = "SELECT * FROM MaintenanceTickets";
-            if (statusFilter != "الكل") query += " WHERE Status = @Status";
-            query += " ORDER BY ReceivedDate DESC";
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    if (statusFilter != "الكل") cmd.Parameters.AddWithValue("@Status", statusFilter);
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                dt.Rows.Add(reader["TicketId"], reader["CustomerName"], reader["CustomerPhone"], reader["DeviceInfo"],
-                                    reader["IssueDescription"], reader["ReceivedDate"],
-                                    reader["EstimatedCost"] == DBNull.Value ? "" : Convert.ToDecimal(reader["EstimatedCost"]).ToString("N2"),
-                                    reader["ActualCost"] == DBNull.Value ? "" : Convert.ToDecimal(reader["ActualCost"]).ToString("N2"),
-                                    reader["Status"], reader["DeliveredDate"] == DBNull.Value ? "" : reader["DeliveredDate"]);
-                            }
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                dgvMaintenanceTickets.DataSource = MaintenanceRepository.GetMaintenanceTickets(statusFilter);
+                if (dgvMaintenanceTickets.Columns["TicketId"] != null) dgvMaintenanceTickets.Columns["TicketId"].Visible = false;
             }
-
-            dgvMaintenanceTickets.DataSource = dt;
-            if (dgvMaintenanceTickets.Columns["TicketId"] != null) dgvMaintenanceTickets.Columns["TicketId"].Visible = false;
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void DgvMaintenanceTickets_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -187,21 +158,16 @@ namespace Temo_Mobile_Store
 
             decimal.TryParse(txtMaintEstimatedCost.Text, out decimal estimatedCost);
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(
-                    "INSERT INTO MaintenanceTickets (CustomerName, CustomerPhone, DeviceInfo, IssueDescription, ReceivedDate, EstimatedCost, Status) VALUES (@N, @P, @D, @I, @R, @E, 'مستلم')", conn))
-                {
-                    cmd.Parameters.AddWithValue("@N", txtMaintCustomerName.Text.Trim());
-                    cmd.Parameters.AddWithValue("@P", string.IsNullOrWhiteSpace(txtMaintCustomerPhone.Text) ? (object)DBNull.Value : txtMaintCustomerPhone.Text.Trim());
-                    cmd.Parameters.AddWithValue("@D", txtMaintDeviceInfo.Text.Trim());
-                    cmd.Parameters.AddWithValue("@I", string.IsNullOrWhiteSpace(txtMaintIssueDescription.Text) ? (object)DBNull.Value : txtMaintIssueDescription.Text.Trim());
-                    cmd.Parameters.AddWithValue("@R", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    cmd.Parameters.AddWithValue("@E", estimatedCost);
-                    conn.Open();
-                    cmd.ExecuteNonQuery();
-                }
+                MaintenanceRepository.ReceiveDevice(
+                    txtMaintCustomerName.Text.Trim(),
+                    string.IsNullOrWhiteSpace(txtMaintCustomerPhone.Text) ? null : txtMaintCustomerPhone.Text.Trim(),
+                    txtMaintDeviceInfo.Text.Trim(),
+                    string.IsNullOrWhiteSpace(txtMaintIssueDescription.Text) ? null : txtMaintIssueDescription.Text.Trim(),
+                    estimatedCost);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم استلام الجهاز وتسجيل التذكرة بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             txtMaintCustomerName.Clear();
@@ -258,16 +224,11 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE MaintenanceTickets SET Status = @S WHERE TicketId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@S", newStatus);
-                    cmd.Parameters.AddWithValue("@Id", selectedTicketId);
-                    conn.Open();
-                    cmd.ExecuteNonQuery();
-                }
+                MaintenanceRepository.UpdateStatus(selectedTicketId, newStatus);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم تحديث حالة التذكرة بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             LoadMaintenanceGrid();
@@ -298,50 +259,12 @@ namespace Temo_Mobile_Store
             }
 
             string method = cmbMaintPaymentMethod.SelectedItem.ToString();
-            string customerName = "";
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-
-                using (SqliteCommand cmdGet = new SqliteCommand("SELECT CustomerName FROM MaintenanceTickets WHERE TicketId = @Id", conn))
-                {
-                    cmdGet.Parameters.AddWithValue("@Id", selectedTicketId);
-                    var res = cmdGet.ExecuteScalar();
-                    customerName = res?.ToString() ?? "";
-                }
-
-                using (SqliteCommand cmd = new SqliteCommand(
-                    "UPDATE MaintenanceTickets SET Status = 'تم التسليم', ActualCost = @A, DeliveredDate = @D WHERE TicketId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@A", actualCost);
-                    cmd.Parameters.AddWithValue("@D", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    cmd.Parameters.AddWithValue("@Id", selectedTicketId);
-                    cmd.ExecuteNonQuery();
-                }
-
-                if (actualCost > 0)
-                {
-                    using (SqliteCommand cmd = new SqliteCommand(
-                        "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode) VALUES (@Date, 'قبض', @Method, @Amount, @Ref, @Desc, @CreatedAt, 4200)", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
-                        cmd.Parameters.AddWithValue("@Method", method);
-                        cmd.Parameters.AddWithValue("@Amount", actualCost);
-                        cmd.Parameters.AddWithValue("@Ref", "تذكرة صيانة رقم " + selectedTicketId);
-                        cmd.Parameters.AddWithValue("@Desc", "أجرة صيانة - " + customerName);
-                        cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = CurrentBalance + @Amount WHERE PaymentMethod = @Method", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Amount", actualCost);
-                        cmd.Parameters.AddWithValue("@Method", method);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
+                MaintenanceRepository.DeliverDevice(selectedTicketId, actualCost, method);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم تسليم الجهاز وتحصيل الأجرة بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             selectedTicketId = -1;
@@ -352,18 +275,6 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         // فحص هل تاريخ النهاردة تم إقفاله بالفعل
         // ==========================================================================
-        private bool IsTodayClosed()
-        {
-            string dateStr = DateTime.Now.ToString("yyyy-MM-dd");
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT COUNT(*) FROM DailyClosures WHERE ClosureDate = @Date AND PaymentMethod = 'نقدي'", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Date", dateStr);
-                    return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-                }
-            }
-        }
+        private bool IsTodayClosed() => UIHelpers.IsTodayClosed();
     }
 }

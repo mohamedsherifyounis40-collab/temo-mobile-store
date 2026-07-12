@@ -4,7 +4,6 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
-using Microsoft.Data.Sqlite;
 
 namespace Temo_Mobile_Store
 {
@@ -210,18 +209,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-                {
-                    conn.Open();
-                    using (SqliteCommand cmd = new SqliteCommand("UPDATE StoreSettings SET StoreName = @Name, Phone = @Phone, Address = @Address, LogoImage = @Logo WHERE Id = 1;", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Name", txtSettingsStoreName.Text.Trim());
-                        cmd.Parameters.AddWithValue("@Phone", txtSettingsPhone.Text.Trim());
-                        cmd.Parameters.AddWithValue("@Address", txtSettingsAddress.Text.Trim());
-                        cmd.Parameters.AddWithValue("@Logo", (object)CurrentStoreLogo ?? DBNull.Value);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
+                SettingsRepository.SaveStoreSettings(txtSettingsStoreName.Text.Trim(), txtSettingsPhone.Text.Trim(), txtSettingsAddress.Text.Trim(), CurrentStoreLogo);
 
                 LoadStoreSettingsIntoMemory();
                 MessageBox.Show("تم حفظ إعدادات المحل بنجاح ✅", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -286,15 +274,7 @@ namespace Temo_Mobile_Store
             string fileName = $"TemoStoreDB_Backup_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.db";
             string destPath = System.IO.Path.Combine(BackupFolderPath, fileName);
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                string escapedPath = destPath.Replace("'", "''");
-                using (SqliteCommand cmd = new SqliteCommand($"VACUUM INTO '{escapedPath}';", conn))
-                {
-                    cmd.ExecuteNonQuery();
-                }
-            }
+            SettingsRepository.BackupDatabaseTo(destPath);
 
             TryCopyToCloudBackup(destPath, fileName);
             return destPath;
@@ -543,27 +523,12 @@ namespace Temo_Mobile_Store
 
         private void LoadUsersGrid()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("Id"), new DataColumn("اسم المستخدم"), new DataColumn("الدور"), new DataColumn("تاريخ الإنشاء") });
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Id, Username, Role, CreatedAt FROM Users ORDER BY Id", conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                dt.Rows.Add(reader["Id"], reader["Username"], reader["Role"], reader["CreatedAt"]);
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                dgvUsers.DataSource = SettingsRepository.GetUsersGrid();
+                if (dgvUsers.Columns["Id"] != null) dgvUsers.Columns["Id"].Visible = false;
             }
-            dgvUsers.DataSource = dt;
-            if (dgvUsers.Columns["Id"] != null) dgvUsers.Columns["Id"].Visible = false;
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void DgvUsers_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -600,76 +565,30 @@ namespace Temo_Mobile_Store
             string newUsername = txtNewUsername.Text.Trim();
             string newRole = cmbNewUserRole.SelectedItem.ToString();
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-
-                string oldUsername = null, oldRole = null;
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Username, Role FROM Users WHERE Id = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedUserId);
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            oldUsername = reader["Username"].ToString();
-                            oldRole = reader["Role"].ToString();
-                        }
-                    }
-                }
-
-                if (oldUsername == null)
+                UserRecord existing = SettingsRepository.GetUser(selectedUserId);
+                if (existing == null)
                 {
                     MessageBox.Show("لم يتم العثور على المستخدم.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
-                using (SqliteCommand cmdCheck = new SqliteCommand("SELECT COUNT(*) FROM Users WHERE Username = @U AND Id <> @Id", conn))
+                if (SettingsRepository.UsernameExists(newUsername, selectedUserId))
                 {
-                    cmdCheck.Parameters.AddWithValue("@U", newUsername);
-                    cmdCheck.Parameters.AddWithValue("@Id", selectedUserId);
-                    if (Convert.ToInt32(cmdCheck.ExecuteScalar()) > 0)
-                    {
-                        MessageBox.Show("اسم المستخدم ده مستخدم بالفعل لحساب تاني.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
+                    MessageBox.Show("اسم المستخدم ده مستخدم بالفعل لحساب تاني.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
                 }
 
-                if (oldRole == "Admin" && newRole != "Admin")
+                if (existing.Role == "Admin" && newRole != "Admin" && SettingsRepository.CountAdmins() <= 1)
                 {
-                    using (SqliteCommand cmdCount = new SqliteCommand("SELECT COUNT(*) FROM Users WHERE Role = 'Admin'", conn))
-                    {
-                        int adminCount = Convert.ToInt32(cmdCount.ExecuteScalar());
-                        if (adminCount <= 1)
-                        {
-                            MessageBox.Show("لا يمكن تغيير دور آخر حساب أدمن في النظام.", "غير مسموح", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                            return;
-                        }
-                    }
+                    MessageBox.Show("لا يمكن تغيير دور آخر حساب أدمن في النظام.", "غير مسموح", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
                 }
 
-                if (string.IsNullOrEmpty(txtNewUserPassword.Text))
-                {
-                    using (SqliteCommand cmd = new SqliteCommand("UPDATE Users SET Username = @U, Role = @R WHERE Id = @Id", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@U", newUsername);
-                        cmd.Parameters.AddWithValue("@R", newRole);
-                        cmd.Parameters.AddWithValue("@Id", selectedUserId);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-                else
-                {
-                    using (SqliteCommand cmd = new SqliteCommand("UPDATE Users SET Username = @U, Role = @R, PasswordHash = @P WHERE Id = @Id", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@U", newUsername);
-                        cmd.Parameters.AddWithValue("@R", newRole);
-                        cmd.Parameters.AddWithValue("@P", AuthManager.HashPassword(txtNewUserPassword.Text));
-                        cmd.Parameters.AddWithValue("@Id", selectedUserId);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
+                SettingsRepository.UpdateUser(selectedUserId, newUsername, newRole, string.IsNullOrEmpty(txtNewUserPassword.Text) ? null : txtNewUserPassword.Text);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم تعديل المستخدم بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             selectedUserId = -1;
@@ -688,28 +607,17 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-                using (SqliteCommand cmdCheck = new SqliteCommand("SELECT COUNT(*) FROM Users WHERE Username = @U", conn))
+                if (SettingsRepository.UsernameExists(txtNewUsername.Text.Trim()))
                 {
-                    cmdCheck.Parameters.AddWithValue("@U", txtNewUsername.Text.Trim());
-                    if (Convert.ToInt32(cmdCheck.ExecuteScalar()) > 0)
-                    {
-                        MessageBox.Show("اسم المستخدم ده مستخدم بالفعل.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
+                    MessageBox.Show("اسم المستخدم ده مستخدم بالفعل.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
                 }
 
-                using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Users (Username, PasswordHash, Role, CreatedAt) VALUES (@U, @P, @R, @C)", conn))
-                {
-                    cmd.Parameters.AddWithValue("@U", txtNewUsername.Text.Trim());
-                    cmd.Parameters.AddWithValue("@P", AuthManager.HashPassword(txtNewUserPassword.Text));
-                    cmd.Parameters.AddWithValue("@R", cmbNewUserRole.SelectedItem.ToString());
-                    cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    cmd.ExecuteNonQuery();
-                }
+                SettingsRepository.AddUser(txtNewUsername.Text.Trim(), txtNewUserPassword.Text, cmbNewUserRole.SelectedItem.ToString());
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم إضافة المستخدم بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             txtNewUsername.Clear();
@@ -728,59 +636,33 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-
-                string username = null, role = null;
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Username, Role FROM Users WHERE Id = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedUserId);
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            username = reader["Username"].ToString();
-                            role = reader["Role"].ToString();
-                        }
-                    }
-                }
-
-                if (username == null)
+                UserRecord user = SettingsRepository.GetUser(selectedUserId);
+                if (user == null)
                 {
                     MessageBox.Show("لم يتم العثور على المستخدم.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
-                if (username == AuthManager.CurrentUsername)
+                if (user.Username == AuthManager.CurrentUsername)
                 {
                     MessageBox.Show("لا يمكنك حذف حسابك اللي داخل بيه دلوقتي.", "غير مسموح", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                if (role == "Admin")
+                if (user.Role == "Admin" && SettingsRepository.CountAdmins() <= 1)
                 {
-                    int adminCount;
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT COUNT(*) FROM Users WHERE Role = 'Admin'", conn))
-                    {
-                        adminCount = Convert.ToInt32(cmd.ExecuteScalar());
-                    }
-                    if (adminCount <= 1)
-                    {
-                        MessageBox.Show("لا يمكن حذف آخر حساب أدمن في النظام.", "غير مسموح", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
+                    MessageBox.Show("لا يمكن حذف آخر حساب أدمن في النظام.", "غير مسموح", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
                 }
 
-                if (MessageBox.Show($"هل أنت متأكد من حذف المستخدم \"{username}\"؟", "تأكيد الحذف", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                if (MessageBox.Show($"هل أنت متأكد من حذف المستخدم \"{user.Username}\"؟", "تأكيد الحذف", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                     return;
 
-                using (SqliteCommand cmd = new SqliteCommand("DELETE FROM Users WHERE Id = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedUserId);
-                    cmd.ExecuteNonQuery();
-                }
+                SettingsRepository.DeleteUser(selectedUserId);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم حذف المستخدم بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             selectedUserId = -1;
