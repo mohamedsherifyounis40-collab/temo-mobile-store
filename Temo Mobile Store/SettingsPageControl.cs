@@ -36,6 +36,9 @@ namespace Temo_Mobile_Store
         // ---------- إعدادات المحل ----------
         private PictureBox picStoreLogo;
         private Guna2TextBox txtSettingsStoreName, txtSettingsPhone, txtSettingsAddress;
+        private Guna2TextBox txtCatalogSyncUrl, txtCatalogSyncSecret;
+        private CheckBox chkCatalogSyncEnabled;
+        private Label lblCatalogSyncStatus;
 
         // ---------- النسخ الاحتياطي ----------
         private Label lblBackupStatus, lblCloudStatus;
@@ -132,13 +135,83 @@ namespace Temo_Mobile_Store
                 ForeColor = Color.FromArgb(85, 92, 102)
             };
 
-            pnlStoreSettings.Controls.AddRange(new Control[] { gbLogo, gbInfo, lblNote });
+            Guna2Panel gbCatalogSync = new Guna2Panel() { Location = new Point(0, 345), Size = new Size(1080, 235), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Label lblSyncTitle = new Label() { Text = "🌐 مزامنة موقع الكتالوج", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
+            Label lblSyncNote = new Label()
+            {
+                Text = "لو عندك موقع كتالوج منفصل بيعرض منتجاتك للعملاء، حط رابطه هنا وفعّل المزامنة - البرنامج هيبعتله قائمة المنتجات والأسعار والتوفر تلقائيًا كل 5 دقايق.",
+                Location = new Point(20, 45), Size = new Size(1000, 35), Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102)
+            };
+
+            Label lblSyncUrl = new Label() { Text = "رابط الموقع:", Location = new Point(20, 90), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtCatalogSyncUrl = new Guna2TextBox() { Location = new Point(20, 110), Width = 500, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), PlaceholderText = "https://your-catalog-site.example.com" };
+
+            Label lblSyncSecret = new Label() { Text = "المفتاح السري (Secret):", Location = new Point(540, 90), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtCatalogSyncSecret = new Guna2TextBox() { Location = new Point(540, 110), Width = 320, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), PasswordChar = '●' };
+
+            chkCatalogSyncEnabled = new CheckBox() { Text = "تفعيل المزامنة التلقائية", Location = new Point(20, 155), AutoSize = true, Font = new Font("Segoe UI", 9F) };
+
+            Guna2Button btnSaveCatalogSync = new Guna2Button() { Text = "حفظ إعدادات المزامنة 💾", Location = new Point(20, 185), Width = 230, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
+            btnSaveCatalogSync.Click += BtnSaveCatalogSync_Click;
+
+            Guna2Button btnSyncNow = new Guna2Button() { Text = "مزامنة الآن 🔄", Location = new Point(260, 185), Width = 180, Height = 36, FillColor = ColorPrimary, BorderRadius = 10 };
+            btnSyncNow.Click += BtnSyncCatalogNow_Click;
+
+            lblCatalogSyncStatus = new Label() { Text = "", Location = new Point(460, 195), AutoSize = true, Font = new Font("Segoe UI", 8.5F) };
+
+            gbCatalogSync.Controls.AddRange(new Control[] { lblSyncTitle, lblSyncNote, lblSyncUrl, txtCatalogSyncUrl, lblSyncSecret, txtCatalogSyncSecret, chkCatalogSyncEnabled, btnSaveCatalogSync, btnSyncNow, lblCatalogSyncStatus });
+
+            pnlStoreSettings.Controls.AddRange(new Control[] { gbLogo, gbInfo, lblNote, gbCatalogSync });
 
             LoadStoreSettingsIntoMemory();
             txtSettingsStoreName.Text = CurrentStoreName;
             txtSettingsPhone.Text = CurrentStorePhone;
             txtSettingsAddress.Text = CurrentStoreAddress;
             RefreshLogoPreview();
+            LoadCatalogSyncSettingsIntoUI();
+        }
+
+        private void LoadCatalogSyncSettingsIntoUI()
+        {
+            try
+            {
+                var (url, secret, enabled) = SettingsRepository.GetCatalogSyncSettings();
+                txtCatalogSyncUrl.Text = url;
+                txtCatalogSyncSecret.Text = secret;
+                chkCatalogSyncEnabled.Checked = enabled;
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        private void BtnSaveCatalogSync_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                SettingsRepository.SaveCatalogSyncSettings(txtCatalogSyncUrl.Text.Trim(), txtCatalogSyncSecret.Text.Trim(), chkCatalogSyncEnabled.Checked);
+                lblCatalogSyncStatus.ForeColor = ColorSuccess;
+                lblCatalogSyncStatus.Text = "تم الحفظ ✅";
+            }
+            catch (Exception ex)
+            {
+                lblCatalogSyncStatus.ForeColor = ColorDanger;
+                lblCatalogSyncStatus.Text = "حصل خطأ: " + ex.Message;
+            }
+        }
+
+        private async void BtnSyncCatalogNow_Click(object sender, EventArgs e)
+        {
+            // بيحفظ الإعدادات الحالية أولًا عشان الزرار يشتغل حتى لو المستخدم عدّل الرابط/السيكرت
+            // وده أول مرة يضغط "مزامنة الآن" من غير ما يدوس "حفظ" الأول
+            try { SettingsRepository.SaveCatalogSyncSettings(txtCatalogSyncUrl.Text.Trim(), txtCatalogSyncSecret.Text.Trim(), chkCatalogSyncEnabled.Checked); }
+            catch { /* هيتلقط تاني في SyncNowAsync لو فيه مشكلة حقيقية */ }
+
+            lblCatalogSyncStatus.ForeColor = ColorPrimary;
+            lblCatalogSyncStatus.Text = "جاري المزامنة...";
+
+            var (success, message) = await WebCatalogSyncService.SyncNowAsync();
+
+            lblCatalogSyncStatus.ForeColor = success ? ColorSuccess : ColorDanger;
+            lblCatalogSyncStatus.Text = message;
         }
 
         private void LoadStoreSettingsIntoMemory()

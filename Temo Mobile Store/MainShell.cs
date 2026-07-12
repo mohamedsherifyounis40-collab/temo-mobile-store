@@ -107,6 +107,7 @@ namespace Temo_Mobile_Store
         private void InitializeShell()
         {
             RemoteDashboardServer.Start();
+            WebCatalogSyncService.Start();
 
             this.Text = "Temo Mobile Store" + (AuthManager.IsAdmin ? "" : " - وضع الموظف 👤");
             try { this.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
@@ -150,7 +151,7 @@ namespace Temo_Mobile_Store
             autoRefreshTimer.Start();
 
             // إيقاف التايمر لما الفورم تتقفل عشان منسيبش حاجة شغالة في الخلفية من غير داعي
-            this.FormClosed += (s, e) => autoRefreshTimer.Stop();
+            this.FormClosed += (s, e) => { autoRefreshTimer.Stop(); WebCatalogSyncService.Stop(); };
         }
 
         // ==========================================================================

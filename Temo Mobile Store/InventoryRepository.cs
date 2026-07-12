@@ -14,6 +14,15 @@ namespace Temo_Mobile_Store
         public int Difference;
     }
 
+    // نفس شكل ProductDto في CatalogWebsite - مستخدمة وقت المزامنة مع موقع الكتالوج البارة
+    public class CatalogProductDto
+    {
+        public string Barcode { get; set; }
+        public string ProductName { get; set; }
+        public decimal SalePrice { get; set; }
+        public int Quantity { get; set; }
+    }
+
     // ==========================================================================
     // InventoryRepository: كل الوصول لقاعدة البيانات الخاص بشاشتي "المخزون"
     // (إكسسوارات + أجهزة/IMEI) و"جرد المخزن".
@@ -38,6 +47,31 @@ namespace Temo_Mobile_Store
                 }
             }
             return dt;
+        }
+
+        // كل المنتجات (إكسسوارات + أجهزة) بشكل بسيط لمزامنتهم مع موقع الكتالوج البارة
+        public static List<CatalogProductDto> GetProductsForCatalogSync()
+        {
+            var result = new List<CatalogProductDto>();
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, ProductName, SalePrice, Quantity FROM Products ORDER BY ProductName", conn))
+                using (SqliteDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        result.Add(new CatalogProductDto
+                        {
+                            Barcode = reader["Barcode"].ToString(),
+                            ProductName = reader["ProductName"].ToString(),
+                            SalePrice = Convert.ToDecimal(reader["SalePrice"]),
+                            Quantity = Convert.ToInt32(reader["Quantity"])
+                        });
+                    }
+                }
+            }
+            return result;
         }
 
         public static void AddAccessoryProduct(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity)

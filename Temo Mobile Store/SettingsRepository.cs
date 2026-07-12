@@ -35,6 +35,39 @@ namespace Temo_Mobile_Store
             }
         }
 
+        public static (string Url, string Secret, bool Enabled) GetCatalogSyncSettings()
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("SELECT CatalogSyncUrl, CatalogSyncSecret, CatalogSyncEnabled FROM StoreSettings WHERE Id = 1;", conn))
+                using (SqliteDataReader reader = cmd.ExecuteReader())
+                {
+                    if (!reader.Read()) return (null, null, false);
+                    string url = reader["CatalogSyncUrl"] == DBNull.Value ? null : reader["CatalogSyncUrl"].ToString();
+                    string secret = reader["CatalogSyncSecret"] == DBNull.Value ? null : reader["CatalogSyncSecret"].ToString();
+                    bool enabled = Convert.ToInt32(reader["CatalogSyncEnabled"]) == 1;
+                    return (url, secret, enabled);
+                }
+            }
+        }
+
+        public static void SaveCatalogSyncSettings(string url, string secret, bool enabled)
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand(
+                    "UPDATE StoreSettings SET CatalogSyncUrl = @Url, CatalogSyncSecret = @Secret, CatalogSyncEnabled = @Enabled WHERE Id = 1;", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Url", string.IsNullOrWhiteSpace(url) ? (object)DBNull.Value : url.Trim());
+                    cmd.Parameters.AddWithValue("@Secret", string.IsNullOrWhiteSpace(secret) ? (object)DBNull.Value : secret.Trim());
+                    cmd.Parameters.AddWithValue("@Enabled", enabled ? 1 : 0);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         // بينسخ قاعدة البيانات كاملة لمسار معين (مستخدم في تصدير نسخة احتياطية)
         public static void BackupDatabaseTo(string destPath)
         {

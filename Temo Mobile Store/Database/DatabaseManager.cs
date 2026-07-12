@@ -175,7 +175,10 @@ namespace Temo_Mobile_Store.Database
                     StoreName TEXT,
                     Phone TEXT,
                     Address TEXT,
-                    LogoImage BLOB
+                    LogoImage BLOB,
+                    CatalogSyncUrl TEXT,
+                    CatalogSyncSecret TEXT,
+                    CatalogSyncEnabled INTEGER NOT NULL DEFAULT 0
                 );");
 
                 ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS Employees (
@@ -266,7 +269,30 @@ namespace Temo_Mobile_Store.Database
                 EnsureExpensesPaymentMethodColumn(conn);
                 EnsureCashMovementsEmployeeIdColumn(conn);
                 EnsureCashMovementsIsAdvanceColumn(conn);
+                EnsureStoreSettingsCatalogSyncColumns(conn);
             }
+        }
+
+        // ==========================================================================
+        // ترحيل: أعمدة مزامنة الكتالوج (CatalogSyncUrl/Secret/Enabled) لجدول StoreSettings -
+        // بتحدد للبرنامج فين يبعت قائمة المنتجات لموقع الكتالوج البارة، ومفتاح التحقق.
+        // ==========================================================================
+        private static void EnsureStoreSettingsCatalogSyncColumns(SqliteConnection conn)
+        {
+            var existingColumns = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(StoreSettings);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                    existingColumns.Add(reader["name"].ToString());
+            }
+
+            if (!existingColumns.Contains("CatalogSyncUrl"))
+                ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN CatalogSyncUrl TEXT;");
+            if (!existingColumns.Contains("CatalogSyncSecret"))
+                ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN CatalogSyncSecret TEXT;");
+            if (!existingColumns.Contains("CatalogSyncEnabled"))
+                ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN CatalogSyncEnabled INTEGER NOT NULL DEFAULT 0;");
         }
 
         // ==========================================================================
