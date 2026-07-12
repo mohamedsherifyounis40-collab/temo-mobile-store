@@ -198,10 +198,13 @@ namespace Temo_Mobile_Store
             dtpPayrollMonth = new DateTimePicker() { Location = new Point(75, 22), Width = 180, Format = DateTimePickerFormat.Custom, CustomFormat = "MMMM yyyy", Value = DateTime.Now };
             dtpPayrollMonth.ValueChanged += (s, e) => LoadPayrollGrid();
 
-            Guna2Button btnClosePayrollMonth = new Guna2Button() { Text = "قفل الشهر لكل الموظفين 🔒", Location = new Point(290, 18), Width = 240, Height = 34, FillColor = ColorDanger, BorderRadius = 9 };
+            Guna2Button btnClosePayrollMonth = new Guna2Button() { Text = "قفل الشهر لكل الموظفين 🔒", Location = new Point(290, 18), Width = 230, Height = 34, FillColor = ColorDanger, BorderRadius = 9 };
             btnClosePayrollMonth.Click += BtnClosePayrollMonth_Click;
 
-            pnlToolbar.Controls.AddRange(new Control[] { lblMonth, dtpPayrollMonth, btnClosePayrollMonth });
+            Guna2Button btnReopenPayrollMonth = new Guna2Button() { Text = "إلغاء قفل الشهر 🔓", Location = new Point(530, 18), Width = 200, Height = 34, FillColor = ColorWarning, BorderRadius = 9 };
+            btnReopenPayrollMonth.Click += BtnReopenPayrollMonth_Click;
+
+            pnlToolbar.Controls.AddRange(new Control[] { lblMonth, dtpPayrollMonth, btnClosePayrollMonth, btnReopenPayrollMonth });
 
             Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 85), Size = new Size(1100, 575), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             dgvPayroll = new DataGridView() { Location = new Point(20, 20), Size = new Size(1060, 495), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false };
@@ -264,6 +267,36 @@ namespace Temo_Mobile_Store
                 MessageBox.Show("كل الموظفين شهرهم مقفول بالفعل لهذا الشهر.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Information);
             else
                 MessageBox.Show($"تم قفل الشهر لـ {closedCount} موظف بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            LoadPayrollGrid();
+        }
+
+        private void BtnReopenPayrollMonth_Click(object sender, EventArgs e)
+        {
+            int year = dtpPayrollMonth.Value.Year;
+            int month = dtpPayrollMonth.Value.Month;
+
+            var confirm = MessageBox.Show(
+                $"هيتم إلغاء قفل شهر {dtpPayrollMonth.Value:MMMM yyyy} لكل الموظفين المقفولين فيه، ويرجع يتحسب حي تاني من سجلات الحضور عشان تقدر تصححه.\n\n" +
+                "تنبيه: لو فيه سلف أو دفعات مرتب اتصرفت بالفعل لأي موظف بناءً على رقم الشهر ده، رصيده المستحق هيتغيّر فورًا لحد ما تقفل الشهر تاني بالرقم الصح. متأكد إنك عايز تكمل؟",
+                "تأكيد إلغاء قفل الشهر", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (confirm != DialogResult.Yes) return;
+
+            int reopenedCount;
+            try
+            {
+                reopenedCount = AttendanceRepository.ReopenPayrollMonthForAll(year, month);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("حصل خطأ أثناء إلغاء قفل الشهر: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (reopenedCount == 0)
+                MessageBox.Show("مفيش أي موظف مقفول لهذا الشهر أصلًا.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            else
+                MessageBox.Show($"تم إلغاء قفل الشهر لـ {reopenedCount} موظف بنجاح، وبقى ممكن تعدّل الحضور فيه تاني.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             LoadPayrollGrid();
         }

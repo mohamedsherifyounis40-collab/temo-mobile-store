@@ -377,6 +377,26 @@ namespace Temo_Mobile_Store
             return closedCount;
         }
 
+        // بيلغي قفل شهر معين لكل الموظفين اللي كانوا مقفولين فيه (لتصحيح خطأ حصل وقت القفل).
+        // بعد الإلغاء، الشهر بيرجع "مفتوح" وبيتحسب حي تاني من سجلات الحضور، وأي تصحيح جديد
+        // للحضور بقى ممكن. ملحوظة: ده بيغيّر رصيد الموظف المستحق فورًا (لأن الشهر ده مابقاش
+        // محسوب ضمن "المكتسب" لحد ما يتقفل تاني)، فلو فيه سلف/دفعات اتصرفت بالفعل بناءً على
+        // الرقم القديم، الرصيد هيبان مختلف لحد ما يتقفل الشهر تاني بالرقم الصح.
+        // بيرجع عدد الموظفين اللي اتلغى قفلهم فعليًا.
+        public static int ReopenPayrollMonthForAll(int year, int month)
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("DELETE FROM PayrollClosures WHERE Year = @Y AND Month = @M", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Y", year);
+                    cmd.Parameters.AddWithValue("@M", month);
+                    return cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         // ---------- كشف حساب الموظف (المستحق ناقص السلف/الدفعات) ----------
 
         // الرصيد المستحق للموظف = إجمالي الشهور المقفولة - إجمالي المسحوب له من الخزينة
