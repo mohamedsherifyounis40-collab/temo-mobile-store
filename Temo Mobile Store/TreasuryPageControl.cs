@@ -3,7 +3,6 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
-using Microsoft.Data.Sqlite;
 
 namespace Temo_Mobile_Store
 {
@@ -216,28 +215,19 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void LoadAccountsIntoCombos()
         {
-            string query = "SELECT AccountCode, AccountName FROM AccountsTree ORDER BY AccountCode";
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        DataTable dtExpense = new DataTable();
-                        dtExpense.Load(cmd.ExecuteReader());
-                        cmbExpenseAccounts.DataSource = dtExpense;
-                        cmbExpenseAccounts.DisplayMember = "AccountName";
-                        cmbExpenseAccounts.ValueMember = "AccountCode";
+                DataTable dtExpense = TreasuryRepository.GetAccountsTree();
+                cmbExpenseAccounts.DataSource = dtExpense;
+                cmbExpenseAccounts.DisplayMember = "AccountName";
+                cmbExpenseAccounts.ValueMember = "AccountCode";
 
-                        DataTable dtMovement = dtExpense.Copy();
-                        cmbMovementAccount.DataSource = dtMovement;
-                        cmbMovementAccount.DisplayMember = "AccountName";
-                        cmbMovementAccount.ValueMember = "AccountCode";
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                DataTable dtMovement = dtExpense.Copy();
+                cmbMovementAccount.DataSource = dtMovement;
+                cmbMovementAccount.DisplayMember = "AccountName";
+                cmbMovementAccount.ValueMember = "AccountCode";
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         // ==========================================================================
@@ -265,23 +255,14 @@ namespace Temo_Mobile_Store
             }
 
             int selectedCode = Convert.ToInt32(cmbExpenseAccounts.SelectedValue);
-            string query = "INSERT INTO Expenses (AccountCode, Amount) VALUES (@AccountCode, @Amount)";
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@AccountCode", selectedCode);
-                    cmd.Parameters.AddWithValue("@Amount", amount);
-                    try
-                    {
-                        conn.Open(); cmd.ExecuteNonQuery();
-                        ClearExpenseInputs();
-                        LoadExpensesData();
-                        MessageBox.Show("تم تسجيل المصروف بنجاح بالتاريخ والوقت اللحظي!", "تم التسجيل", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                TreasuryRepository.AddExpense(selectedCode, amount);
+                ClearExpenseInputs();
+                LoadExpensesData();
+                MessageBox.Show("تم تسجيل المصروف بنجاح بالتاريخ والوقت اللحظي!", "تم التسجيل", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void DgvExpenses_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -318,25 +299,15 @@ namespace Temo_Mobile_Store
             }
 
             int selectedCode = Convert.ToInt32(cmbExpenseAccounts.SelectedValue);
-            string query = "UPDATE Expenses SET AccountCode = @AccountCode, Amount = @Amount WHERE ExpenseID = @ExpenseID";
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@AccountCode", selectedCode);
-                    cmd.Parameters.AddWithValue("@Amount", amount);
-                    cmd.Parameters.AddWithValue("@ExpenseID", selectedExpenseID);
-                    try
-                    {
-                        conn.Open(); cmd.ExecuteNonQuery();
-                        btnSaveExpenseUpdate.Enabled = false;
-                        ClearExpenseInputs();
-                        LoadExpensesData();
-                        MessageBox.Show("تم تعديل قيمة المصروف وتحديث الخلاصة المالية بنجاح!", "تم التعديل", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                TreasuryRepository.UpdateExpense(selectedExpenseID, selectedCode, amount);
+                btnSaveExpenseUpdate.Enabled = false;
+                ClearExpenseInputs();
+                LoadExpensesData();
+                MessageBox.Show("تم تعديل قيمة المصروف وتحديث الخلاصة المالية بنجاح!", "تم التعديل", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void BtnDeleteExpense_Click(object sender, EventArgs e)
@@ -351,22 +322,14 @@ namespace Temo_Mobile_Store
 
             if (MessageBox.Show("هل أنت متأكد من حذف حركة المصروف هذه نهائياً؟", "تأكيد الحذف", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
             {
-                string query = "DELETE FROM Expenses WHERE ExpenseID = @ExpenseID";
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+                try
                 {
-                    using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@ExpenseID", selectedExpenseID);
-                        try
-                        {
-                            conn.Open(); cmd.ExecuteNonQuery();
-                            ClearExpenseInputs();
-                            LoadExpensesData();
-                            MessageBox.Show("تم حذف حركة المصروف بنجاح!", "تم الحذف", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                        catch (Exception ex) { MessageBox.Show(ex.Message); }
-                    }
+                    TreasuryRepository.DeleteExpense(selectedExpenseID);
+                    ClearExpenseInputs();
+                    LoadExpensesData();
+                    MessageBox.Show("تم حذف حركة المصروف بنجاح!", "تم الحذف", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
+                catch (Exception ex) { MessageBox.Show(ex.Message); }
             }
         }
 
@@ -379,38 +342,12 @@ namespace Temo_Mobile_Store
 
         private void LoadExpensesData()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] {
-                new DataColumn("رقم الحركة"),
-                new DataColumn("كود الحساب"),
-                new DataColumn("اسم بند المصروف"),
-                new DataColumn("المبلغ ج.م"),
-                new DataColumn("التاريخ والوقت ⏰")
-            });
-
-            string query = @"SELECT E.ExpenseID, E.AccountCode, A.AccountName, E.Amount, E.ExpenseDate 
-                             FROM Expenses E 
-                             INNER JOIN AccountsTree A ON E.AccountCode = A.AccountCode 
-                             ORDER BY E.ExpenseID ASC";
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                dt.Rows.Add(reader["ExpenseID"], reader["AccountCode"], reader["AccountName"], reader["Amount"], reader["ExpenseDate"]);
-                        }
-                        dgvExpenses.DataSource = dt;
-                        if (dgvExpenses.Columns["كود الحساب"] != null) dgvExpenses.Columns["كود الحساب"].Visible = false;
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                dgvExpenses.DataSource = TreasuryRepository.GetExpenses();
+                if (dgvExpenses.Columns["كود الحساب"] != null) dgvExpenses.Columns["كود الحساب"].Visible = false;
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         // ==========================================================================
@@ -432,64 +369,16 @@ namespace Temo_Mobile_Store
 
             string type = cmbMovementType.SelectedItem.ToString();
             string method = cmbPaymentMethod.SelectedItem.ToString();
+            int? accountCode = cmbMovementAccount.SelectedValue != null ? Convert.ToInt32(cmbMovementAccount.SelectedValue) : (int?)null;
 
             try
             {
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-                {
-                    conn.Open();
-                    using (SqliteTransaction transaction = conn.BeginTransaction())
-                    {
-                        try
-                        {
-                            decimal currentBalance = 0;
-                            using (SqliteCommand cmdBalance = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmdBalance.Parameters.AddWithValue("@Method", method);
-                                var result = cmdBalance.ExecuteScalar();
-                                if (result != null) currentBalance = Convert.ToDecimal(result);
-                            }
-
-                            if (type == "صرف" && amount > currentBalance)
-                            {
-                                transaction.Rollback();
-                                MessageBox.Show($"الرصيد الحالي في \"{method}\" هو {currentBalance} فقط، لا يمكن صرف مبلغ أكبر منه.", "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                return;
-                            }
-
-                            object accountCodeParam = (cmbMovementAccount.SelectedValue != null) ? (object)Convert.ToInt32(cmbMovementAccount.SelectedValue) : DBNull.Value;
-
-                            using (SqliteCommand cmdInsert = new SqliteCommand(
-                                "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode) VALUES (@Date, @Type, @Method, @Amount, @Ref, @Desc, @CreatedAt, @AccountCode)", conn, transaction))
-                            {
-                                cmdInsert.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
-                                cmdInsert.Parameters.AddWithValue("@Type", type);
-                                cmdInsert.Parameters.AddWithValue("@Method", method);
-                                cmdInsert.Parameters.AddWithValue("@Amount", amount);
-                                cmdInsert.Parameters.AddWithValue("@Ref", txtMovementReference.Text);
-                                cmdInsert.Parameters.AddWithValue("@Desc", txtMovementDescription.Text);
-                                cmdInsert.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                                cmdInsert.Parameters.AddWithValue("@AccountCode", accountCodeParam);
-                                cmdInsert.ExecuteNonQuery();
-                            }
-
-                            decimal newBalance = type == "قبض" ? currentBalance + amount : currentBalance - amount;
-                            using (SqliteCommand cmdUpdate = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = @NewBalance WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmdUpdate.Parameters.AddWithValue("@NewBalance", newBalance);
-                                cmdUpdate.Parameters.AddWithValue("@Method", method);
-                                cmdUpdate.ExecuteNonQuery();
-                            }
-
-                            transaction.Commit();
-                        }
-                        catch
-                        {
-                            transaction.Rollback();
-                            throw;
-                        }
-                    }
-                }
+                TreasuryRepository.AddMovement(type, method, amount, txtMovementReference.Text, txtMovementDescription.Text, accountCode);
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
             catch (Exception ex)
             {
@@ -508,28 +397,12 @@ namespace Temo_Mobile_Store
 
         private void LoadCashMovements()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("Id"), new DataColumn("النوع"), new DataColumn("الوسيلة"), new DataColumn("المبلغ"), new DataColumn("المرجع"), new DataColumn("الوصف"), new DataColumn("التاريخ والوقت") });
-
-            string query = "SELECT Id, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt FROM CashMovements ORDER BY Id DESC";
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                dt.Rows.Add(reader["Id"], reader["MovementType"], reader["PaymentMethod"], reader["Amount"], reader["ReferenceNumber"], reader["Description"], reader["CreatedAt"]);
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                dgvCashMovements.DataSource = TreasuryRepository.GetCashMovements();
+                if (dgvCashMovements.Columns["Id"] != null) dgvCashMovements.Columns["Id"].Visible = false;
             }
-            dgvCashMovements.DataSource = dt;
-            if (dgvCashMovements.Columns["Id"] != null) dgvCashMovements.Columns["Id"].Visible = false;
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void CmbPaymentMethod_SelectedIndexChanged(object sender, EventArgs e)
@@ -537,19 +410,7 @@ namespace Temo_Mobile_Store
             if (cmbPaymentMethod.SelectedItem == null) return;
 
             string method = cmbPaymentMethod.SelectedItem.ToString();
-            decimal balance = 0;
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                string query = "SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method";
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@Method", method);
-                    conn.Open();
-                    var result = cmd.ExecuteScalar();
-                    if (result != null) balance = Convert.ToDecimal(result);
-                }
-            }
+            decimal balance = TreasuryRepository.GetPaymentMethodBalance(method);
 
             lblMethodBalance.Text = $"الرصيد الحالي في \"{method}\": {balance} جنيه";
         }
@@ -567,35 +428,24 @@ namespace Temo_Mobile_Store
 
         private void LoadMovementIntoFields(int movementId)
         {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("SELECT MovementType, PaymentMethod, Amount, ReferenceNumber, Description, AccountCode FROM CashMovements WHERE Id = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", movementId);
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                selectedMovementId = movementId;
-                                cmbMovementType.Text = reader["MovementType"].ToString();
-                                cmbPaymentMethod.Text = reader["PaymentMethod"].ToString();
-                                txtMovementAmount.Text = reader["Amount"].ToString();
-                                txtMovementReference.Text = reader["ReferenceNumber"]?.ToString();
-                                txtMovementDescription.Text = reader["Description"]?.ToString();
-                                if (reader["AccountCode"] != DBNull.Value)
-                                    cmbMovementAccount.SelectedValue = Convert.ToInt32(reader["AccountCode"]);
-                                else
-                                    cmbMovementAccount.SelectedIndex = -1;
-                                btnSaveMovementEdit.Enabled = false;
-                            }
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                CashMovementRecord record = TreasuryRepository.GetMovementById(movementId);
+                if (record == null) return;
+
+                selectedMovementId = movementId;
+                cmbMovementType.Text = record.MovementType;
+                cmbPaymentMethod.Text = record.PaymentMethod;
+                txtMovementAmount.Text = record.Amount.ToString();
+                txtMovementReference.Text = record.ReferenceNumber;
+                txtMovementDescription.Text = record.Description;
+                if (record.AccountCode.HasValue)
+                    cmbMovementAccount.SelectedValue = record.AccountCode.Value;
+                else
+                    cmbMovementAccount.SelectedIndex = -1;
+                btnSaveMovementEdit.Enabled = false;
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void BtnEditMovement_Click(object sender, EventArgs e)
@@ -606,25 +456,14 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            string movementDateStr = null;
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT MovementDate FROM CashMovements WHERE Id = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedMovementId);
-                    var res = cmd.ExecuteScalar();
-                    if (res != null) movementDateStr = res.ToString();
-                }
-            }
-
-            if (movementDateStr == null)
+            CashMovementRecord existing = TreasuryRepository.GetMovementById(selectedMovementId);
+            if (existing == null)
             {
                 MessageBox.Show("لم يتم العثور على الحركة.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            if (IsDateClosed(DateTime.Parse(movementDateStr).Date))
+            if (IsDateClosed(DateTime.Parse(existing.MovementDate).Date))
             {
                 MessageBox.Show("لا يمكن تعديل حركة تابعة ليوم تم إقفاله بالفعل.", "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -650,108 +489,29 @@ namespace Temo_Mobile_Store
             string newType = cmbMovementType.SelectedItem.ToString();
             string newMethod = cmbPaymentMethod.SelectedItem.ToString();
 
+            CashMovementRecord existing = TreasuryRepository.GetMovementById(selectedMovementId);
+            if (existing == null)
+            {
+                MessageBox.Show("لم يتم العثور على الحركة.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (IsDateClosed(DateTime.Parse(existing.MovementDate).Date))
+            {
+                MessageBox.Show("لا يمكن تعديل حركة تابعة ليوم تم إقفاله بالفعل.", "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            int? accountCode = cmbMovementAccount.SelectedValue != null ? Convert.ToInt32(cmbMovementAccount.SelectedValue) : (int?)null;
+
             try
             {
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-                {
-                    conn.Open();
-                    using (SqliteTransaction transaction = conn.BeginTransaction())
-                    {
-                        try
-                        {
-                            string oldType = null, oldMethod = null, movementDateStr = null;
-                            decimal oldAmount = 0;
-                            using (SqliteCommand cmd = new SqliteCommand("SELECT MovementType, PaymentMethod, Amount, MovementDate FROM CashMovements WHERE Id = @Id", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Id", selectedMovementId);
-                                using (SqliteDataReader reader = cmd.ExecuteReader())
-                                {
-                                    if (!reader.Read())
-                                    {
-                                        transaction.Rollback();
-                                        MessageBox.Show("لم يتم العثور على الحركة.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                        return;
-                                    }
-                                    oldType = reader["MovementType"].ToString();
-                                    oldMethod = reader["PaymentMethod"].ToString();
-                                    oldAmount = Convert.ToDecimal(reader["Amount"]);
-                                    movementDateStr = reader["MovementDate"].ToString();
-                                }
-                            }
-
-                            if (IsDateClosed(DateTime.Parse(movementDateStr).Date))
-                            {
-                                transaction.Rollback();
-                                MessageBox.Show("لا يمكن تعديل حركة تابعة ليوم تم إقفاله بالفعل.", "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                return;
-                            }
-
-                            decimal oldMethodBalance = 0;
-                            using (SqliteCommand cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Method", oldMethod);
-                                var res = cmd.ExecuteScalar();
-                                if (res != null) oldMethodBalance = Convert.ToDecimal(res);
-                            }
-                            decimal revertedOldBalance = oldType == "قبض" ? oldMethodBalance - oldAmount : oldMethodBalance + oldAmount;
-
-                            decimal newMethodBalance = revertedOldBalance;
-                            if (newMethod != oldMethod)
-                            {
-                                using (SqliteCommand cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn, transaction))
-                                {
-                                    cmd.Parameters.AddWithValue("@Method", newMethod);
-                                    var res = cmd.ExecuteScalar();
-                                    if (res != null) newMethodBalance = Convert.ToDecimal(res);
-                                }
-                            }
-
-                            if (newType == "صرف" && newAmount > newMethodBalance)
-                            {
-                                transaction.Rollback();
-                                MessageBox.Show($"الرصيد المتاح في \"{newMethod}\" هو {newMethodBalance} فقط، لا يمكن صرف مبلغ أكبر منه.", "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                return;
-                            }
-
-                            using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = @Balance WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Balance", revertedOldBalance);
-                                cmd.Parameters.AddWithValue("@Method", oldMethod);
-                                cmd.ExecuteNonQuery();
-                            }
-
-                            decimal finalNewBalance = newType == "قبض" ? newMethodBalance + newAmount : newMethodBalance - newAmount;
-                            using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = @Balance WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Balance", finalNewBalance);
-                                cmd.Parameters.AddWithValue("@Method", newMethod);
-                                cmd.ExecuteNonQuery();
-                            }
-
-                            object accountCodeParam = (cmbMovementAccount.SelectedValue != null) ? (object)Convert.ToInt32(cmbMovementAccount.SelectedValue) : DBNull.Value;
-
-                            using (SqliteCommand cmd = new SqliteCommand(
-                                "UPDATE CashMovements SET MovementType = @Type, PaymentMethod = @Method, Amount = @Amount, ReferenceNumber = @Ref, Description = @Desc, AccountCode = @AccountCode WHERE Id = @Id", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Type", newType);
-                                cmd.Parameters.AddWithValue("@Method", newMethod);
-                                cmd.Parameters.AddWithValue("@Amount", newAmount);
-                                cmd.Parameters.AddWithValue("@Ref", txtMovementReference.Text);
-                                cmd.Parameters.AddWithValue("@Desc", txtMovementDescription.Text);
-                                cmd.Parameters.AddWithValue("@AccountCode", accountCodeParam);
-                                cmd.Parameters.AddWithValue("@Id", selectedMovementId);
-                                cmd.ExecuteNonQuery();
-                            }
-
-                            transaction.Commit();
-                        }
-                        catch
-                        {
-                            transaction.Rollback();
-                            throw;
-                        }
-                    }
-                }
+                TreasuryRepository.UpdateMovement(selectedMovementId, newType, newMethod, newAmount, txtMovementReference.Text, txtMovementDescription.Text, accountCode);
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
             catch (Exception ex)
             {
@@ -777,30 +537,14 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            string type = null, method = null, movementDateStr = null;
-            decimal amount = 0;
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            CashMovementRecord existing = TreasuryRepository.GetMovementById(selectedMovementId);
+            if (existing == null)
             {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT MovementType, PaymentMethod, Amount, MovementDate FROM CashMovements WHERE Id = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedMovementId);
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        if (!reader.Read())
-                        {
-                            MessageBox.Show("لم يتم العثور على الحركة.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            return;
-                        }
-                        type = reader["MovementType"].ToString();
-                        method = reader["PaymentMethod"].ToString();
-                        amount = Convert.ToDecimal(reader["Amount"]);
-                        movementDateStr = reader["MovementDate"].ToString();
-                    }
-                }
+                MessageBox.Show("لم يتم العثور على الحركة.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
 
-            if (IsDateClosed(DateTime.Parse(movementDateStr).Date))
+            if (IsDateClosed(DateTime.Parse(existing.MovementDate).Date))
             {
                 MessageBox.Show("لا يمكن إلغاء حركة تابعة ليوم تم إقفاله بالفعل.", "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -811,44 +555,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-                {
-                    conn.Open();
-                    using (SqliteTransaction transaction = conn.BeginTransaction())
-                    {
-                        try
-                        {
-                            decimal currentBalance = 0;
-                            using (SqliteCommand cmdBalance = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmdBalance.Parameters.AddWithValue("@Method", method);
-                                var result = cmdBalance.ExecuteScalar();
-                                if (result != null) currentBalance = Convert.ToDecimal(result);
-                            }
-
-                            decimal newBalance = type == "قبض" ? currentBalance - amount : currentBalance + amount;
-                            using (SqliteCommand cmdUpdate = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = @NewBalance WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmdUpdate.Parameters.AddWithValue("@NewBalance", newBalance);
-                                cmdUpdate.Parameters.AddWithValue("@Method", method);
-                                cmdUpdate.ExecuteNonQuery();
-                            }
-
-                            using (SqliteCommand cmdDelete = new SqliteCommand("DELETE FROM CashMovements WHERE Id = @Id", conn, transaction))
-                            {
-                                cmdDelete.Parameters.AddWithValue("@Id", selectedMovementId);
-                                cmdDelete.ExecuteNonQuery();
-                            }
-
-                            transaction.Commit();
-                        }
-                        catch
-                        {
-                            transaction.Rollback();
-                            throw;
-                        }
-                    }
-                }
+                TreasuryRepository.CancelMovement(selectedMovementId, existing.MovementType, existing.PaymentMethod, existing.Amount);
             }
             catch (Exception ex)
             {

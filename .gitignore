@@ -10,3 +10,8 @@ TemoStoreDB.db-shm
 TemoStoreDB.db-wal
 license.dat
 remote_server_log.txt
+*.db.bak
+*.db.before-password-reset.bak
+
+# إعدادات محلية خاصة بالبيئة - مش جزء من المشروع
+.claude/settings.local.json
