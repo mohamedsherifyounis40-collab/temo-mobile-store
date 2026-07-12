@@ -35,6 +35,7 @@ namespace Temo_Mobile_Store
             public const string Treasury = "Treasury";
             public const string Reports = "Reports";
             public const string Accounts = "Accounts";
+            public const string Attendance = "Attendance";
             public const string Settings = "Settings";
         }
 
@@ -80,6 +81,7 @@ namespace Temo_Mobile_Store
             (PageKeys.Treasury,       "الخزينة",    "🏦"),
             (PageKeys.Reports,        "التقارير",   "📊"),
             (PageKeys.Accounts,       "الحسابات",   "📒"),
+            (PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
             (PageKeys.Settings,       "الإعدادات",  "⚙️"),
         };
 
@@ -175,7 +177,7 @@ namespace Temo_Mobile_Store
             };
 
             // العناصر المخصصة للأدمن بس - نفس القائمة بالظبط اللي في Form1.cs (ApplyEmployeeRestrictions)
-            var adminOnlyKeys = new HashSet<string> { PageKeys.Customers, PageKeys.Suppliers, PageKeys.Reports, PageKeys.Accounts, PageKeys.Settings, PageKeys.InventoryCount };
+            var adminOnlyKeys = new HashSet<string> { PageKeys.Customers, PageKeys.Suppliers, PageKeys.Reports, PageKeys.Accounts, PageKeys.Settings, PageKeys.InventoryCount, PageKeys.Attendance };
             var visibleNavItems = AuthManager.IsAdmin
                 ? navItems
                 : navItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
@@ -296,12 +298,81 @@ namespace Temo_Mobile_Store
             pnlBellHolder.Controls.Add(lblBellBadge);
             lblBellBadge.BringToFront();
 
+            Panel pnlLicenseHolder = BuildLicenseBadge();
+
             pnlTopBar.Controls.Add(lblPageTitle);
+            pnlTopBar.Controls.Add(pnlLicenseHolder);
             pnlTopBar.Controls.Add(pnlDateHolder);
             pnlTopBar.Controls.Add(pnlBellHolder);
             this.Controls.Add(pnlTopBar);
 
             RefreshNotificationBadge();
+        }
+
+        // ==========================================================================
+        // بادچ مدة انتهاء الترخيص في الشريط العلوي - لونه بيتغيّر حسب قرب الانتهاء
+        // (البرنامج أصلاً مبيوصلش لـ MainShell غير لو الترخيص سليم وقت التشغيل،
+        // فده مجرد عرض تذكيري بيبقى شكله شيك، مش بوابة فحص تانية)
+        // ==========================================================================
+        private Panel BuildLicenseBadge()
+        {
+            Panel holder = new Panel { Dock = DockStyle.Right, Width = 190 };
+
+            if (!LicenseManager.CheckSavedLicense(out DateTime? expiration, out _) || !expiration.HasValue)
+                return holder;
+
+            int daysLeft = (expiration.Value.Date - DateTime.Now.Date).Days;
+            Color accent;
+            string icon, text;
+
+            if (daysLeft < 0)
+            {
+                accent = Color.FromArgb(231, 76, 60);
+                icon = "⛔";
+                text = "الترخيص منتهي";
+            }
+            else if (daysLeft <= 7)
+            {
+                accent = Color.FromArgb(231, 76, 60);
+                icon = "⚠️";
+                text = $"باقي {daysLeft} يوم على الترخيص";
+            }
+            else if (daysLeft <= 30)
+            {
+                accent = Color.FromArgb(243, 156, 18);
+                icon = "⏳";
+                text = $"باقي {daysLeft} يوم على الترخيص";
+            }
+            else
+            {
+                accent = Color.FromArgb(39, 174, 96);
+                icon = "✅";
+                text = "الترخيص ساري";
+            }
+
+            Guna2Panel pill = new Guna2Panel
+            {
+                Size = new Size(175, 34),
+                Location = new Point(8, 13),
+                BorderRadius = 17,
+                FillColor = LightTint(accent, 0.88f),
+                BorderColor = accent,
+                BorderThickness = 1
+            };
+            Label lblBadge = new Label
+            {
+                Text = $"{icon} {text}",
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = accent,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Dock = DockStyle.Fill
+            };
+            var tip = new ToolTip();
+            tip.SetToolTip(lblBadge, "تاريخ انتهاء الترخيص: " + expiration.Value.ToString("yyyy-MM-dd"));
+
+            pill.Controls.Add(lblBadge);
+            holder.Controls.Add(pill);
+            return holder;
         }
 
         // ==========================================================================
@@ -501,6 +572,8 @@ namespace Temo_Mobile_Store
                 BuildReportsPage();
             else if (pageKey == PageKeys.Accounts)
                 BuildAccountsPage();
+            else if (pageKey == PageKeys.Attendance)
+                BuildAttendancePage();
             else if (pageKey == PageKeys.Settings)
                 BuildSettingsPage();
             else
@@ -525,6 +598,16 @@ namespace Temo_Mobile_Store
             pnlContent.Controls.Clear();
             AccountsPageControl accountsPage = new AccountsPageControl { Dock = DockStyle.Fill };
             pnlContent.Controls.Add(accountsPage);
+        }
+
+        // ==========================================================================
+        // بناء صفحة "الحضور والمرتبات" - أدمن فقط (AttendancePageControl)
+        // ==========================================================================
+        private void BuildAttendancePage()
+        {
+            pnlContent.Controls.Clear();
+            AttendancePageControl attendancePage = new AttendancePageControl { Dock = DockStyle.Fill };
+            pnlContent.Controls.Add(attendancePage);
         }
 
         // ==========================================================================
