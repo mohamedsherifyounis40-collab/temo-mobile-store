@@ -176,6 +176,24 @@ namespace Temo_Mobile_Store.Database
                     LogoImage BLOB
                 );");
 
+                ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS Employees (
+                    EmployeeId INTEGER PRIMARY KEY AUTOINCREMENT,
+                    FullName TEXT NOT NULL,
+                    Phone TEXT,
+                    MonthlySalary REAL NOT NULL DEFAULT 0,
+                    HireDate TEXT NOT NULL DEFAULT (date('now','localtime')),
+                    CreatedAt TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+                );");
+
+                ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS AttendanceRecords (
+                    AttendanceId INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EmployeeId INTEGER NOT NULL,
+                    AttendanceDate TEXT NOT NULL,
+                    Status TEXT NOT NULL,
+                    CreatedAt TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    UNIQUE(EmployeeId, AttendanceDate)
+                );");
+
                 // ---------- بيانات أساسية لازمة عشان البرنامج يشتغل صح من أول تشغيل ----------
 
                 // صف افتراضي لإعدادات المحل (لو مش موجود)
