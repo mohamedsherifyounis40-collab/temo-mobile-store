@@ -1,13 +1,24 @@
 var builder = WebApplication.CreateBuilder(args);
+
+// وقت التشغيل المحلي، السيكرتات بتتحمّل من secrets.local.json (ملف مش متتبّع في git خالص -
+// شايفه .gitignore) بدل ما تتحط كـ Environment Variable على سطر الأوامر (ده كان بيسجّلها في
+// تاريخ الشِل). وقت النشر الفعلي (Render/Koyeb/...) بتتحط زي العادي كـ Environment Variables،
+// وهي بتاخد أولوية أعلى من الملف المحلي لو الاتنين موجودين.
+builder.Configuration.AddJsonFile("secrets.local.json", optional: true, reloadOnChange: false);
+// بتتحط تاني هنا عمدًا عشان تفضل الأولوية الأعلى لو حد حط Environment Variable حقيقي
+// (زي وقت النشر على استضافة سحابية) فوق قيمة الملف المحلي
+builder.Configuration.AddEnvironmentVariables();
+
 var app = builder.Build();
 
 string dbPath = Path.Combine(AppContext.BaseDirectory, "catalog.db");
 CatalogDb.Init(dbPath);
 
-// السيكرت اللي البرنامج بيبعته وقت المزامنة (اسم/سعر/كمية بس)، ومنفصل عن كلمة سر الإدارة
-string syncSecret = Environment.GetEnvironmentVariable("SYNC_SECRET") ?? "change-me-please";
-// كلمة سر صفحة إدارة الموقع (صورة + سعر قبل الخصم) - منفصلة تمامًا عن نظام مستخدمين برنامج المحل
-string adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD") ?? "change-me-please";
+// السيكرت اللي البرنامج بيبعته وقت المزامنة (اسم/سعر/كمية بس)، ومنفصل عن حساب الإدارة
+string syncSecret = builder.Configuration["SYNC_SECRET"] ?? "change-me-please";
+// يوزر/باسورد صفحة إدارة الموقع (صورة + سعر قبل الخصم) - منفصلين تمامًا عن نظام مستخدمين برنامج المحل
+string adminUsername = builder.Configuration["ADMIN_USERNAME"] ?? "admin";
+string adminPassword = builder.Configuration["ADMIN_PASSWORD"] ?? "change-me-please";
 
 app.MapGet("/", () => Results.Content(Pages.CatalogHtml, "text/html; charset=utf-8"));
 
@@ -47,13 +58,13 @@ app.MapPost("/api/sync", async (HttpRequest request) =>
 
 app.MapGet("/admin", (HttpRequest request) =>
 {
-    if (!AdminAuth.Check(request, adminPassword)) return AdminAuth.UnauthorizedPrompt();
+    if (!AdminAuth.Check(request, adminUsername, adminPassword)) return AdminAuth.UnauthorizedPrompt();
     return Results.Content(Pages.BuildAdminHtml(CatalogDb.GetProducts()), "text/html; charset=utf-8");
 });
 
 app.MapPost("/admin/products/{barcode}/image", async (string barcode, HttpRequest request) =>
 {
-    if (!AdminAuth.Check(request, adminPassword)) return AdminAuth.UnauthorizedPrompt();
+    if (!AdminAuth.Check(request, adminUsername, adminPassword)) return AdminAuth.UnauthorizedPrompt();
 
     if (!request.HasFormContentType) return Results.BadRequest("مفيش صورة مرفوعة.");
     var form = await request.ReadFormAsync();
@@ -71,7 +82,7 @@ app.MapPost("/admin/products/{barcode}/image", async (string barcode, HttpReques
 
 app.MapPost("/admin/products/{barcode}/price", async (string barcode, HttpRequest request) =>
 {
-    if (!AdminAuth.Check(request, adminPassword)) return AdminAuth.UnauthorizedPrompt();
+    if (!AdminAuth.Check(request, adminUsername, adminPassword)) return AdminAuth.UnauthorizedPrompt();
 
     var form = await request.ReadFormAsync();
     string? originalPriceText = form["originalPrice"];

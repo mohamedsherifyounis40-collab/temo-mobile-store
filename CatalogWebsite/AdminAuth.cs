@@ -7,7 +7,7 @@ using System.Text;
 // ==========================================================================
 public static class AdminAuth
 {
-    public static bool Check(HttpRequest request, string adminPassword)
+    public static bool Check(HttpRequest request, string adminUsername, string adminPassword)
     {
         string? authHeader = request.Headers["Authorization"];
         if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Basic ")) return false;
@@ -19,8 +19,9 @@ public static class AdminAuth
             int sep = decoded.IndexOf(':');
             if (sep < 0) return false;
 
+            string username = decoded[..sep];
             string password = decoded[(sep + 1)..];
-            return password == adminPassword;
+            return username == adminUsername && password == adminPassword;
         }
         catch
         {
