@@ -81,23 +81,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         // نفس تنسيق الجداول المستخدم في كل شاشات Form1.cs
         // ==========================================================================
-        private void StyleDataGridView(DataGridView dgv)
-        {
-            dgv.EnableHeadersVisualStyles = false;
-            dgv.ColumnHeadersDefaultCellStyle.BackColor = ColorPrimary;
-            dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10, FontStyle.Bold);
-            dgv.ColumnHeadersHeight = 40;
-            dgv.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F);
-            dgv.DefaultCellStyle.BackColor = Color.White;
-            dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(200, 210, 230);
-            dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary;
-            dgv.AlternatingRowsDefaultCellStyle.BackColor = ColorBackground;
-            dgv.GridColor = Color.FromArgb(230, 230, 230);
-            dgv.RowTemplate.Height = 32;
-            dgv.BorderStyle = BorderStyle.None;
-            dgv.BackgroundColor = Color.White;
-        }
+        private void StyleDataGridView(DataGridView dgv) => UIHelpers.StyleDataGridView(dgv);
 
         // ==========================================================================
         // تحميل جدول الجرد بكل المنتجات، وكمياتهم المسجّلة بالنظام
