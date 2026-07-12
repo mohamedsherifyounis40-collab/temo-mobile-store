@@ -128,20 +128,28 @@ partial class Program
 <style>
   * { box-sizing: border-box; }
   body { margin:0; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background:#F5F6FA; color:#1A2B4C; }
-  header { background:#1A2B4C; color:#fff; padding:22px 20px; text-align:center; }
-  header h1 { margin:0; font-size:22px; }
-  header p { margin:6px 0 0; font-size:13px; color:#9AA3B2; }
-  .wrap { padding:16px; max-width:960px; margin:0 auto; }
-  .search { width:100%; padding:12px 16px; border-radius:12px; border:1px solid #E1E4EA; font-size:14px; margin-bottom:16px; }
-  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:14px; }
-  .card { background:#fff; border-radius:14px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
-  .card .name { font-size:15px; font-weight:bold; margin-bottom:8px; min-height:38px; }
-  .card .price { font-size:18px; font-weight:bold; color:#1A2B4C; margin-bottom:8px; }
-  .badge { display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:bold; }
-  .badge.in { background:#E6F7EE; color:#27AE60; }
-  .badge.out { background:#FDEAEA; color:#E74C3C; }
-  .empty { text-align:center; color:#9AA3B2; padding:60px 0; }
-  .updated { text-align:center; color:#9AA3B2; font-size:11px; margin-top:24px; }
+  header { background:linear-gradient(135deg, #1A2B4C, #26406F); color:#fff; padding:36px 20px 44px; text-align:center; }
+  header h1 { margin:0; font-size:26px; letter-spacing:0.5px; }
+  header p { margin:8px 0 0; font-size:13px; color:#B9C2D6; }
+  .wrap { padding:0 16px 40px; max-width:1100px; margin:-26px auto 0; }
+  .search-bar { background:#fff; border-radius:14px; box-shadow:0 4px 16px rgba(26,43,76,0.12); padding:6px; display:flex; align-items:center; margin-bottom:22px; }
+  .search-bar span { padding:0 12px; font-size:16px; color:#9AA3B2; }
+  .search { flex:1; border:none; outline:none; padding:12px 4px; font-size:14px; background:transparent; font-family:inherit; }
+  .section-title { font-size:16px; font-weight:bold; color:#1A2B4C; margin:0 0 14px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap:16px; }
+  .card { position:relative; background:#fff; border-radius:16px; padding:0 0 14px; box-shadow:0 2px 10px rgba(26,43,76,0.07); overflow:hidden; transition:transform .15s ease, box-shadow .15s ease; }
+  .card:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(26,43,76,0.14); }
+  .thumb { height:130px; display:flex; align-items:center; justify-content:center; font-size:46px; background:linear-gradient(160deg, #F5F6FA, #E9ECF3); }
+  .card.out .thumb { filter:grayscale(1); opacity:0.6; }
+  .stock-badge { position:absolute; top:10px; inset-inline-start:10px; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:bold; z-index:2; }
+  .stock-badge.low { background:#FFF4E0; color:#C9821A; }
+  .stock-badge.out { background:#1A2B4C; color:#fff; }
+  .body { padding:12px 14px 0; }
+  .name { font-size:14px; font-weight:600; min-height:38px; line-height:1.35; margin-bottom:8px; color:#1A2B4C; }
+  .price { font-size:17px; font-weight:bold; color:#1A2B4C; }
+  .price.out { color:#9AA3B2; }
+  .empty { text-align:center; color:#9AA3B2; padding:70px 0; font-size:14px; }
+  .updated { text-align:center; color:#9AA3B2; font-size:11px; margin-top:28px; }
 </style>
 </head>
 <body>
@@ -150,13 +158,15 @@ partial class Program
   <p>كتالوج المنتجات المتاحة</p>
 </header>
 <div class=""wrap"">
-  <input class=""search"" id=""search"" placeholder=""ابحث عن منتج..."" oninput=""render()"">
+  <div class=""search-bar""><span>🔍</span><input class=""search"" id=""search"" placeholder=""ابحث عن منتج..."" oninput=""render()""></div>
+  <div class=""section-title"">📦 كل المنتجات</div>
   <div class=""grid"" id=""grid""></div>
   <div class=""empty"" id=""empty"" style=""display:none"">مفيش منتجات مطابقة.</div>
   <div class=""updated"" id=""updated""></div>
 </div>
 <script>
 let allProducts = [];
+const LOW_STOCK_THRESHOLD = 5;
 
 async function load() {
   try {
@@ -177,13 +187,23 @@ function render() {
   grid.innerHTML = '';
   empty.style.display = filtered.length === 0 ? 'block' : 'none';
   filtered.forEach(p => {
+    const outOfStock = p.quantity <= 0;
+    const lowStock = !outOfStock && p.quantity <= LOW_STOCK_THRESHOLD;
+
     const card = document.createElement('div');
-    card.className = 'card';
-    const inStock = p.quantity > 0;
+    card.className = 'card' + (outOfStock ? ' out' : '');
+
+    let badgeHtml = '';
+    if (outOfStock) badgeHtml = '<span class=""stock-badge out"">غير متوفر</span>';
+    else if (lowStock) badgeHtml = '<span class=""stock-badge low"">تبقى ' + p.quantity + ' فقط</span>';
+
     card.innerHTML =
-      '<div class=""name"">' + escapeHtml(p.productName) + '</div>' +
-      '<div class=""price"">' + p.salePrice.toFixed(2) + ' ج.م</div>' +
-      '<span class=""badge ' + (inStock ? 'in' : 'out') + '"">' + (inStock ? 'متوفر ✅' : 'غير متوفر ❌') + '</span>';
+      badgeHtml +
+      '<div class=""thumb"">📱</div>' +
+      '<div class=""body"">' +
+        '<div class=""name"">' + escapeHtml(p.productName) + '</div>' +
+        '<div class=""price' + (outOfStock ? ' out' : '') + '"">' + p.salePrice.toFixed(2) + ' ج.م</div>' +
+      '</div>';
     grid.appendChild(card);
   });
 }
