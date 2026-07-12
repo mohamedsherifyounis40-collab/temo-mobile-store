@@ -1,10 +1,8 @@
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
-using Microsoft.Data.Sqlite;
 
 namespace Temo_Mobile_Store
 {
@@ -100,72 +98,26 @@ namespace Temo_Mobile_Store
         private void LoadCollectCustomerCombo()
         {
             if (cmbCollectCustomer == null) return;
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("CustomerId", typeof(int)), new DataColumn("CustomerName") });
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("SELECT CustomerId, CustomerName FROM Customers ORDER BY CustomerName", conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                dt.Rows.Add(Convert.ToInt32(reader["CustomerId"]), reader["CustomerName"].ToString());
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                DataTable dt = CustomersRepository.GetCollectCustomerCombo();
+                cmbCollectCustomer.DataSource = dt;
+                cmbCollectCustomer.DisplayMember = "CustomerName";
+                cmbCollectCustomer.ValueMember = "CustomerId";
             }
-            cmbCollectCustomer.DataSource = dt;
-            cmbCollectCustomer.DisplayMember = "CustomerName";
-            cmbCollectCustomer.ValueMember = "CustomerId";
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void LoadCustomersGrid()
         {
             if (dgvCustomers == null) return;
-
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("CustomerId"), new DataColumn("اسم العميل"), new DataColumn("التليفون"), new DataColumn("إجمالي المبيعات بالآجل"), new DataColumn("إجمالي المحصّل"), new DataColumn("المتبقي عليه") });
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-                var customers = new List<(int id, string name, string phone)>();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT CustomerId, CustomerName, Phone FROM Customers ORDER BY CustomerName", conn))
-                {
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                            customers.Add((Convert.ToInt32(reader["CustomerId"]), reader["CustomerName"].ToString(), reader["Phone"]?.ToString()));
-                    }
-                }
-
-                foreach (var cust in customers)
-                {
-                    decimal totalCredit = 0, totalCollected = 0;
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Total) FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Credit'", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Id", cust.id);
-                        var res = cmd.ExecuteScalar();
-                        totalCredit = (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
-                    }
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM CashMovements WHERE CustomerId = @Id AND MovementType = 'قبض'", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Id", cust.id);
-                        var res = cmd.ExecuteScalar();
-                        totalCollected = (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
-                    }
-
-                    dt.Rows.Add(cust.id, cust.name, cust.phone, totalCredit.ToString("N2"), totalCollected.ToString("N2"), (totalCredit - totalCollected).ToString("N2"));
-                }
+                DataTable dt = CustomersRepository.GetCustomersWithBalances();
+                dgvCustomers.DataSource = dt;
+                if (dgvCustomers.Columns["CustomerId"] != null) dgvCustomers.Columns["CustomerId"].Visible = false;
             }
-
-            dgvCustomers.DataSource = dt;
-            if (dgvCustomers.Columns["CustomerId"] != null) dgvCustomers.Columns["CustomerId"].Visible = false;
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void DgvCustomers_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -182,33 +134,11 @@ namespace Temo_Mobile_Store
 
         private void LoadCustomerStatement(int customerId)
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("التاريخ"), new DataColumn("النوع"), new DataColumn("التفاصيل"), new DataColumn("المبلغ") });
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleDate, ProductName, Total FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Credit' ORDER BY SaleDate", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", customerId);
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                            dt.Rows.Add(reader["SaleDate"], "بيع آجل", reader["ProductName"], reader["Total"]);
-                    }
-                }
-                using (SqliteCommand cmd = new SqliteCommand("SELECT CreatedAt, Amount, PaymentMethod FROM CashMovements WHERE CustomerId = @Id AND MovementType = 'قبض' ORDER BY CreatedAt", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", customerId);
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                            dt.Rows.Add(reader["CreatedAt"], "تحصيل", "تحصيل عبر " + reader["PaymentMethod"], "-" + Convert.ToDecimal(reader["Amount"]).ToString("N2"));
-                    }
-                }
+                dgvCustomerStatement.DataSource = CustomersRepository.GetCustomerStatement(customerId);
             }
-
-            dgvCustomerStatement.DataSource = dt;
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void BtnAddCustomer_Click(object sender, EventArgs e)
@@ -219,17 +149,11 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Customers (CustomerName, Phone, CreatedAt) VALUES (@N, @P, @C)", conn))
-                {
-                    cmd.Parameters.AddWithValue("@N", txtCustomerName.Text.Trim());
-                    cmd.Parameters.AddWithValue("@P", string.IsNullOrWhiteSpace(txtCustomerPhone.Text) ? (object)DBNull.Value : txtCustomerPhone.Text.Trim());
-                    cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    conn.Open();
-                    cmd.ExecuteNonQuery();
-                }
+                CustomersRepository.AddCustomer(txtCustomerName.Text.Trim(), string.IsNullOrWhiteSpace(txtCustomerPhone.Text) ? null : txtCustomerPhone.Text.Trim());
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم إضافة العميل بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             ClearCustomerInputs();
@@ -241,17 +165,11 @@ namespace Temo_Mobile_Store
         {
             if (selectedCustomerId == -1 || string.IsNullOrWhiteSpace(txtCustomerName.Text)) return;
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE Customers SET CustomerName = @N, Phone = @P WHERE CustomerId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@N", txtCustomerName.Text.Trim());
-                    cmd.Parameters.AddWithValue("@P", string.IsNullOrWhiteSpace(txtCustomerPhone.Text) ? (object)DBNull.Value : txtCustomerPhone.Text.Trim());
-                    cmd.Parameters.AddWithValue("@Id", selectedCustomerId);
-                    conn.Open();
-                    cmd.ExecuteNonQuery();
-                }
+                CustomersRepository.UpdateCustomer(selectedCustomerId, txtCustomerName.Text.Trim(), string.IsNullOrWhiteSpace(txtCustomerPhone.Text) ? null : txtCustomerPhone.Text.Trim());
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم تعديل بيانات العميل بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             ClearCustomerInputs();
@@ -267,17 +185,9 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-                int salesCount;
-                using (SqliteCommand cmd = new SqliteCommand("SELECT COUNT(*) FROM Sales WHERE CustomerId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedCustomerId);
-                    salesCount = Convert.ToInt32(cmd.ExecuteScalar());
-                }
-
-                if (salesCount > 0)
+                if (CustomersRepository.HasSales(selectedCustomerId))
                 {
                     MessageBox.Show("لا يمكن حذف هذا العميل لأن له مبيعات مسجّلة بالفعل.", "غير مسموح", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -286,12 +196,9 @@ namespace Temo_Mobile_Store
                 if (MessageBox.Show("هل أنت متأكد من حذف هذا العميل؟", "تأكيد الحذف", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                     return;
 
-                using (SqliteCommand cmd = new SqliteCommand("DELETE FROM Customers WHERE CustomerId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedCustomerId);
-                    cmd.ExecuteNonQuery();
-                }
+                CustomersRepository.DeleteCustomer(selectedCustomerId);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم حذف العميل بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             ClearCustomerInputs();
@@ -326,30 +233,11 @@ namespace Temo_Mobile_Store
             string method = cmbCollectPaymentMethod.SelectedItem.ToString();
             string customerName = cmbCollectCustomer.Text;
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-
-                using (SqliteCommand cmd = new SqliteCommand(
-                    "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, CustomerId) VALUES (@Date, 'قبض', @Method, @Amount, @Ref, @Desc, @CreatedAt, 1300, @CustomerId)", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
-                    cmd.Parameters.AddWithValue("@Method", method);
-                    cmd.Parameters.AddWithValue("@Amount", amount);
-                    cmd.Parameters.AddWithValue("@Ref", "");
-                    cmd.Parameters.AddWithValue("@Desc", "تحصيل من عميل: " + customerName);
-                    cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    cmd.Parameters.AddWithValue("@CustomerId", customerId);
-                    cmd.ExecuteNonQuery();
-                }
-
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = CurrentBalance + @Amount WHERE PaymentMethod = @Method", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Amount", amount);
-                    cmd.Parameters.AddWithValue("@Method", method);
-                    cmd.ExecuteNonQuery();
-                }
+                CustomersRepository.CollectFromCustomer(customerId, customerName, method, amount);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم تسجيل التحصيل بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             txtCollectAmount.Clear();
@@ -359,18 +247,6 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         // فحص هل تاريخ النهاردة تم إقفاله بالفعل (منع تحصيل في يوم مقفول)
         // ==========================================================================
-        private bool IsTodayClosed()
-        {
-            string dateStr = DateTime.Now.ToString("yyyy-MM-dd");
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT COUNT(*) FROM DailyClosures WHERE ClosureDate = @Date AND PaymentMethod = 'نقدي'", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Date", dateStr);
-                    return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-                }
-            }
-        }
+        private bool IsTodayClosed() => UIHelpers.IsTodayClosed();
     }
 }
