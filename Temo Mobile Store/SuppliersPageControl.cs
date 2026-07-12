@@ -5,7 +5,6 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
-using Microsoft.Data.Sqlite;
 
 namespace Temo_Mobile_Store
 {
@@ -38,8 +37,7 @@ namespace Temo_Mobile_Store
         private CheckBox chkPurchaseSerialized;
         private DataGridView dgvPurchaseCart;
         private Label lblPurchaseCartTotal;
-        private List<(string Barcode, string ProductName, int Qty, decimal UnitCost, decimal SalePrice, decimal LineTotal, bool IsSerialized, List<string> Imeis)> currentPurchaseItems
-            = new List<(string, string, int, decimal, decimal, decimal, bool, List<string>)>();
+        private List<PurchaseCartItem> currentPurchaseItems = new List<PurchaseCartItem>();
 
         // ---------- سداد مورد ----------
         private Guna2ComboBox cmbPaymentSupplier, cmbSupplierPaymentMethod;
@@ -219,75 +217,30 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void LoadSupplierCombos()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("SupplierId", typeof(int)), new DataColumn("SupplierName") });
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SupplierId, SupplierName FROM Suppliers ORDER BY SupplierName", conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                dt.Rows.Add(Convert.ToInt32(reader["SupplierId"]), reader["SupplierName"].ToString());
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                DataTable dt = SuppliersRepository.GetSupplierCombos();
+
+                cmbPurchaseSupplier.DataSource = dt.Copy();
+                cmbPurchaseSupplier.DisplayMember = "SupplierName";
+                cmbPurchaseSupplier.ValueMember = "SupplierId";
+
+                cmbPaymentSupplier.DataSource = dt.Copy();
+                cmbPaymentSupplier.DisplayMember = "SupplierName";
+                cmbPaymentSupplier.ValueMember = "SupplierId";
             }
-
-            cmbPurchaseSupplier.DataSource = dt.Copy();
-            cmbPurchaseSupplier.DisplayMember = "SupplierName";
-            cmbPurchaseSupplier.ValueMember = "SupplierId";
-
-            cmbPaymentSupplier.DataSource = dt.Copy();
-            cmbPaymentSupplier.DisplayMember = "SupplierName";
-            cmbPaymentSupplier.ValueMember = "SupplierId";
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void LoadSuppliersGrid()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("SupplierId"), new DataColumn("اسم المورد"), new DataColumn("التليفون"), new DataColumn("إجمالي المشتريات"), new DataColumn("إجمالي المسدد"), new DataColumn("المتبقي") });
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-                var suppliers = new List<(int id, string name, string phone)>();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SupplierId, SupplierName, Phone FROM Suppliers ORDER BY SupplierName", conn))
-                {
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                            suppliers.Add((Convert.ToInt32(reader["SupplierId"]), reader["SupplierName"].ToString(), reader["Phone"]?.ToString()));
-                    }
-                }
-
-                foreach (var sup in suppliers)
-                {
-                    decimal totalPurchases = 0, totalPaid = 0;
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(TotalAmount) FROM Purchases WHERE SupplierId = @Id", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Id", sup.id);
-                        var res = cmd.ExecuteScalar();
-                        totalPurchases = (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
-                    }
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM CashMovements WHERE SupplierId = @Id AND MovementType = 'صرف'", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Id", sup.id);
-                        var res = cmd.ExecuteScalar();
-                        totalPaid = (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
-                    }
-
-                    dt.Rows.Add(sup.id, sup.name, sup.phone, totalPurchases.ToString("N2"), totalPaid.ToString("N2"), (totalPurchases - totalPaid).ToString("N2"));
-                }
+                DataTable dt = SuppliersRepository.GetSuppliersWithBalances();
+                dgvSuppliers.DataSource = dt;
+                if (dgvSuppliers.Columns["SupplierId"] != null) dgvSuppliers.Columns["SupplierId"].Visible = false;
             }
-
-            dgvSuppliers.DataSource = dt;
-            if (dgvSuppliers.Columns["SupplierId"] != null) dgvSuppliers.Columns["SupplierId"].Visible = false;
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void DgvSuppliers_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -304,33 +257,11 @@ namespace Temo_Mobile_Store
 
         private void LoadSupplierStatement(int supplierId)
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("التاريخ"), new DataColumn("النوع"), new DataColumn("التفاصيل"), new DataColumn("المبلغ") });
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT PurchaseId, PurchaseDate, TotalAmount, Notes FROM Purchases WHERE SupplierId = @Id ORDER BY PurchaseDate", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", supplierId);
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                            dt.Rows.Add(reader["PurchaseDate"], "فاتورة شراء", "فاتورة رقم " + reader["PurchaseId"], reader["TotalAmount"]);
-                    }
-                }
-                using (SqliteCommand cmd = new SqliteCommand("SELECT CreatedAt, Amount, PaymentMethod FROM CashMovements WHERE SupplierId = @Id AND MovementType = 'صرف' ORDER BY CreatedAt", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", supplierId);
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                            dt.Rows.Add(reader["CreatedAt"], "سداد", "سداد عبر " + reader["PaymentMethod"], "-" + Convert.ToDecimal(reader["Amount"]).ToString("N2"));
-                    }
-                }
+                dgvSupplierStatement.DataSource = SuppliersRepository.GetSupplierStatement(supplierId);
             }
-
-            dgvSupplierStatement.DataSource = dt;
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         // ==========================================================================
@@ -344,17 +275,11 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Suppliers (SupplierName, Phone, CreatedAt) VALUES (@N, @P, @C)", conn))
-                {
-                    cmd.Parameters.AddWithValue("@N", txtSupplierName.Text.Trim());
-                    cmd.Parameters.AddWithValue("@P", string.IsNullOrWhiteSpace(txtSupplierPhone.Text) ? (object)DBNull.Value : txtSupplierPhone.Text.Trim());
-                    cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    conn.Open();
-                    cmd.ExecuteNonQuery();
-                }
+                SuppliersRepository.AddSupplier(txtSupplierName.Text.Trim(), string.IsNullOrWhiteSpace(txtSupplierPhone.Text) ? null : txtSupplierPhone.Text.Trim());
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم إضافة المورد بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             ClearSupplierInputs();
@@ -366,17 +291,11 @@ namespace Temo_Mobile_Store
         {
             if (selectedSupplierId == -1 || string.IsNullOrWhiteSpace(txtSupplierName.Text)) return;
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE Suppliers SET SupplierName = @N, Phone = @P WHERE SupplierId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@N", txtSupplierName.Text.Trim());
-                    cmd.Parameters.AddWithValue("@P", string.IsNullOrWhiteSpace(txtSupplierPhone.Text) ? (object)DBNull.Value : txtSupplierPhone.Text.Trim());
-                    cmd.Parameters.AddWithValue("@Id", selectedSupplierId);
-                    conn.Open();
-                    cmd.ExecuteNonQuery();
-                }
+                SuppliersRepository.UpdateSupplier(selectedSupplierId, txtSupplierName.Text.Trim(), string.IsNullOrWhiteSpace(txtSupplierPhone.Text) ? null : txtSupplierPhone.Text.Trim());
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم تعديل بيانات المورد بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             ClearSupplierInputs();
@@ -392,17 +311,9 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-                int purchaseCount;
-                using (SqliteCommand cmd = new SqliteCommand("SELECT COUNT(*) FROM Purchases WHERE SupplierId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedSupplierId);
-                    purchaseCount = Convert.ToInt32(cmd.ExecuteScalar());
-                }
-
-                if (purchaseCount > 0)
+                if (SuppliersRepository.HasPurchases(selectedSupplierId))
                 {
                     MessageBox.Show("لا يمكن حذف هذا المورد لأن له فواتير شراء مسجّلة بالفعل.", "غير مسموح", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -411,12 +322,9 @@ namespace Temo_Mobile_Store
                 if (MessageBox.Show("هل أنت متأكد من حذف هذا المورد؟", "تأكيد الحذف", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                     return;
 
-                using (SqliteCommand cmd = new SqliteCommand("DELETE FROM Suppliers WHERE SupplierId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedSupplierId);
-                    cmd.ExecuteNonQuery();
-                }
+                SuppliersRepository.DeleteSupplier(selectedSupplierId);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             MessageBox.Show("تم حذف المورد بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
             ClearSupplierInputs();
@@ -439,30 +347,24 @@ namespace Temo_Mobile_Store
         {
             if (e.KeyCode != Keys.Enter || string.IsNullOrWhiteSpace(txtPurchaseBarcode.Text)) return;
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("SELECT ProductName, Price, SalePrice, IsSerialized FROM Products WHERE Barcode = @Barcode", conn))
+                ProductForPurchase product = SuppliersRepository.GetProductForPurchase(txtPurchaseBarcode.Text.Trim());
+                if (product != null)
                 {
-                    cmd.Parameters.AddWithValue("@Barcode", txtPurchaseBarcode.Text.Trim());
-                    conn.Open();
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            txtPurchaseProductName.Text = reader["ProductName"].ToString();
-                            txtPurchaseUnitCost.Text = reader["Price"].ToString();
-                            txtPurchaseSalePrice.Text = reader["SalePrice"].ToString();
-                            chkPurchaseSerialized.Checked = reader["IsSerialized"] != DBNull.Value && Convert.ToInt32(reader["IsSerialized"]) == 1;
-                        }
-                        else
-                        {
-                            txtPurchaseProductName.Clear();
-                            txtPurchaseSalePrice.Clear();
-                            MessageBox.Show("المنتج ده مش موجود في المخزون. اكتب اسمه وسعر بيعه المقترح عشان يتضاف كمنتج جديد.", "منتج جديد", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                    }
+                    txtPurchaseProductName.Text = product.ProductName;
+                    txtPurchaseUnitCost.Text = product.Price.ToString();
+                    txtPurchaseSalePrice.Text = product.SalePrice.ToString();
+                    chkPurchaseSerialized.Checked = product.IsSerialized;
+                }
+                else
+                {
+                    txtPurchaseProductName.Clear();
+                    txtPurchaseSalePrice.Clear();
+                    MessageBox.Show("المنتج ده مش موجود في المخزون. اكتب اسمه وسعر بيعه المقترح عشان يتضاف كمنتج جديد.", "منتج جديد", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void BtnAddPurchaseItem_Click(object sender, EventArgs e)
@@ -509,7 +411,17 @@ namespace Temo_Mobile_Store
             }
 
             decimal lineTotal = qty * unitCost;
-            currentPurchaseItems.Add((barcode, txtPurchaseProductName.Text.Trim(), qty, unitCost, salePrice, lineTotal, chkPurchaseSerialized.Checked, imeis));
+            currentPurchaseItems.Add(new PurchaseCartItem
+            {
+                Barcode = barcode,
+                ProductName = txtPurchaseProductName.Text.Trim(),
+                Qty = qty,
+                UnitCost = unitCost,
+                SalePrice = salePrice,
+                LineTotal = lineTotal,
+                IsSerialized = chkPurchaseSerialized.Checked,
+                Imeis = imeis
+            });
 
             RefreshPurchaseCartGrid();
 
@@ -567,164 +479,24 @@ namespace Temo_Mobile_Store
             int supplierId = Convert.ToInt32(cmbPurchaseSupplier.SelectedValue);
             decimal totalAmount = currentPurchaseItems.Sum(x => x.LineTotal);
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-
-                foreach (var checkItem in currentPurchaseItems)
-                {
-                    if (!checkItem.IsSerialized || checkItem.Imeis == null) continue;
-                    foreach (string imei in checkItem.Imeis)
-                    {
-                        using (SqliteCommand cmdCheckImei = new SqliteCommand("SELECT COUNT(*) FROM ProductUnits WHERE IMEI = @IMEI", conn))
-                        {
-                            cmdCheckImei.Parameters.AddWithValue("@IMEI", imei);
-                            if (Convert.ToInt32(cmdCheckImei.ExecuteScalar()) > 0)
-                            {
-                                MessageBox.Show($"رقم الـIMEI \"{imei}\" مسجل بالفعل في النظام من قبل. راجع القايمة وشيله أو صحّحه.", "رقم مكرر", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                if (payCashNow)
-                {
-                    decimal currentBalance = 0;
-                    using (SqliteCommand cmdBal = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn))
-                    {
-                        cmdBal.Parameters.AddWithValue("@Method", cashMethod);
-                        var res = cmdBal.ExecuteScalar();
-                        currentBalance = res != null ? Convert.ToDecimal(res) : 0;
-                    }
-                    if (totalAmount > currentBalance)
-                    {
-                        MessageBox.Show($"الرصيد المتاح في \"{cashMethod}\" هو {currentBalance:N2} فقط، أقل من إجمالي الفاتورة.", "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-                }
-
-                using (var transaction = conn.BeginTransaction())
-                {
-                    try
-                    {
-                        int purchaseId;
-                        using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Purchases (SupplierId, PurchaseDate, TotalAmount, Notes) VALUES (@S, @D, @T, @N)", conn, transaction))
-                        {
-                            cmd.Parameters.AddWithValue("@S", supplierId);
-                            cmd.Parameters.AddWithValue("@D", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                            cmd.Parameters.AddWithValue("@T", totalAmount);
-                            cmd.Parameters.AddWithValue("@N", DBNull.Value);
-                            cmd.ExecuteNonQuery();
-                        }
-                        using (SqliteCommand cmdId = new SqliteCommand("SELECT last_insert_rowid();", conn, transaction))
-                        {
-                            purchaseId = Convert.ToInt32(cmdId.ExecuteScalar());
-                        }
-
-                        foreach (var item in currentPurchaseItems)
-                        {
-                            using (SqliteCommand cmd = new SqliteCommand(
-                                "INSERT INTO PurchaseItems (PurchaseId, Barcode, ProductName, Quantity, UnitCost, LineTotal) VALUES (@P, @B, @N, @Q, @U, @L)", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@P", purchaseId);
-                                cmd.Parameters.AddWithValue("@B", string.IsNullOrEmpty(item.Barcode) ? (object)DBNull.Value : item.Barcode);
-                                cmd.Parameters.AddWithValue("@N", item.ProductName);
-                                cmd.Parameters.AddWithValue("@Q", item.Qty);
-                                cmd.Parameters.AddWithValue("@U", item.UnitCost);
-                                cmd.Parameters.AddWithValue("@L", item.LineTotal);
-                                cmd.ExecuteNonQuery();
-                            }
-
-                            bool productExists = false;
-                            if (!string.IsNullOrEmpty(item.Barcode))
-                            {
-                                using (SqliteCommand cmd = new SqliteCommand("SELECT COUNT(*) FROM Products WHERE Barcode = @B", conn, transaction))
-                                {
-                                    cmd.Parameters.AddWithValue("@B", item.Barcode);
-                                    productExists = Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-                                }
-                            }
-
-                            string finalBarcode = item.Barcode;
-
-                            if (productExists)
-                            {
-                                using (SqliteCommand cmd = new SqliteCommand(
-                                    "UPDATE Products SET Quantity = Quantity + @Q, Price = @U, IsSerialized = CASE WHEN @IsSerialized = 1 THEN 1 ELSE IsSerialized END WHERE Barcode = @B", conn, transaction))
-                                {
-                                    cmd.Parameters.AddWithValue("@Q", item.Qty);
-                                    cmd.Parameters.AddWithValue("@U", item.UnitCost);
-                                    cmd.Parameters.AddWithValue("@IsSerialized", item.IsSerialized ? 1 : 0);
-                                    cmd.Parameters.AddWithValue("@B", item.Barcode);
-                                    cmd.ExecuteNonQuery();
-                                }
-                            }
-                            else
-                            {
-                                finalBarcode = string.IsNullOrEmpty(item.Barcode) ? ("NEW-" + DateTime.Now.Ticks) : item.Barcode;
-                                using (SqliteCommand cmd = new SqliteCommand(
-                                    "INSERT INTO Products (Barcode, ProductName, Price, SalePrice, Quantity, IsSerialized) VALUES (@B, @N, @U, @S, @Q, @IsSerialized)", conn, transaction))
-                                {
-                                    cmd.Parameters.AddWithValue("@B", finalBarcode);
-                                    cmd.Parameters.AddWithValue("@N", item.ProductName);
-                                    cmd.Parameters.AddWithValue("@U", item.UnitCost);
-                                    cmd.Parameters.AddWithValue("@S", item.SalePrice);
-                                    cmd.Parameters.AddWithValue("@Q", item.Qty);
-                                    cmd.Parameters.AddWithValue("@IsSerialized", item.IsSerialized ? 1 : 0);
-                                    cmd.ExecuteNonQuery();
-                                }
-                            }
-
-                            if (item.IsSerialized && item.Imeis != null)
-                            {
-                                foreach (string imei in item.Imeis)
-                                {
-                                    using (SqliteCommand cmd = new SqliteCommand(
-                                        "INSERT INTO ProductUnits (Barcode, IMEI, Status, PurchaseId, CreatedAt) VALUES (@B, @IMEI, 'InStock', @P, @C)", conn, transaction))
-                                    {
-                                        cmd.Parameters.AddWithValue("@B", finalBarcode);
-                                        cmd.Parameters.AddWithValue("@IMEI", imei);
-                                        cmd.Parameters.AddWithValue("@P", purchaseId);
-                                        cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                                        cmd.ExecuteNonQuery();
-                                    }
-                                }
-                            }
-                        }
-
-                        if (payCashNow)
-                        {
-                            using (SqliteCommand cmd = new SqliteCommand(
-                                "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, SupplierId) VALUES (@Date, 'صرف', @Method, @Amount, @Ref, @Desc, @CreatedAt, 2100, @SupplierId)", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
-                                cmd.Parameters.AddWithValue("@Method", cashMethod);
-                                cmd.Parameters.AddWithValue("@Amount", totalAmount);
-                                cmd.Parameters.AddWithValue("@Ref", "فاتورة شراء رقم " + purchaseId);
-                                cmd.Parameters.AddWithValue("@Desc", "سداد كاش فوري لفاتورة شراء رقم " + purchaseId);
-                                cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                                cmd.Parameters.AddWithValue("@SupplierId", supplierId);
-                                cmd.ExecuteNonQuery();
-                            }
-
-                            using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = CurrentBalance - @Amount WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Amount", totalAmount);
-                                cmd.Parameters.AddWithValue("@Method", cashMethod);
-                                cmd.ExecuteNonQuery();
-                            }
-                        }
-
-                        transaction.Commit();
-                    }
-                    catch (Exception ex)
-                    {
-                        transaction.Rollback();
-                        MessageBox.Show("حصل خطأ أثناء حفظ الفاتورة ولم يتم حفظ أي حاجة: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-                }
+                SuppliersRepository.SavePurchase(supplierId, currentPurchaseItems, payCashNow, cashMethod);
+            }
+            catch (DuplicateImeiException ex)
+            {
+                MessageBox.Show(ex.Message, "رقم مكرر", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("حصل خطأ أثناء حفظ الفاتورة ولم يتم حفظ أي حاجة: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
 
             MessageBox.Show($"تم حفظ فاتورة الشراء بنجاح بإجمالي {totalAmount:N2} ج.م، وتحديث المخزون تلقائي" + (payCashNow ? "، وتم خصم المبلغ فورًا من الرصيد." : "، وسجّلت كدين على المورد."), "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -755,43 +527,19 @@ namespace Temo_Mobile_Store
             string method = cmbSupplierPaymentMethod.SelectedItem.ToString();
             string supplierName = cmbPaymentSupplier.Text;
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-
-                decimal currentBalance = 0;
-                using (SqliteCommand cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Method", method);
-                    var res = cmd.ExecuteScalar();
-                    currentBalance = res != null ? Convert.ToDecimal(res) : 0;
-                }
-
-                if (amount > currentBalance)
-                {
-                    MessageBox.Show($"الرصيد المتاح في \"{method}\" هو {currentBalance:N2} فقط.", "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                using (SqliteCommand cmd = new SqliteCommand(
-                    "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, SupplierId) VALUES (@Date, 'صرف', @Method, @Amount, @Ref, @Desc, @CreatedAt, 2100, @SupplierId)", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
-                    cmd.Parameters.AddWithValue("@Method", method);
-                    cmd.Parameters.AddWithValue("@Amount", amount);
-                    cmd.Parameters.AddWithValue("@Ref", "");
-                    cmd.Parameters.AddWithValue("@Desc", "سداد لمورد: " + supplierName);
-                    cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    cmd.Parameters.AddWithValue("@SupplierId", supplierId);
-                    cmd.ExecuteNonQuery();
-                }
-
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = CurrentBalance - @Amount WHERE PaymentMethod = @Method", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Amount", amount);
-                    cmd.Parameters.AddWithValue("@Method", method);
-                    cmd.ExecuteNonQuery();
-                }
+                SuppliersRepository.PaySupplier(supplierId, supplierName, method, amount);
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
 
             MessageBox.Show("تم تسجيل السداد بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
