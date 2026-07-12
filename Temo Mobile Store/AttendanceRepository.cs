@@ -18,6 +18,19 @@ namespace Temo_Mobile_Store
         public PayrollMonthClosedException(string message) : base(message) { }
     }
 
+    // بتترمي لما حد يحاول يصرف "دفعة من المستحق" بمبلغ أكبر من رصيد الموظف الفعلي -
+    // دفعة المستحق لازم تكون في حدود اللي اتكسب فعليًا، أي مبلغ زيادة لازم يكون "سلفة" بدل كده
+    public class InsufficientEarnedBalanceException : Exception
+    {
+        public decimal AvailableBalance { get; }
+
+        public InsufficientEarnedBalanceException(decimal availableBalance)
+            : base($"المستحق الحالي للموظف هو {availableBalance:N2} ج.م فقط، لا يمكن صرف دفعة أكبر منه. لو عايز تصرف أكتر من المستحق، استخدم نوع \"سلفة\" بدل \"دفعة من المستحق\".")
+        {
+            AvailableBalance = availableBalance;
+        }
+    }
+
     public static class AttendanceRepository
     {
         public const string StatusPresent = "حاضر";
@@ -405,24 +418,56 @@ namespace Temo_Mobile_Store
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                decimal totalEarned = 0, totalPaid = 0;
-
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(NetSalary) FROM PayrollClosures WHERE EmployeeId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", employeeId);
-                    var res = cmd.ExecuteScalar();
-                    if (res != null && res != DBNull.Value) totalEarned = Convert.ToDecimal(res);
-                }
-
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM CashMovements WHERE EmployeeId = @Id AND MovementType = 'صرف'", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", employeeId);
-                    var res = cmd.ExecuteScalar();
-                    if (res != null && res != DBNull.Value) totalPaid = Convert.ToDecimal(res);
-                }
-
-                return totalEarned - totalPaid;
+                return GetEmployeeBalanceInTransaction(conn, null, employeeId);
             }
+        }
+
+        private static decimal GetEmployeeBalanceInTransaction(SqliteConnection conn, SqliteTransaction transaction, int employeeId)
+        {
+            decimal totalEarned = 0, totalPaid = 0;
+
+            using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(NetSalary) FROM PayrollClosures WHERE EmployeeId = @Id", conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@Id", employeeId);
+                var res = cmd.ExecuteScalar();
+                if (res != null && res != DBNull.Value) totalEarned = Convert.ToDecimal(res);
+            }
+
+            using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM CashMovements WHERE EmployeeId = @Id AND MovementType = 'صرف'", conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@Id", employeeId);
+                var res = cmd.ExecuteScalar();
+                if (res != null && res != DBNull.Value) totalPaid = Convert.ToDecimal(res);
+            }
+
+            return totalEarned - totalPaid;
+        }
+
+        // كل الموظفين اللي رصيدهم سالب حاليًا (يعني اتصرفلهم سلف أكتر من المستحق ليهم لحد دلوقتي)
+        public static DataTable GetOutstandingAdvances()
+        {
+            DataTable dt = new DataTable();
+            dt.Columns.AddRange(new DataColumn[] { new DataColumn("الاسم"), new DataColumn("السلفة المستحقة عليه") });
+
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                var employees = new System.Collections.Generic.List<(int Id, string Name)>();
+                using (SqliteCommand cmd = new SqliteCommand("SELECT EmployeeId, FullName FROM Employees ORDER BY FullName", conn))
+                using (SqliteDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                        employees.Add((Convert.ToInt32(reader["EmployeeId"]), reader["FullName"].ToString()));
+                }
+
+                foreach (var emp in employees)
+                {
+                    decimal balance = GetEmployeeBalanceInTransaction(conn, null, emp.Id);
+                    if (balance < 0)
+                        dt.Rows.Add(emp.Name, (-balance).ToString("N2"));
+                }
+            }
+            return dt;
         }
 
         // كشف حساب الموظف بالترتيب الزمني: كل شهر مقفول (مستحق +) وكل صرف/سلفة (مسحوب -)، مع رصيد متراكم
@@ -453,7 +498,7 @@ namespace Temo_Mobile_Store
                 }
 
                 using (SqliteCommand cmd = new SqliteCommand(
-                    "SELECT MovementDate, Description, Amount FROM CashMovements WHERE EmployeeId = @Id AND MovementType = 'صرف' ORDER BY MovementDate", conn))
+                    "SELECT MovementDate, Description, Amount, IsAdvance FROM CashMovements WHERE EmployeeId = @Id AND MovementType = 'صرف' ORDER BY MovementDate", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", employeeId);
                     using (SqliteDataReader reader = cmd.ExecuteReader())
@@ -461,7 +506,9 @@ namespace Temo_Mobile_Store
                         while (reader.Read())
                         {
                             DateTime moveDate = DateTime.Parse(reader["MovementDate"].ToString());
-                            string desc = reader["Description"] == DBNull.Value ? "صرف مرتب/سلفة" : reader["Description"].ToString();
+                            bool isAdvance = Convert.ToInt32(reader["IsAdvance"]) == 1;
+                            string typeLabel = isAdvance ? "سلفة" : "دفعة مستحق";
+                            string desc = reader["Description"] == DBNull.Value ? typeLabel : $"{typeLabel}: {reader["Description"]}";
                             events.Add((moveDate, desc, 0, Convert.ToDecimal(reader["Amount"])));
                         }
                     }
@@ -482,9 +529,13 @@ namespace Temo_Mobile_Store
             return dt;
         }
 
-        // بيسجّل صرف مرتب/سلفة لموظف من رصيد وسيلة دفع معينة، جوه Transaction واحدة.
-        // بيرمي InsufficientBalanceException لو رصيد وسيلة الدفع مايكفيش.
-        public static void PayEmployee(int employeeId, string employeeName, string method, decimal amount, string description)
+        // بيسجّل صرف مرتب لموظف من رصيد وسيلة دفع معينة، جوه Transaction واحدة.
+        // isAdvance = false ("دفعة من المستحق"): لازم المبلغ يكون في حدود رصيد الموظف الفعلي،
+        // وبيرمي InsufficientEarnedBalanceException لو المبلغ أكبر من المستحق.
+        // isAdvance = true ("سلفة"): مفيش حد أقصى مرتبط بالمستحق - بيسمح يتصرف أكتر من المستحق
+        // فعليًا (وده يظهر كرصيد سالب في كشف حسابه لحد ما يتقفل شهر جديد).
+        // في الحالتين، بيرمي InsufficientBalanceException لو رصيد وسيلة الدفع نفسها مايكفيش.
+        public static void PayEmployee(int employeeId, string employeeName, string method, decimal amount, string description, bool isAdvance)
         {
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
@@ -493,22 +544,30 @@ namespace Temo_Mobile_Store
                 {
                     try
                     {
+                        if (!isAdvance)
+                        {
+                            decimal earnedBalance = GetEmployeeBalanceInTransaction(conn, transaction, employeeId);
+                            if (amount > earnedBalance)
+                                throw new InsufficientEarnedBalanceException(earnedBalance);
+                        }
+
                         decimal currentBalance = TreasuryRepository.GetBalanceInTransaction(conn, transaction, method);
                         if (amount > currentBalance)
                             throw new InsufficientBalanceException(method, currentBalance);
 
                         using (SqliteCommand cmd = new SqliteCommand(
-                            @"INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, EmployeeId)
-                              VALUES (@Date, 'صرف', @Method, @Amount, @Ref, @Desc, @CreatedAt, @AccountCode, @EmployeeId)", conn, transaction))
+                            @"INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, EmployeeId, IsAdvance)
+                              VALUES (@Date, 'صرف', @Method, @Amount, @Ref, @Desc, @CreatedAt, @AccountCode, @EmployeeId, @IsAdvance)", conn, transaction))
                         {
                             cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
                             cmd.Parameters.AddWithValue("@Method", method);
                             cmd.Parameters.AddWithValue("@Amount", amount);
                             cmd.Parameters.AddWithValue("@Ref", "");
-                            cmd.Parameters.AddWithValue("@Desc", string.IsNullOrWhiteSpace(description) ? ("صرف مرتب/سلفة: " + employeeName) : description);
+                            cmd.Parameters.AddWithValue("@Desc", string.IsNullOrWhiteSpace(description) ? ("صرف مرتب لـ " + employeeName) : description);
                             cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                             cmd.Parameters.AddWithValue("@AccountCode", SalariesAccountCode);
                             cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
+                            cmd.Parameters.AddWithValue("@IsAdvance", isAdvance ? 1 : 0);
                             cmd.ExecuteNonQuery();
                         }
 

@@ -33,7 +33,7 @@ namespace Temo_Mobile_Store
         private Label lblPayrollTotals;
 
         // ---------- كشف حساب موظف ----------
-        private Guna2ComboBox cmbStatementEmployee, cmbPayMethod;
+        private Guna2ComboBox cmbStatementEmployee, cmbPayMethod, cmbPayType;
         private Guna2TextBox txtPayAmount, txtPayDescription;
         private Label lblEmployeeBalance;
         private DataGridView dgvEmployeeStatement;
@@ -306,33 +306,42 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildStatementPanel()
         {
-            Guna2Panel gbSelect = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(300, 130), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbSelect = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(300, 175), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblSelectTitle = new Label() { Text = "👤 اختر الموظف", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
             cmbStatementEmployee = new Guna2ComboBox() { Location = new Point(20, 50), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbStatementEmployee.SelectedIndexChanged += (s, e) => LoadEmployeeStatement();
-            gbSelect.Controls.AddRange(new Control[] { lblSelectTitle, cmbStatementEmployee });
 
-            Guna2Panel pnlBalanceCard = new Guna2Panel() { Location = new Point(0, 145), Size = new Size(300, 70), FillColor = Color.FromArgb(240, 245, 255), BorderRadius = 14 };
+            Guna2Button btnViewAdvances = new Guna2Button() { Text = "عرض كل السلف الحالية 📋", Location = new Point(20, 95), Width = 260, Height = 32, FillColor = UIHelpers.ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
+            btnViewAdvances.Click += BtnViewAdvances_Click;
+
+            gbSelect.Controls.AddRange(new Control[] { lblSelectTitle, cmbStatementEmployee, btnViewAdvances });
+
+            Guna2Panel pnlBalanceCard = new Guna2Panel() { Location = new Point(0, 190), Size = new Size(300, 70), FillColor = Color.FromArgb(240, 245, 255), BorderRadius = 14 };
             lblEmployeeBalance = new Label() { Text = "الرصيد المستحق: --", Location = new Point(0, 0), Size = new Size(300, 70), TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
             pnlBalanceCard.Controls.Add(lblEmployeeBalance);
 
-            Guna2Panel gbPay = new Guna2Panel() { Location = new Point(0, 230), Size = new Size(300, 300), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbPay = new Guna2Panel() { Location = new Point(0, 275), Size = new Size(300, 340), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblPayTitle = new Label() { Text = "💸 صرف مرتب / سلفة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblPayMethod = new Label() { Text = "وسيلة الصرف:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             cmbPayMethod = new Guna2ComboBox() { Location = new Point(20, 70), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbPayMethod.Items.AddRange(UIHelpers.PaymentMethods);
 
-            Label lblPayAmount = new Label() { Text = "المبلغ:", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtPayAmount = new Guna2TextBox() { Location = new Point(20, 128), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            Label lblPayType = new Label() { Text = "نوع الصرف:", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbPayType = new Guna2ComboBox() { Location = new Point(20, 128), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            cmbPayType.Items.AddRange(new string[] { "دفعة من المستحق ✅", "سلفة 💵" });
+            cmbPayType.SelectedIndex = 0;
 
-            Label lblPayDesc = new Label() { Text = "بيان (اختياري):", Location = new Point(20, 166), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtPayDescription = new Guna2TextBox() { Location = new Point(20, 186), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            Label lblPayAmount = new Label() { Text = "المبلغ:", Location = new Point(20, 166), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtPayAmount = new Guna2TextBox() { Location = new Point(20, 186), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnPayEmployee = new Guna2Button() { Text = "صرف المبلغ ✅", Location = new Point(20, 226), Width = 260, Height = 38, FillColor = ColorSuccess, BorderRadius = 10 };
+            Label lblPayDesc = new Label() { Text = "بيان (اختياري):", Location = new Point(20, 224), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtPayDescription = new Guna2TextBox() { Location = new Point(20, 244), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+
+            Guna2Button btnPayEmployee = new Guna2Button() { Text = "صرف المبلغ ✅", Location = new Point(20, 284), Width = 260, Height = 38, FillColor = ColorSuccess, BorderRadius = 10 };
             btnPayEmployee.Click += BtnPayEmployee_Click;
 
-            gbPay.Controls.AddRange(new Control[] { lblPayTitle, lblPayMethod, cmbPayMethod, lblPayAmount, txtPayAmount, lblPayDesc, txtPayDescription, btnPayEmployee });
+            gbPay.Controls.AddRange(new Control[] { lblPayTitle, lblPayMethod, cmbPayMethod, lblPayType, cmbPayType, lblPayAmount, txtPayAmount, lblPayDesc, txtPayDescription, btnPayEmployee });
 
             Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(320, 0), Size = new Size(780, 660), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📋 كشف الحساب (بالترتيب الزمني)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
@@ -341,6 +350,28 @@ namespace Temo_Mobile_Store
             pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvEmployeeStatement });
 
             pnlStatementOps.Controls.AddRange(new Control[] { gbSelect, pnlBalanceCard, gbPay, pnlGridCard });
+        }
+
+        private void BtnViewAdvances_Click(object sender, EventArgs e)
+        {
+            DataTable dt;
+            try
+            {
+                dt = AttendanceRepository.GetOutstandingAdvances();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+                return;
+            }
+
+            using (Form advancesForm = new Form() { Text = "السلف الحالية المستحقة على الموظفين", Size = new Size(600, 500), StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true })
+            {
+                DataGridView dgvAdvances = new DataGridView() { Dock = DockStyle.Fill, DataSource = dt, ReadOnly = true, AllowUserToAddRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, RowHeadersVisible = false };
+                StyleDataGridView(dgvAdvances);
+                advancesForm.Controls.Add(dgvAdvances);
+                advancesForm.ShowDialog(this.FindForm());
+            }
         }
 
         private void LoadStatementEmployeeCombo()
@@ -382,20 +413,26 @@ namespace Temo_Mobile_Store
 
         private void BtnPayEmployee_Click(object sender, EventArgs e)
         {
-            if (cmbStatementEmployee.SelectedValue == null || cmbPayMethod.SelectedItem == null
+            if (cmbStatementEmployee.SelectedValue == null || cmbPayMethod.SelectedItem == null || cmbPayType.SelectedIndex == -1
                 || !decimal.TryParse(txtPayAmount.Text, out decimal amount) || amount <= 0)
             {
-                MessageBox.Show("من فضلك اختر الموظف ووسيلة الصرف وأدخل مبلغ صحيح.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("من فضلك اختر الموظف ووسيلة الصرف ونوع الصرف وأدخل مبلغ صحيح.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             int employeeId = Convert.ToInt32(cmbStatementEmployee.SelectedValue);
             string employeeName = cmbStatementEmployee.Text;
             string method = cmbPayMethod.SelectedItem.ToString();
+            bool isAdvance = cmbPayType.SelectedIndex == 1;
 
             try
             {
-                AttendanceRepository.PayEmployee(employeeId, employeeName, method, amount, txtPayDescription.Text.Trim());
+                AttendanceRepository.PayEmployee(employeeId, employeeName, method, amount, txtPayDescription.Text.Trim(), isAdvance);
+            }
+            catch (InsufficientEarnedBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "المستحق غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
             catch (InsufficientBalanceException ex)
             {

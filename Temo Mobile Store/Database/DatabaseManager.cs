@@ -125,7 +125,8 @@ namespace Temo_Mobile_Store.Database
                     AccountCode INTEGER,
                     CustomerId INTEGER,
                     SupplierId INTEGER,
-                    EmployeeId INTEGER
+                    EmployeeId INTEGER,
+                    IsAdvance INTEGER NOT NULL DEFAULT 0
                 );");
 
                 ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS PaymentMethodBalances (
@@ -264,6 +265,7 @@ namespace Temo_Mobile_Store.Database
 
                 EnsureExpensesPaymentMethodColumn(conn);
                 EnsureCashMovementsEmployeeIdColumn(conn);
+                EnsureCashMovementsIsAdvanceColumn(conn);
             }
         }
 
@@ -289,6 +291,30 @@ namespace Temo_Mobile_Store.Database
 
             if (!columnExists)
                 ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN EmployeeId INTEGER;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود IsAdvance لجدول CashMovements - بيفرّق بين "دفعة من المستحق"
+        // و"سلفة" لصرف المرتبات (كانت كلها نفس النوع من غير تمييز).
+        // ==========================================================================
+        private static void EnsureCashMovementsIsAdvanceColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(CashMovements);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "IsAdvance", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN IsAdvance INTEGER NOT NULL DEFAULT 0;");
         }
 
         // ==========================================================================
