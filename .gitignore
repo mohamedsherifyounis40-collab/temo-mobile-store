@@ -15,3 +15,8 @@ remote_server_log.txt
 
 # إعدادات محلية خاصة بالبيئة - مش جزء من المشروع
 .claude/settings.local.json
+
+# قاعدة بيانات موقع الكتالوج - بتتبني تلقائيًا وقت التشغيل من المزامنة
+CatalogWebsite/catalog.db
+CatalogWebsite/catalog.db-shm
+CatalogWebsite/catalog.db-wal
