@@ -28,7 +28,6 @@ namespace Temo_Mobile_Store
             public const string Home = "Home";
             public const string Sales = "Sales";
             public const string Inventory = "Inventory";
-            public const string Imei = "Imei";
             public const string InventoryCount = "InventoryCount";
             public const string Maintenance = "Maintenance";
             public const string Customers = "Customers";
@@ -74,7 +73,6 @@ namespace Temo_Mobile_Store
             (PageKeys.Home,           "الرئيسية",   "🏠"),
             (PageKeys.Sales,          "المبيعات",   "🛒"),
             (PageKeys.Inventory,      "المخزون",    "🗄️"),
-            (PageKeys.Imei,           "الأجهزة والسيريالات", "📱"),
             (PageKeys.InventoryCount, "جرد المخزن", "📋"),
             (PageKeys.Maintenance,    "الصيانة",    "🔧"),
             (PageKeys.Customers,      "العملاء",    "👥"),
@@ -488,8 +486,6 @@ namespace Temo_Mobile_Store
                 BuildSalesPage();
             else if (pageKey == PageKeys.Inventory)
                 BuildInventoryPage();
-            else if (pageKey == PageKeys.Imei)
-                BuildImeiPage();
             else if (pageKey == PageKeys.InventoryCount)
                 BuildInventoryCountPage();
             else if (pageKey == PageKeys.Customers)
@@ -590,16 +586,6 @@ namespace Temo_Mobile_Store
             pnlContent.Controls.Clear();
             InventoryPageControl inventoryPage = new InventoryPageControl { Dock = DockStyle.Fill };
             pnlContent.Controls.Add(inventoryPage);
-        }
-
-        // ==========================================================================
-        // بناء صفحة "الأجهزة والسيريالات" - بتستخدم شاشة IMEI الحقيقية (ImeiPageControl)
-        // ==========================================================================
-        private void BuildImeiPage()
-        {
-            pnlContent.Controls.Clear();
-            ImeiPageControl imeiPage = new ImeiPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(imeiPage);
         }
 
         // ==========================================================================
