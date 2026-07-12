@@ -124,7 +124,8 @@ namespace Temo_Mobile_Store.Database
                     CreatedAt TEXT NOT NULL DEFAULT (datetime('now','localtime')),
                     AccountCode INTEGER,
                     CustomerId INTEGER,
-                    SupplierId INTEGER
+                    SupplierId INTEGER,
+                    EmployeeId INTEGER
                 );");
 
                 ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS PaymentMethodBalances (
@@ -194,6 +195,25 @@ namespace Temo_Mobile_Store.Database
                     UNIQUE(EmployeeId, AttendanceDate)
                 );");
 
+                // قفل شهر الرواتب: بمجرد ما شهر معين يتقفل لموظف، القيم بتاعته (قيمة اليوم،
+                // أيام الحضور/الغياب، الراتب الصافي) بتتجمد هنا نهائيًا - حتى لو المرتب الشهري
+                // اتغيّر بعد كده أو حد عدّل سجل حضور قديم، الشهر المقفول مايتأثرش. ده اللي بيضمن
+                // إن "المستحق" للموظف رقم ثابت ومايتغيرش تحت رجلينا وقت الحساب.
+                ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS PayrollClosures (
+                    ClosureId INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EmployeeId INTEGER NOT NULL,
+                    Year INTEGER NOT NULL,
+                    Month INTEGER NOT NULL,
+                    MonthlySalary REAL NOT NULL,
+                    DayValue REAL NOT NULL,
+                    PresentDays INTEGER NOT NULL,
+                    AbsentDays INTEGER NOT NULL,
+                    LeaveDays INTEGER NOT NULL,
+                    NetSalary REAL NOT NULL,
+                    ClosedAt TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    UNIQUE(EmployeeId, Year, Month)
+                );");
+
                 // ---------- بيانات أساسية لازمة عشان البرنامج يشتغل صح من أول تشغيل ----------
 
                 // صف افتراضي لإعدادات المحل (لو مش موجود)
@@ -243,7 +263,32 @@ namespace Temo_Mobile_Store.Database
                 }
 
                 EnsureExpensesPaymentMethodColumn(conn);
+                EnsureCashMovementsEmployeeIdColumn(conn);
             }
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود EmployeeId لجدول CashMovements (كان ناقص من الأول، عشان كده
+        // سلف/دفعات المرتبات كانت هتتسجل من غير ما ترتبط بموظف معين).
+        // ==========================================================================
+        private static void EnsureCashMovementsEmployeeIdColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(CashMovements);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "EmployeeId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN EmployeeId INTEGER;");
         }
 
         // ==========================================================================
