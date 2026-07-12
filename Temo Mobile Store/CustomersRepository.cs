@@ -176,12 +176,8 @@ namespace Temo_Mobile_Store
                             cmd.ExecuteNonQuery();
                         }
 
-                        using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = CurrentBalance + @Amount WHERE PaymentMethod = @Method", conn, transaction))
-                        {
-                            cmd.Parameters.AddWithValue("@Amount", amount);
-                            cmd.Parameters.AddWithValue("@Method", method);
-                            cmd.ExecuteNonQuery();
-                        }
+                        decimal currentBalance = TreasuryRepository.GetBalanceInTransaction(conn, transaction, method);
+                        TreasuryRepository.SetBalanceInTransaction(conn, transaction, method, currentBalance + amount);
 
                         transaction.Commit();
                     }

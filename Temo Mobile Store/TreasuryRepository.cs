@@ -397,7 +397,9 @@ namespace Temo_Mobile_Store
             }
         }
 
-        private static decimal GetBalanceInTransaction(SqliteConnection conn, SqliteTransaction transaction, string method)
+        // internal (مش private) عشان باقي الـ Repositories (Suppliers/Customers/Maintenance) تقدر
+        // تعدّل رصيد وسيلة دفع من غير ما تكرر نفس الـ SELECT/UPDATE لجدول PaymentMethodBalances
+        internal static decimal GetBalanceInTransaction(SqliteConnection conn, SqliteTransaction transaction, string method)
         {
             using (SqliteCommand cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn, transaction))
             {
@@ -407,7 +409,7 @@ namespace Temo_Mobile_Store
             }
         }
 
-        private static void SetBalanceInTransaction(SqliteConnection conn, SqliteTransaction transaction, string method, decimal newBalance)
+        internal static void SetBalanceInTransaction(SqliteConnection conn, SqliteTransaction transaction, string method, decimal newBalance)
         {
             using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = @Balance WHERE PaymentMethod = @Method", conn, transaction))
             {

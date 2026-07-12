@@ -238,13 +238,7 @@ namespace Temo_Mobile_Store
                     {
                         if (payCashNow)
                         {
-                            decimal currentBalance = 0;
-                            using (SqliteCommand cmdBal = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmdBal.Parameters.AddWithValue("@Method", cashMethod);
-                                var res = cmdBal.ExecuteScalar();
-                                currentBalance = res != null ? Convert.ToDecimal(res) : 0;
-                            }
+                            decimal currentBalance = TreasuryRepository.GetBalanceInTransaction(conn, transaction, cashMethod);
                             if (totalAmount > currentBalance)
                                 throw new InsufficientBalanceException(cashMethod, currentBalance);
                         }
@@ -347,12 +341,8 @@ namespace Temo_Mobile_Store
                                 cmd.ExecuteNonQuery();
                             }
 
-                            using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = CurrentBalance - @Amount WHERE PaymentMethod = @Method", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Amount", totalAmount);
-                                cmd.Parameters.AddWithValue("@Method", cashMethod);
-                                cmd.ExecuteNonQuery();
-                            }
+                            decimal balanceBeforePayment = TreasuryRepository.GetBalanceInTransaction(conn, transaction, cashMethod);
+                            TreasuryRepository.SetBalanceInTransaction(conn, transaction, cashMethod, balanceBeforePayment - totalAmount);
                         }
 
                         transaction.Commit();
@@ -377,14 +367,7 @@ namespace Temo_Mobile_Store
                 {
                     try
                     {
-                        decimal currentBalance = 0;
-                        using (SqliteCommand cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn, transaction))
-                        {
-                            cmd.Parameters.AddWithValue("@Method", method);
-                            var res = cmd.ExecuteScalar();
-                            currentBalance = res != null ? Convert.ToDecimal(res) : 0;
-                        }
-
+                        decimal currentBalance = TreasuryRepository.GetBalanceInTransaction(conn, transaction, method);
                         if (amount > currentBalance)
                             throw new InsufficientBalanceException(method, currentBalance);
 
@@ -401,12 +384,7 @@ namespace Temo_Mobile_Store
                             cmd.ExecuteNonQuery();
                         }
 
-                        using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = CurrentBalance - @Amount WHERE PaymentMethod = @Method", conn, transaction))
-                        {
-                            cmd.Parameters.AddWithValue("@Amount", amount);
-                            cmd.Parameters.AddWithValue("@Method", method);
-                            cmd.ExecuteNonQuery();
-                        }
+                        TreasuryRepository.SetBalanceInTransaction(conn, transaction, method, currentBalance - amount);
 
                         transaction.Commit();
                     }
