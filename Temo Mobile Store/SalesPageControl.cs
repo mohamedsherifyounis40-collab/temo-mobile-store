@@ -5,7 +5,6 @@ using System.Drawing;
 using System.Drawing.Printing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
-using Microsoft.Data.Sqlite;
 
 namespace Temo_Mobile_Store
 {
@@ -237,28 +236,14 @@ namespace Temo_Mobile_Store
         private void LoadCustomersIntoCombo()
         {
             if (cmbSaleCustomer == null) return;
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("CustomerId", typeof(int)), new DataColumn("CustomerName") });
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("SELECT CustomerId, CustomerName FROM Customers ORDER BY CustomerName", conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                dt.Rows.Add(Convert.ToInt32(reader["CustomerId"]), reader["CustomerName"].ToString());
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                DataTable dt = SalesRepository.GetCustomers();
+                cmbSaleCustomer.DataSource = dt;
+                cmbSaleCustomer.DisplayMember = "CustomerName";
+                cmbSaleCustomer.ValueMember = "CustomerId";
             }
-            cmbSaleCustomer.DataSource = dt;
-            cmbSaleCustomer.DisplayMember = "CustomerName";
-            cmbSaleCustomer.ValueMember = "CustomerId";
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         // ==========================================================================
@@ -266,27 +251,11 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void LoadSalesData()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("رقم البيع"), new DataColumn("المنتج"), new DataColumn("الكمية المباعة"), new DataColumn("الإجمالي"), new DataColumn("التاريخ والوقت ⏰") });
-
-            string query = "SELECT SaleID, ProductName, CostPrice, Price, QuantitySold, Total, SaleDate FROM Sales ORDER BY SaleID ASC";
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                dt.Rows.Add(reader["SaleID"], reader["ProductName"], reader["QuantitySold"], reader["Total"], reader["SaleDate"]);
-                        }
-                        dgvSales.DataSource = dt;
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                dgvSales.DataSource = SalesRepository.GetSales();
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         // ==========================================================================
@@ -303,57 +272,44 @@ namespace Temo_Mobile_Store
         {
             if (e.KeyCode == Keys.Enter && !string.IsNullOrEmpty(txtSaleBarcode.Text))
             {
-                string query = "SELECT ProductName, SalePrice, Quantity, IsSerialized FROM Products WHERE Barcode = @Barcode";
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+                try
                 {
-                    using (SqliteCommand cmd = new SqliteCommand(query, conn))
+                    ProductForSale product = SalesRepository.GetProductForSale(txtSaleBarcode.Text);
+                    if (product == null)
                     {
-                        cmd.Parameters.AddWithValue("@Barcode", txtSaleBarcode.Text);
-                        try
-                        {
-                            conn.Open();
-                            using (SqliteDataReader reader = cmd.ExecuteReader())
-                            {
-                                if (reader.Read())
-                                {
-                                    int stockQty = Convert.ToInt32(reader["Quantity"]);
-                                    if (stockQty <= 0)
-                                    {
-                                        MessageBox.Show("عذراً، هذا المنتج نفذ من المخزن تماماً!", "نفذت الكمية", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                        return;
-                                    }
-                                    txtSaleName.Text = reader["ProductName"].ToString();
-                                    txtCustomerPrice.Text = reader["SalePrice"].ToString();
-                                    CalculateTotal();
+                        MessageBox.Show("هذا الباركود غير مسجل في المخزن!", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        txtSaleBarcode.Clear();
+                        txtSaleBarcode.Focus();
+                        return;
+                    }
 
-                                    bool isSerialized = reader["IsSerialized"] != DBNull.Value && Convert.ToInt32(reader["IsSerialized"]) == 1;
-                                    lblSaleImei.Visible = isSerialized;
-                                    cmbSaleImei.Visible = isSerialized;
+                    if (product.Quantity <= 0)
+                    {
+                        MessageBox.Show("عذراً، هذا المنتج نفذ من المخزن تماماً!", "نفذت الكمية", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
 
-                                    if (isSerialized)
-                                    {
-                                        txtSaleQty.Text = "1";
-                                        txtSaleQty.ReadOnly = true;
-                                        LoadAvailableImeisForSale(txtSaleBarcode.Text.Trim());
-                                        cmbSaleImei.Focus();
-                                    }
-                                    else
-                                    {
-                                        txtSaleQty.ReadOnly = false;
-                                        txtSaleQty.Focus();
-                                    }
-                                }
-                                else
-                                {
-                                    MessageBox.Show("هذا الباركود غير مسجل في المخزن!", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                    txtSaleBarcode.Clear();
-                                    txtSaleBarcode.Focus();
-                                }
-                            }
-                        }
-                        catch (Exception ex) { MessageBox.Show(ex.Message); }
+                    txtSaleName.Text = product.ProductName;
+                    txtCustomerPrice.Text = product.SalePrice.ToString();
+                    CalculateTotal();
+
+                    lblSaleImei.Visible = product.IsSerialized;
+                    cmbSaleImei.Visible = product.IsSerialized;
+
+                    if (product.IsSerialized)
+                    {
+                        txtSaleQty.Text = "1";
+                        txtSaleQty.ReadOnly = true;
+                        LoadAvailableImeisForSale(txtSaleBarcode.Text.Trim());
+                        cmbSaleImei.Focus();
+                    }
+                    else
+                    {
+                        txtSaleQty.ReadOnly = false;
+                        txtSaleQty.Focus();
                     }
                 }
+                catch (Exception ex) { MessageBox.Show(ex.Message); }
             }
         }
 
@@ -375,25 +331,12 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void LoadAvailableImeisForSale(string barcode)
         {
-            DataTable dt = new DataTable();
-            dt.Columns.Add("IMEI");
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            DataTable dt;
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("SELECT IMEI FROM ProductUnits WHERE Barcode = @Barcode AND Status = 'InStock' ORDER BY UnitId", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Barcode", barcode);
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read()) dt.Rows.Add(reader["IMEI"].ToString());
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                dt = SalesRepository.GetAvailableImeisForSale(barcode);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
             cmbSaleImei.DataSource = dt;
             cmbSaleImei.DisplayMember = "IMEI";
@@ -442,85 +385,14 @@ namespace Temo_Mobile_Store
             int dailyInvoiceNumber;
             try
             {
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-                {
-                    conn.Open();
-                    using (SqliteTransaction transaction = conn.BeginTransaction())
-                    {
-                        try
-                        {
-                            string checkQuery = "SELECT Quantity, Price FROM Products WHERE Barcode = @Barcode";
-                            int currentStock = 0; decimal currentCostPrice = 0;
-                            using (SqliteCommand cmdCheck = new SqliteCommand(checkQuery, conn, transaction))
-                            {
-                                cmdCheck.Parameters.AddWithValue("@Barcode", txtSaleBarcode.Text);
-                                using (SqliteDataReader reader = cmdCheck.ExecuteReader())
-                                {
-                                    if (reader.Read()) { currentStock = Convert.ToInt32(reader["Quantity"]); currentCostPrice = Convert.ToDecimal(reader["Price"]); }
-                                }
-                            }
-
-                            if (qtySold > currentStock)
-                            {
-                                transaction.Rollback();
-                                MessageBox.Show($"الكمية المطلوبة أكبر من المتاح! المتاح حالياً هو: {currentStock}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                return;
-                            }
-
-                            string insertSale = "INSERT INTO Sales (Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, IMEI) VALUES (@Barcode, @ProductName, @CostPrice, @Price, @QuantitySold, @Total, @CustomerId, @PaymentType, @IMEI)";
-                            using (SqliteCommand cmdInsert = new SqliteCommand(insertSale, conn, transaction))
-                            {
-                                cmdInsert.Parameters.AddWithValue("@Barcode", txtSaleBarcode.Text);
-                                cmdInsert.Parameters.AddWithValue("@ProductName", txtSaleName.Text);
-                                cmdInsert.Parameters.AddWithValue("@CostPrice", currentCostPrice);
-                                cmdInsert.Parameters.AddWithValue("@Price", Convert.ToDecimal(txtCustomerPrice.Text));
-                                cmdInsert.Parameters.AddWithValue("@QuantitySold", qtySold);
-                                cmdInsert.Parameters.AddWithValue("@Total", Convert.ToDecimal(txtSaleTotal.Text));
-                                cmdInsert.Parameters.AddWithValue("@CustomerId", customerIdParam);
-                                cmdInsert.Parameters.AddWithValue("@PaymentType", paymentType);
-                                cmdInsert.Parameters.AddWithValue("@IMEI", (object)selectedImei ?? DBNull.Value);
-                                cmdInsert.ExecuteNonQuery();
-                            }
-
-                            int newSaleId;
-                            using (SqliteCommand cmdId = new SqliteCommand("SELECT last_insert_rowid();", conn, transaction))
-                            {
-                                newSaleId = Convert.ToInt32(cmdId.ExecuteScalar());
-                            }
-
-                            if (selectedImei != null)
-                            {
-                                using (SqliteCommand cmdUnit = new SqliteCommand("UPDATE ProductUnits SET Status = 'Sold', SaleId = @SaleId WHERE IMEI = @IMEI", conn, transaction))
-                                {
-                                    cmdUnit.Parameters.AddWithValue("@SaleId", newSaleId);
-                                    cmdUnit.Parameters.AddWithValue("@IMEI", selectedImei);
-                                    cmdUnit.ExecuteNonQuery();
-                                }
-                            }
-
-                            string updateStock = "UPDATE Products SET Quantity = Quantity - @Qty WHERE Barcode = @Barcode";
-                            using (SqliteCommand cmdUpdate = new SqliteCommand(updateStock, conn, transaction))
-                            {
-                                cmdUpdate.Parameters.AddWithValue("@Qty", qtySold);
-                                cmdUpdate.Parameters.AddWithValue("@Barcode", txtSaleBarcode.Text);
-                                cmdUpdate.ExecuteNonQuery();
-                            }
-
-                            using (SqliteCommand cmdDaily = new SqliteCommand("SELECT COUNT(*) FROM Sales WHERE date(SaleDate) = date('now','localtime') AND SaleID <= @SaleId", conn, transaction))
-                            {
-                                cmdDaily.Parameters.AddWithValue("@SaleId", newSaleId);
-                                dailyInvoiceNumber = Convert.ToInt32(cmdDaily.ExecuteScalar());
-                            }
-
-                            transaction.Commit();
-                        }
-                        catch
-                        {
-                            transaction.Rollback();
-                            throw;
-                        }
-                    }
-                }
+                dailyInvoiceNumber = SalesRepository.AddSale(
+                    txtSaleBarcode.Text, txtSaleName.Text, Convert.ToDecimal(txtCustomerPrice.Text), qtySold,
+                    Convert.ToDecimal(txtSaleTotal.Text), customerIdParam, paymentType, selectedImei);
+            }
+            catch (InsufficientStockException ex)
+            {
+                MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
             catch (Exception ex)
             {
@@ -548,31 +420,20 @@ namespace Temo_Mobile_Store
 
         private void LoadSaleIntoFields(int saleId)
         {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, ProductName, Price, QuantitySold, SaleDate FROM Sales WHERE SaleID = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", saleId);
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                selectedSaleId = saleId;
-                                txtSaleBarcode.Text = reader["Barcode"].ToString();
-                                txtSaleName.Text = reader["ProductName"].ToString();
-                                txtCustomerPrice.Text = reader["Price"].ToString();
-                                txtSaleQty.Text = reader["QuantitySold"].ToString();
-                                txtSaleBarcode.ReadOnly = true;
-                                if (btnSaveSaleEdit != null) btnSaveSaleEdit.Enabled = false;
-                            }
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                SaleRecord sale = SalesRepository.GetSaleById(saleId);
+                if (sale == null) return;
+
+                selectedSaleId = saleId;
+                txtSaleBarcode.Text = sale.Barcode;
+                txtSaleName.Text = sale.ProductName;
+                txtCustomerPrice.Text = sale.Price.ToString();
+                txtSaleQty.Text = sale.QuantitySold.ToString();
+                txtSaleBarcode.ReadOnly = true;
+                if (btnSaveSaleEdit != null) btnSaveSaleEdit.Enabled = false;
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void BtnEditSaleMode_Click(object sender, EventArgs e)
@@ -598,83 +459,27 @@ namespace Temo_Mobile_Store
                 return;
             }
 
+            SaleRecord existing = SalesRepository.GetSaleById(selectedSaleId);
+            if (existing == null)
+            {
+                MessageBox.Show("لم يتم العثور على عملية البيع.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (IsDateClosed(DateTime.Parse(existing.SaleDate).Date))
+            {
+                MessageBox.Show("لا يمكن تعديل عملية بيع تابعة ليوم تم إقفاله بالفعل.", "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             try
             {
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-                {
-                    conn.Open();
-                    using (SqliteTransaction transaction = conn.BeginTransaction())
-                    {
-                        try
-                        {
-                            string barcode = null; int oldQty = 0; decimal price = 0; string saleDateStr = null;
-                            using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, QuantitySold, Price, SaleDate FROM Sales WHERE SaleID = @Id", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Id", selectedSaleId);
-                                using (SqliteDataReader reader = cmd.ExecuteReader())
-                                {
-                                    if (!reader.Read())
-                                    {
-                                        transaction.Rollback();
-                                        MessageBox.Show("لم يتم العثور على عملية البيع.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                        return;
-                                    }
-                                    barcode = reader["Barcode"].ToString();
-                                    oldQty = Convert.ToInt32(reader["QuantitySold"]);
-                                    price = Convert.ToDecimal(reader["Price"]);
-                                    saleDateStr = reader["SaleDate"].ToString();
-                                }
-                            }
-
-                            if (IsDateClosed(DateTime.Parse(saleDateStr).Date))
-                            {
-                                transaction.Rollback();
-                                MessageBox.Show("لا يمكن تعديل عملية بيع تابعة ليوم تم إقفاله بالفعل.", "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                return;
-                            }
-
-                            int currentStock = 0;
-                            using (SqliteCommand cmd = new SqliteCommand("SELECT Quantity FROM Products WHERE Barcode = @Barcode", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@Barcode", barcode);
-                                var res = cmd.ExecuteScalar();
-                                if (res != null) currentStock = Convert.ToInt32(res);
-                            }
-
-                            int availableIfReverted = currentStock + oldQty;
-                            if (newQty > availableIfReverted)
-                            {
-                                transaction.Rollback();
-                                MessageBox.Show($"الكمية الجديدة أكبر من المتاح! أقصى كمية ممكنة هي: {availableIfReverted}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                return;
-                            }
-
-                            decimal newTotal = price * newQty;
-                            using (SqliteCommand cmdUpdateSale = new SqliteCommand("UPDATE Sales SET QuantitySold = @Qty, Total = @Total WHERE SaleID = @Id", conn, transaction))
-                            {
-                                cmdUpdateSale.Parameters.AddWithValue("@Qty", newQty);
-                                cmdUpdateSale.Parameters.AddWithValue("@Total", newTotal);
-                                cmdUpdateSale.Parameters.AddWithValue("@Id", selectedSaleId);
-                                cmdUpdateSale.ExecuteNonQuery();
-                            }
-
-                            int stockAdjustment = oldQty - newQty;
-                            using (SqliteCommand cmdUpdateStock = new SqliteCommand("UPDATE Products SET Quantity = Quantity + @Adjustment WHERE Barcode = @Barcode", conn, transaction))
-                            {
-                                cmdUpdateStock.Parameters.AddWithValue("@Adjustment", stockAdjustment);
-                                cmdUpdateStock.Parameters.AddWithValue("@Barcode", barcode);
-                                cmdUpdateStock.ExecuteNonQuery();
-                            }
-
-                            transaction.Commit();
-                        }
-                        catch
-                        {
-                            transaction.Rollback();
-                            throw;
-                        }
-                    }
-                }
+                SalesRepository.UpdateSaleQuantity(selectedSaleId, newQty);
+            }
+            catch (InsufficientStockException ex)
+            {
+                MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
             catch (Exception ex)
             {
@@ -695,29 +500,14 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            string barcode = null; int qty = 0; string saleDateStr = null; string imei = null;
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            SaleRecord existing = SalesRepository.GetSaleById(selectedSaleId);
+            if (existing == null)
             {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, QuantitySold, SaleDate, IMEI FROM Sales WHERE SaleID = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", selectedSaleId);
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        if (!reader.Read())
-                        {
-                            MessageBox.Show("لم يتم العثور على عملية البيع.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            return;
-                        }
-                        barcode = reader["Barcode"].ToString();
-                        qty = Convert.ToInt32(reader["QuantitySold"]);
-                        saleDateStr = reader["SaleDate"].ToString();
-                        imei = reader["IMEI"] != DBNull.Value ? reader["IMEI"].ToString() : null;
-                    }
-                }
+                MessageBox.Show("لم يتم العثور على عملية البيع.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
 
-            if (IsDateClosed(DateTime.Parse(saleDateStr).Date))
+            if (IsDateClosed(DateTime.Parse(existing.SaleDate).Date))
             {
                 MessageBox.Show("لا يمكن إلغاء عملية بيع تابعة ليوم تم إقفاله بالفعل.", "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -728,44 +518,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-                {
-                    conn.Open();
-                    using (SqliteTransaction transaction = conn.BeginTransaction())
-                    {
-                        try
-                        {
-                            using (SqliteCommand cmdUpdateStock = new SqliteCommand("UPDATE Products SET Quantity = Quantity + @Qty WHERE Barcode = @Barcode", conn, transaction))
-                            {
-                                cmdUpdateStock.Parameters.AddWithValue("@Qty", qty);
-                                cmdUpdateStock.Parameters.AddWithValue("@Barcode", barcode);
-                                cmdUpdateStock.ExecuteNonQuery();
-                            }
-
-                            if (imei != null)
-                            {
-                                using (SqliteCommand cmdUnit = new SqliteCommand("UPDATE ProductUnits SET Status = 'InStock', SaleId = NULL WHERE IMEI = @IMEI", conn, transaction))
-                                {
-                                    cmdUnit.Parameters.AddWithValue("@IMEI", imei);
-                                    cmdUnit.ExecuteNonQuery();
-                                }
-                            }
-
-                            using (SqliteCommand cmdDelete = new SqliteCommand("DELETE FROM Sales WHERE SaleID = @Id", conn, transaction))
-                            {
-                                cmdDelete.Parameters.AddWithValue("@Id", selectedSaleId);
-                                cmdDelete.ExecuteNonQuery();
-                            }
-
-                            transaction.Commit();
-                        }
-                        catch
-                        {
-                            transaction.Rollback();
-                            throw;
-                        }
-                    }
-                }
+                SalesRepository.CancelSale(selectedSaleId, existing.Barcode, existing.QuantitySold, existing.IMEI);
             }
             catch (Exception ex)
             {
@@ -812,56 +565,27 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BtnSendInvoiceWhatsApp_Click(object sender, EventArgs e)
         {
-            int saleId = 0; string productName = null; int quantitySold = 0; decimal total = 0; string saleDate = null; string customerPhone = null; string customerName = null;
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                try
-                {
-                    conn.Open();
-                    using (SqliteCommand cmd = new SqliteCommand(
-                        "SELECT S.SaleID, S.ProductName, S.QuantitySold, S.Total, S.SaleDate, C.Phone, C.CustomerName FROM Sales S LEFT JOIN Customers C ON S.CustomerId = C.CustomerId ORDER BY S.SaleID DESC LIMIT 1", conn))
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            saleId = Convert.ToInt32(reader["SaleID"]);
-                            productName = reader["ProductName"].ToString();
-                            quantitySold = Convert.ToInt32(reader["QuantitySold"]);
-                            total = Convert.ToDecimal(reader["Total"]);
-                            saleDate = reader["SaleDate"].ToString();
-                            customerPhone = reader["Phone"] != DBNull.Value ? reader["Phone"].ToString() : null;
-                            customerName = reader["CustomerName"] != DBNull.Value ? reader["CustomerName"].ToString() : null;
-                        }
-                    }
-                }
-                catch (Exception ex) { MessageBox.Show(ex.Message); }
-            }
-
-            if (productName == null)
+            var lastSale = SalesRepository.GetLastSaleWithCustomer();
+            if (lastSale.ProductName == null)
             {
                 MessageBox.Show("لا توجد عمليات بيع مسجلة بعد.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
+            decimal total = lastSale.Total;
+            string saleDate = lastSale.SaleDate;
+            string customerPhone = lastSale.CustomerPhone;
+            string customerName = lastSale.CustomerName;
+
             int dailyInvoiceNumber = 0;
-            using (SqliteConnection conn2 = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                try
-                {
-                    conn2.Open();
-                    using (SqliteCommand cmdDaily = new SqliteCommand("SELECT COUNT(*) FROM Sales WHERE date(SaleDate) = date(@SaleDate) AND SaleID <= @SaleId", conn2))
-                    {
-                        cmdDaily.Parameters.AddWithValue("@SaleDate", saleDate);
-                        cmdDaily.Parameters.AddWithValue("@SaleId", saleId);
-                        dailyInvoiceNumber = Convert.ToInt32(cmdDaily.ExecuteScalar());
-                    }
-                }
-                catch
-                {
-                    // البيع نفسه اتسجل بالفعل قبل الوصول هنا - لو رقم الفاتورة فشل يتجاب، بنكمل
-                    // برسالة واتساب من غيره بدل ما نوقف/نبلّغ خطأ على حاجة خلصت وسجلت صح
-                }
+                dailyInvoiceNumber = SalesRepository.GetDailyInvoiceNumber(lastSale.SaleId, saleDate);
+            }
+            catch
+            {
+                // البيع نفسه اتسجل بالفعل قبل الوصول هنا - لو رقم الفاتورة فشل يتجاب، بنكمل
+                // برسالة واتساب من غيره بدل ما نوقف/نبلّغ خطأ على حاجة خلصت وسجلت صح
             }
 
             string greetingName = customerName ?? "عميلنا العزيز";
@@ -1022,37 +746,18 @@ namespace Temo_Mobile_Store
 
             string productName = null; int quantitySold = 0; decimal total = 0; string saleDate = null; int dailyInvoiceNumber = 0;
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                try
-                {
-                    conn.Open();
-                    int lastSaleId = 0;
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT SaleID, ProductName, QuantitySold, Total, SaleDate FROM Sales ORDER BY SaleID DESC LIMIT 1", conn))
-                    using (SqliteDataReader reader = cmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            lastSaleId = Convert.ToInt32(reader["SaleID"]);
-                            productName = reader["ProductName"].ToString();
-                            quantitySold = Convert.ToInt32(reader["QuantitySold"]);
-                            total = Convert.ToDecimal(reader["Total"]);
-                            saleDate = reader["SaleDate"].ToString();
-                        }
-                    }
+                var lastSale = SalesRepository.GetLastSale();
+                productName = lastSale.ProductName;
+                quantitySold = lastSale.QuantitySold;
+                total = lastSale.Total;
+                saleDate = lastSale.SaleDate;
 
-                    if (lastSaleId > 0)
-                    {
-                        using (SqliteCommand cmdDaily = new SqliteCommand("SELECT COUNT(*) FROM Sales WHERE date(SaleDate) = date(@SaleDate) AND SaleID <= @SaleId", conn))
-                        {
-                            cmdDaily.Parameters.AddWithValue("@SaleDate", saleDate);
-                            cmdDaily.Parameters.AddWithValue("@SaleId", lastSaleId);
-                            dailyInvoiceNumber = Convert.ToInt32(cmdDaily.ExecuteScalar());
-                        }
-                    }
-                }
-                catch (Exception ex) { MessageBox.Show("حدث خطأ أثناء تجهيز الفاتورة: " + ex.Message); }
+                if (lastSale.SaleId > 0)
+                    dailyInvoiceNumber = SalesRepository.GetDailyInvoiceNumber(lastSale.SaleId, saleDate);
             }
+            catch (Exception ex) { MessageBox.Show("حدث خطأ أثناء تجهيز الفاتورة: " + ex.Message); }
 
             g.DrawString($"رقم الفاتورة: {dailyInvoiceNumber}", fontSmall, Brushes.DimGray, margin, yPos);
             yPos += isThermal ? 16 : 20;
