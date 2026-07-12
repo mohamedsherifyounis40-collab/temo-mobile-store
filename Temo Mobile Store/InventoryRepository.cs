@@ -167,54 +167,66 @@ namespace Temo_Mobile_Store
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-
-                using (SqliteCommand cmdCheckImei = new SqliteCommand("SELECT COUNT(*) FROM ProductUnits WHERE IMEI = @IMEI", conn))
+                using (SqliteTransaction transaction = conn.BeginTransaction())
                 {
-                    cmdCheckImei.Parameters.AddWithValue("@IMEI", imei);
-                    if (Convert.ToInt32(cmdCheckImei.ExecuteScalar()) > 0)
-                        throw new DuplicateImeiException(imei);
-                }
-
-                bool productExists = false;
-                if (!string.IsNullOrEmpty(barcode))
-                {
-                    using (SqliteCommand cmdCheck = new SqliteCommand("SELECT COUNT(*) FROM Products WHERE Barcode = @B", conn))
+                    try
                     {
-                        cmdCheck.Parameters.AddWithValue("@B", barcode);
-                        productExists = Convert.ToInt32(cmdCheck.ExecuteScalar()) > 0;
+                        using (SqliteCommand cmdCheckImei = new SqliteCommand("SELECT COUNT(*) FROM ProductUnits WHERE IMEI = @IMEI", conn, transaction))
+                        {
+                            cmdCheckImei.Parameters.AddWithValue("@IMEI", imei);
+                            if (Convert.ToInt32(cmdCheckImei.ExecuteScalar()) > 0)
+                                throw new DuplicateImeiException(imei);
+                        }
+
+                        bool productExists = false;
+                        if (!string.IsNullOrEmpty(barcode))
+                        {
+                            using (SqliteCommand cmdCheck = new SqliteCommand("SELECT COUNT(*) FROM Products WHERE Barcode = @B", conn, transaction))
+                            {
+                                cmdCheck.Parameters.AddWithValue("@B", barcode);
+                                productExists = Convert.ToInt32(cmdCheck.ExecuteScalar()) > 0;
+                            }
+                        }
+
+                        string finalBarcode = barcode;
+
+                        if (productExists)
+                        {
+                            using (SqliteCommand cmd = new SqliteCommand("UPDATE Products SET Quantity = Quantity + 1, Price = @U, IsSerialized = 1 WHERE Barcode = @B", conn, transaction))
+                            {
+                                cmd.Parameters.AddWithValue("@U", costPrice);
+                                cmd.Parameters.AddWithValue("@B", barcode);
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+                        else
+                        {
+                            finalBarcode = string.IsNullOrEmpty(barcode) ? ("NEW-" + DateTime.Now.Ticks) : barcode;
+                            using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Products (Barcode, ProductName, Price, SalePrice, Quantity, IsSerialized) VALUES (@B, @N, @U, @S, 1, 1)", conn, transaction))
+                            {
+                                cmd.Parameters.AddWithValue("@B", finalBarcode);
+                                cmd.Parameters.AddWithValue("@N", productName);
+                                cmd.Parameters.AddWithValue("@U", costPrice);
+                                cmd.Parameters.AddWithValue("@S", salePrice);
+                                cmd.ExecuteNonQuery();
+                            }
+                        }
+
+                        using (SqliteCommand cmd = new SqliteCommand("INSERT INTO ProductUnits (Barcode, IMEI, Status, PurchaseId, CreatedAt) VALUES (@B, @IMEI, 'InStock', NULL, @C)", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@B", finalBarcode);
+                            cmd.Parameters.AddWithValue("@IMEI", imei);
+                            cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
                     }
-                }
-
-                string finalBarcode = barcode;
-
-                if (productExists)
-                {
-                    using (SqliteCommand cmd = new SqliteCommand("UPDATE Products SET Quantity = Quantity + 1, Price = @U, IsSerialized = 1 WHERE Barcode = @B", conn))
+                    catch
                     {
-                        cmd.Parameters.AddWithValue("@U", costPrice);
-                        cmd.Parameters.AddWithValue("@B", barcode);
-                        cmd.ExecuteNonQuery();
+                        transaction.Rollback();
+                        throw;
                     }
-                }
-                else
-                {
-                    finalBarcode = string.IsNullOrEmpty(barcode) ? ("NEW-" + DateTime.Now.Ticks) : barcode;
-                    using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Products (Barcode, ProductName, Price, SalePrice, Quantity, IsSerialized) VALUES (@B, @N, @U, @S, 1, 1)", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@B", finalBarcode);
-                        cmd.Parameters.AddWithValue("@N", productName);
-                        cmd.Parameters.AddWithValue("@U", costPrice);
-                        cmd.Parameters.AddWithValue("@S", salePrice);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-
-                using (SqliteCommand cmd = new SqliteCommand("INSERT INTO ProductUnits (Barcode, IMEI, Status, PurchaseId, CreatedAt) VALUES (@B, @IMEI, 'InStock', NULL, @C)", conn))
-                {
-                    cmd.Parameters.AddWithValue("@B", finalBarcode);
-                    cmd.Parameters.AddWithValue("@IMEI", imei);
-                    cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                    cmd.ExecuteNonQuery();
                 }
             }
         }
