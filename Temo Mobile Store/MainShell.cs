@@ -442,7 +442,8 @@ namespace Temo_Mobile_Store
             {
                 Dock = DockStyle.Fill,
                 BackColor = ColorContentBg,
-                Padding = new Padding(20)
+                Padding = new Padding(20),
+                AutoScroll = true
             };
 
             this.Controls.Add(pnlContent);
@@ -821,10 +822,21 @@ namespace Temo_Mobile_Store
                 }
             }
 
-            // ترتيب الإضافة هنا مهم: الرسم البياني (Fill) الأول، بعدين العنوان (Top)،
+            // الشارت وكارت "الأكثر مبيعًا" اتحطوا جوه بانل بارتفاع ثابت (مش Dock.Fill مباشرة على
+            // pnlContent) عشان لما المحتوى فوقهم يزيد عن ارتفاع الشاشة، الصف ده يفضل بحجمه
+            // الطبيعي بدل ما ينكمش لحجم صفر، وبالتالي الـ AutoScroll بتاع pnlContent يشتغل صح.
+            Panel pnlChartRow = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 320,
+                BackColor = ColorContentBg
+            };
+            pnlChartRow.Controls.Add(chart);
+            pnlChartRow.Controls.Add(pnlTopProducts);
+
+            // ترتيب الإضافة هنا مهم: صف الشارت (Top، ارتفاع ثابت) الأول، بعدين العنوان (Top)،
             // وأخيرًا صف الكروت (Top) عشان يفضل هو أقرب حاجة لحافة الشاشة العليا
-            pnlContent.Controls.Add(chart);
-            pnlContent.Controls.Add(pnlTopProducts);
+            pnlContent.Controls.Add(pnlChartRow);
             pnlContent.Controls.Add(lblChartTitle);
             pnlContent.Controls.Add(flowBalances);
             pnlContent.Controls.Add(lblBalancesTitle);
@@ -910,24 +922,34 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private Panel CreateKpiCard(string icon, Color accentColor, string title, string value)
         {
-            Panel card = new Panel
+            Guna2Panel card = new Guna2Panel
             {
                 Width = 195,
-                Height = 105,
-                BackColor = Color.White,
+                Height = 120,
+                FillColor = Color.White,
+                BorderRadius = 14,
+                BorderColor = Color.FromArgb(230, 232, 238),
+                BorderThickness = 1,
                 Margin = new Padding(8)
             };
 
-            Label lblIcon = new Label
+            Guna2Panel lblIcon = new Guna2Panel
             {
-                Text = icon,
-                Font = new Font("Segoe UI", 16F),
-                BackColor = LightTint(accentColor, 0.85f),
-                ForeColor = accentColor,
-                TextAlign = ContentAlignment.MiddleCenter,
+                FillColor = LightTint(accentColor, 0.85f),
+                BorderRadius = 10,
                 Location = new Point(15, 15),
                 Size = new Size(42, 42)
             };
+            Label lblIconText = new Label
+            {
+                Text = icon,
+                Font = new Font("Segoe UI", 16F),
+                ForeColor = accentColor,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent
+            };
+            lblIcon.Controls.Add(lblIconText);
 
             Label lblTitle = new Label
             {
@@ -935,7 +957,7 @@ namespace Temo_Mobile_Store
                 Font = new Font("Segoe UI", 8.5F),
                 ForeColor = Color.FromArgb(85, 92, 102),
                 AutoSize = true,
-                Location = new Point(15, 65)
+                Location = new Point(15, 62)
             };
 
             Label lblValue = new Label
@@ -944,7 +966,7 @@ namespace Temo_Mobile_Store
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 ForeColor = ColorTitleText,
                 AutoSize = true,
-                Location = new Point(15, 84)
+                Location = new Point(15, 80)
             };
 
             card.Controls.Add(lblIcon);
