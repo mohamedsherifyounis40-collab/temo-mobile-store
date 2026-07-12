@@ -5,7 +5,6 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
-using Microsoft.Data.Sqlite;
 
 namespace Temo_Mobile_Store
 {
@@ -105,23 +104,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void LoadInventoryCountGrid()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.Add("الباركود");
-            dt.Columns.Add("اسم المنتج");
-            dt.Columns.Add("الكمية بالنظام", typeof(int));
-            dt.Columns.Add("الكمية الفعلية");
-            dt.Columns.Add("الفرق");
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, ProductName, Quantity FROM Products ORDER BY ProductName ASC", conn))
-                using (SqliteDataReader reader = cmd.ExecuteReader())
-                {
-                    while (reader.Read())
-                        dt.Rows.Add(reader["Barcode"].ToString(), reader["ProductName"].ToString(), Convert.ToInt32(reader["Quantity"]), "", "");
-                }
-            }
+            DataTable dt = InventoryRepository.GetProductsForCount();
 
             dgvInventoryCount.DataSource = dt;
             dgvInventoryCount.Columns["الباركود"].ReadOnly = true;
@@ -189,7 +172,7 @@ namespace Temo_Mobile_Store
         {
             if (!(dgvInventoryCount.DataSource is DataTable dt)) return;
 
-            var changedRows = new List<(string Barcode, string ProductName, int SystemQty, int CountedQty, int Difference)>();
+            var changedRows = new List<InventoryAdjustmentRow>();
 
             foreach (DataRow dr in dt.Rows)
             {
@@ -201,7 +184,14 @@ namespace Temo_Mobile_Store
                 int diff = countedQty - systemQty;
                 if (diff == 0) continue; // مطابق، مفيش داعي نسجله في السجل
 
-                changedRows.Add((dr["الباركود"].ToString(), dr["اسم المنتج"].ToString(), systemQty, countedQty, diff));
+                changedRows.Add(new InventoryAdjustmentRow
+                {
+                    Barcode = dr["الباركود"].ToString(),
+                    ProductName = dr["اسم المنتج"].ToString(),
+                    SystemQty = systemQty,
+                    CountedQty = countedQty,
+                    Difference = diff
+                });
             }
 
             if (changedRows.Count == 0)
@@ -214,43 +204,14 @@ namespace Temo_Mobile_Store
             var confirm = MessageBox.Show($"هيتم تعديل كمية {changedRows.Count} صنف في المخزون حسب نتيجة الجرد ده:\n\n{summary}\n\nمتأكد إنك عايز تكمل؟", "تأكيد تسوية الجرد", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
             if (confirm != DialogResult.Yes) return;
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-                using (var transaction = conn.BeginTransaction())
-                {
-                    try
-                    {
-                        string nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                        foreach (var r in changedRows)
-                        {
-                            using (SqliteCommand cmdUpdate = new SqliteCommand("UPDATE Products SET Quantity = @NewQty WHERE Barcode = @Barcode", conn, transaction))
-                            {
-                                cmdUpdate.Parameters.AddWithValue("@NewQty", r.CountedQty);
-                                cmdUpdate.Parameters.AddWithValue("@Barcode", r.Barcode);
-                                cmdUpdate.ExecuteNonQuery();
-                            }
-
-                            using (SqliteCommand cmdLog = new SqliteCommand("INSERT INTO InventoryAdjustments (Barcode, ProductName, SystemQuantityBefore, CountedQuantity, Difference, AdjustmentDate) VALUES (@Barcode, @Name, @Before, @Counted, @Diff, @Date)", conn, transaction))
-                            {
-                                cmdLog.Parameters.AddWithValue("@Barcode", r.Barcode);
-                                cmdLog.Parameters.AddWithValue("@Name", r.ProductName);
-                                cmdLog.Parameters.AddWithValue("@Before", r.SystemQty);
-                                cmdLog.Parameters.AddWithValue("@Counted", r.CountedQty);
-                                cmdLog.Parameters.AddWithValue("@Diff", r.Difference);
-                                cmdLog.Parameters.AddWithValue("@Date", nowStr);
-                                cmdLog.ExecuteNonQuery();
-                            }
-                        }
-                        transaction.Commit();
-                    }
-                    catch (Exception ex)
-                    {
-                        transaction.Rollback();
-                        MessageBox.Show("حصل خطأ أثناء حفظ الجرد: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-                }
+                InventoryRepository.SaveInventoryAdjustments(changedRows);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("حصل خطأ أثناء حفظ الجرد: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
 
             MessageBox.Show($"تم تسوية {changedRows.Count} صنف بنجاح", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -259,26 +220,15 @@ namespace Temo_Mobile_Store
 
         private void BtnViewAdjustmentsLog_Click(object sender, EventArgs e)
         {
-            DataTable dt = new DataTable();
-            dt.Columns.Add("التاريخ والوقت");
-            dt.Columns.Add("الباركود");
-            dt.Columns.Add("اسم المنتج");
-            dt.Columns.Add("الكمية قبل الجرد");
-            dt.Columns.Add("الكمية بعد الجرد");
-            dt.Columns.Add("الفرق");
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            DataTable dt;
+            try
             {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT AdjustmentDate, Barcode, ProductName, SystemQuantityBefore, CountedQuantity, Difference FROM InventoryAdjustments ORDER BY AdjustmentId DESC", conn))
-                using (SqliteDataReader reader = cmd.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        int diff = Convert.ToInt32(reader["Difference"]);
-                        dt.Rows.Add(reader["AdjustmentDate"], reader["Barcode"], reader["ProductName"], reader["SystemQuantityBefore"], reader["CountedQuantity"], diff > 0 ? $"+{diff}" : diff.ToString());
-                    }
-                }
+                dt = InventoryRepository.GetAdjustmentsLog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+                return;
             }
 
             using (Form logForm = new Form() { Text = "سجل تسويات الجرد", Size = new Size(900, 600), StartPosition = FormStartPosition.CenterParent, RightToLeft = RightToLeft.Yes, RightToLeftLayout = true })

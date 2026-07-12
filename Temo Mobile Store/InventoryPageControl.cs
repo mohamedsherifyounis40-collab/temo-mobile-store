@@ -3,7 +3,6 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
-using Microsoft.Data.Sqlite;
 
 namespace Temo_Mobile_Store
 {
@@ -208,28 +207,13 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void LoadProductsData()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("الباركود"), new DataColumn("اسم المنتج"), new DataColumn("سعر الشراء"), new DataColumn("سعر البيع"), new DataColumn("الكمية") });
-            string query = "SELECT Barcode, ProductName, Price, SalePrice, Quantity FROM Products WHERE IsSerialized = 0 OR IsSerialized IS NULL ORDER BY ROWID ASC";
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                dt.Rows.Add(reader["Barcode"], reader["ProductName"], reader["Price"], reader["SalePrice"], reader["Quantity"]);
-                        }
-                        dgvProducts.DataSource = dt;
-                        HighlightOutOfStockRows();
-                        if (!AuthManager.IsAdmin && dgvProducts.Columns["سعر الشراء"] != null) dgvProducts.Columns["سعر الشراء"].Visible = false;
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                dgvProducts.DataSource = InventoryRepository.GetAccessoryProducts();
+                HighlightOutOfStockRows();
+                if (!AuthManager.IsAdmin && dgvProducts.Columns["سعر الشراء"] != null) dgvProducts.Columns["سعر الشراء"].Visible = false;
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void HighlightOutOfStockRows()
@@ -280,27 +264,14 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            string query = "INSERT INTO Products (Barcode, ProductName, Price, SalePrice, Quantity, IsSerialized) VALUES (@Barcode, @ProductName, @Price, @SalePrice, @Quantity, 0)";
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@Barcode", txtBarcode.Text);
-                    cmd.Parameters.AddWithValue("@ProductName", txtProductName.Text);
-                    cmd.Parameters.AddWithValue("@Price", costPrice);
-                    cmd.Parameters.AddWithValue("@SalePrice", salePrice);
-                    cmd.Parameters.AddWithValue("@Quantity", quantity);
-                    try
-                    {
-                        conn.Open();
-                        cmd.ExecuteNonQuery();
-                        LoadProductsData();
-                        ClearInputs();
-                        MessageBox.Show("تم إضافة المنتج بنجاح!", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                InventoryRepository.AddAccessoryProduct(txtBarcode.Text, txtProductName.Text, costPrice, salePrice, quantity);
+                LoadProductsData();
+                ClearInputs();
+                MessageBox.Show("تم إضافة المنتج بنجاح!", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void BtnEditMode_Click(object sender, EventArgs e)
@@ -331,27 +302,14 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            string query = "UPDATE Products SET ProductName = @ProductName, Price = @Price, SalePrice = @SalePrice, Quantity = @Quantity WHERE Barcode = @Barcode";
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@Barcode", txtBarcode.Text);
-                    cmd.Parameters.AddWithValue("@ProductName", txtProductName.Text);
-                    cmd.Parameters.AddWithValue("@Price", costPrice);
-                    cmd.Parameters.AddWithValue("@SalePrice", salePrice);
-                    cmd.Parameters.AddWithValue("@Quantity", quantity);
-                    try
-                    {
-                        conn.Open();
-                        cmd.ExecuteNonQuery();
-                        LoadProductsData();
-                        btnSaveUpdate.Enabled = false;
-                        MessageBox.Show("تم تعديل المنتج!", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                InventoryRepository.UpdateAccessoryProduct(txtBarcode.Text, txtProductName.Text, costPrice, salePrice, quantity);
+                LoadProductsData();
+                btnSaveUpdate.Enabled = false;
+                MessageBox.Show("تم تعديل المنتج!", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void ClearInputs()
@@ -371,16 +329,8 @@ namespace Temo_Mobile_Store
             if (string.IsNullOrEmpty(txtBarcode.Text)) return;
             if (MessageBox.Show("حذف المنتج؟", "تحذير", MessageBoxButtons.YesNo) == DialogResult.Yes)
             {
-                string query = "DELETE FROM Products WHERE Barcode = @Barcode";
-                using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-                {
-                    using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@Barcode", txtBarcode.Text);
-                        try { conn.Open(); cmd.ExecuteNonQuery(); LoadProductsData(); ClearInputs(); }
-                        catch (Exception ex) { MessageBox.Show(ex.Message); }
-                    }
-                }
+                try { InventoryRepository.DeleteProduct(txtBarcode.Text); LoadProductsData(); ClearInputs(); }
+                catch (Exception ex) { MessageBox.Show(ex.Message); }
             }
         }
 
@@ -464,44 +414,15 @@ namespace Temo_Mobile_Store
         {
             if (dgvImeiUnits == null) return;
 
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("IMEI"), new DataColumn("الباركود"), new DataColumn("المنتج"), new DataColumn("الحالة"), new DataColumn("تاريخ الإضافة") });
-
             string statusFilter = cmbImeiStatusFilter?.SelectedItem?.ToString() ?? "الكل";
             string search = txtImeiSearch?.Text?.Trim() ?? "";
 
-            string query = @"SELECT PU.IMEI, PU.Barcode, PU.Status, PU.CreatedAt, P.ProductName
-                FROM ProductUnits PU LEFT JOIN Products P ON PU.Barcode = P.Barcode
-                WHERE (PU.IMEI LIKE @Search OR P.ProductName LIKE @Search)";
-
-            if (statusFilter == "متاح في المخزون") query += " AND PU.Status = 'InStock'";
-            else if (statusFilter == "مباع") query += " AND PU.Status = 'Sold'";
-
-            query += " ORDER BY PU.CreatedAt DESC";
-
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@Search", "%" + search + "%");
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                string statusArabic = reader["Status"].ToString() == "InStock" ? "متاح في المخزون" : (reader["Status"].ToString() == "Sold" ? "مباع" : reader["Status"].ToString());
-                                dt.Rows.Add(reader["IMEI"], reader["Barcode"], reader["ProductName"], statusArabic, reader["CreatedAt"]);
-                            }
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                dgvImeiUnits.DataSource = InventoryRepository.GetImeiUnits(statusFilter, search);
+                if (dgvImeiUnits.Columns["الباركود"] != null) dgvImeiUnits.Columns["الباركود"].Visible = false;
             }
-
-            dgvImeiUnits.DataSource = dt;
-            if (dgvImeiUnits.Columns["الباركود"] != null) dgvImeiUnits.Columns["الباركود"].Visible = false;
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         // ==========================================================================
@@ -514,29 +435,20 @@ namespace Temo_Mobile_Store
             string barcode = dgvImeiUnits.Rows[e.RowIndex].Cells["الباركود"].Value?.ToString();
             if (string.IsNullOrEmpty(barcode)) return;
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("SELECT ProductName, Price, SalePrice FROM Products WHERE Barcode = @B", conn))
-                {
-                    cmd.Parameters.AddWithValue("@B", barcode);
-                    try
-                    {
-                        conn.Open();
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            if (!reader.Read()) return;
-                            selectedDeviceBarcode = barcode;
-                            txtQaBarcode.Text = barcode;
-                            txtQaProductName.Text = reader["ProductName"].ToString();
-                            txtQaCostPrice.Text = reader["Price"].ToString();
-                            txtQaSalePrice.Text = reader["SalePrice"].ToString();
-                            txtQaImei.Clear();
-                            txtQaBarcode.ReadOnly = true;
-                        }
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                ProductForPurchase product = InventoryRepository.GetProductByBarcode(barcode);
+                if (product == null) return;
+
+                selectedDeviceBarcode = barcode;
+                txtQaBarcode.Text = barcode;
+                txtQaProductName.Text = product.ProductName;
+                txtQaCostPrice.Text = product.Price.ToString();
+                txtQaSalePrice.Text = product.SalePrice.ToString();
+                txtQaImei.Clear();
+                txtQaBarcode.ReadOnly = true;
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         // ==========================================================================
@@ -555,25 +467,14 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE Products SET ProductName = @Name, Price = @Cost, SalePrice = @Sale WHERE Barcode = @Barcode", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Name", txtQaProductName.Text);
-                    cmd.Parameters.AddWithValue("@Cost", costPrice);
-                    cmd.Parameters.AddWithValue("@Sale", salePrice);
-                    cmd.Parameters.AddWithValue("@Barcode", selectedDeviceBarcode);
-                    try
-                    {
-                        conn.Open();
-                        cmd.ExecuteNonQuery();
-                        MessageBox.Show("تم تعديل سعر الموديل بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        LoadImeiUnitsGrid();
-                        ClearDeviceInputs();
-                    }
-                    catch (Exception ex) { MessageBox.Show(ex.Message); }
-                }
+                InventoryRepository.UpdateModelPrice(selectedDeviceBarcode, txtQaProductName.Text, costPrice, salePrice);
+                MessageBox.Show("تم تعديل سعر الموديل بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                LoadImeiUnitsGrid();
+                ClearDeviceInputs();
             }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         // ==========================================================================
@@ -592,72 +493,19 @@ namespace Temo_Mobile_Store
             string imei = txtQaImei.Text.Trim();
             string barcode = txtQaBarcode.Text.Trim();
 
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            try
             {
-                conn.Open();
-
-                using (SqliteCommand cmdCheckImei = new SqliteCommand("SELECT COUNT(*) FROM ProductUnits WHERE IMEI = @IMEI", conn))
-                {
-                    cmdCheckImei.Parameters.AddWithValue("@IMEI", imei);
-                    if (Convert.ToInt32(cmdCheckImei.ExecuteScalar()) > 0)
-                    {
-                        MessageBox.Show($"رقم الـIMEI \"{imei}\" مسجل بالفعل في النظام من قبل.", "رقم مكرر", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-                }
-
-                bool productExists = false;
-                if (!string.IsNullOrEmpty(barcode))
-                {
-                    using (SqliteCommand cmdCheck = new SqliteCommand("SELECT COUNT(*) FROM Products WHERE Barcode = @B", conn))
-                    {
-                        cmdCheck.Parameters.AddWithValue("@B", barcode);
-                        productExists = Convert.ToInt32(cmdCheck.ExecuteScalar()) > 0;
-                    }
-                }
-
-                string finalBarcode = barcode;
-
-                try
-                {
-                    if (productExists)
-                    {
-                        using (SqliteCommand cmd = new SqliteCommand(
-                            "UPDATE Products SET Quantity = Quantity + 1, Price = @U, IsSerialized = 1 WHERE Barcode = @B", conn))
-                        {
-                            cmd.Parameters.AddWithValue("@U", costPrice);
-                            cmd.Parameters.AddWithValue("@B", barcode);
-                            cmd.ExecuteNonQuery();
-                        }
-                    }
-                    else
-                    {
-                        finalBarcode = string.IsNullOrEmpty(barcode) ? ("NEW-" + DateTime.Now.Ticks) : barcode;
-                        using (SqliteCommand cmd = new SqliteCommand(
-                            "INSERT INTO Products (Barcode, ProductName, Price, SalePrice, Quantity, IsSerialized) VALUES (@B, @N, @U, @S, 1, 1)", conn))
-                        {
-                            cmd.Parameters.AddWithValue("@B", finalBarcode);
-                            cmd.Parameters.AddWithValue("@N", txtQaProductName.Text.Trim());
-                            cmd.Parameters.AddWithValue("@U", costPrice);
-                            cmd.Parameters.AddWithValue("@S", salePrice);
-                            cmd.ExecuteNonQuery();
-                        }
-                    }
-
-                    using (SqliteCommand cmd = new SqliteCommand(
-                        "INSERT INTO ProductUnits (Barcode, IMEI, Status, PurchaseId, CreatedAt) VALUES (@B, @IMEI, 'InStock', NULL, @C)", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@B", finalBarcode);
-                        cmd.Parameters.AddWithValue("@IMEI", imei);
-                        cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("حصل خطأ: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
+                InventoryRepository.AddDevice(barcode, txtQaProductName.Text.Trim(), costPrice, salePrice, imei);
+            }
+            catch (DuplicateImeiException ex)
+            {
+                MessageBox.Show(ex.Message, "رقم مكرر", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("حصل خطأ: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
 
             MessageBox.Show("تم إضافة الجهاز للمخزون بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
