@@ -316,9 +316,13 @@ namespace Temo_Mobile_Store
             try
             {
                 DataTable dt = AttendanceRepository.GetEmployeesCombo();
-                cmbStatementEmployee.DataSource = dt;
+                // ملحوظة مهمة: لازم نحط DisplayMember/ValueMember قبل DataSource، لأن تعيين
+                // DataSource بيطلق SelectedIndexChanged فورًا (بيختار أول صف تلقائيًا)، ولو
+                // ValueMember لسه فاضي وقتها، SelectedValue بترجّع الـ DataRowView الخام مش القيمة
+                // (EmployeeId) - وده اللي كان بيسبب InvalidCastException في LoadEmployeeStatement.
                 cmbStatementEmployee.DisplayMember = "FullName";
                 cmbStatementEmployee.ValueMember = "EmployeeId";
+                cmbStatementEmployee.DataSource = dt;
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
