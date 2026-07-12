@@ -54,31 +54,91 @@ namespace Temo_Mobile_Store
             }
         }
 
-        public static void AddExpense(int accountCode, decimal amount)
+        // تسجيل مصروف بيخصم من رصيد وسيلة الدفع بنفس منطق حركة "صرف" بالظبط
+        public static void AddExpense(int accountCode, decimal amount, string paymentMethod)
         {
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Expenses (AccountCode, Amount) VALUES (@AccountCode, @Amount)", conn))
+                using (SqliteTransaction transaction = conn.BeginTransaction())
                 {
-                    cmd.Parameters.AddWithValue("@AccountCode", accountCode);
-                    cmd.Parameters.AddWithValue("@Amount", amount);
-                    cmd.ExecuteNonQuery();
+                    try
+                    {
+                        decimal currentBalance = GetBalanceInTransaction(conn, transaction, paymentMethod);
+                        if (amount > currentBalance)
+                            throw new InsufficientBalanceException(paymentMethod, currentBalance);
+
+                        using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Expenses (AccountCode, Amount, PaymentMethod) VALUES (@AccountCode, @Amount, @Method)", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@AccountCode", accountCode);
+                            cmd.Parameters.AddWithValue("@Amount", amount);
+                            cmd.Parameters.AddWithValue("@Method", paymentMethod);
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        SetBalanceInTransaction(conn, transaction, paymentMethod, currentBalance - amount);
+                        transaction.Commit();
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
                 }
             }
         }
 
-        public static void UpdateExpense(int expenseId, int accountCode, decimal amount)
+        public static void UpdateExpense(int expenseId, int accountCode, decimal amount, string paymentMethod)
         {
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE Expenses SET AccountCode = @AccountCode, Amount = @Amount WHERE ExpenseID = @ExpenseID", conn))
+                using (SqliteTransaction transaction = conn.BeginTransaction())
                 {
-                    cmd.Parameters.AddWithValue("@AccountCode", accountCode);
-                    cmd.Parameters.AddWithValue("@Amount", amount);
-                    cmd.Parameters.AddWithValue("@ExpenseID", expenseId);
-                    cmd.ExecuteNonQuery();
+                    try
+                    {
+                        string oldMethod; decimal oldAmount;
+                        using (SqliteCommand cmd = new SqliteCommand("SELECT Amount, PaymentMethod FROM Expenses WHERE ExpenseID = @Id", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@Id", expenseId);
+                            using (SqliteDataReader reader = cmd.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                    throw new InvalidOperationException("لم يتم العثور على حركة المصروف.");
+                                oldAmount = Convert.ToDecimal(reader["Amount"]);
+                                oldMethod = reader["PaymentMethod"] == DBNull.Value ? "نقدي" : reader["PaymentMethod"].ToString();
+                            }
+                        }
+
+                        decimal oldMethodBalance = GetBalanceInTransaction(conn, transaction, oldMethod);
+                        decimal revertedOldBalance = oldMethodBalance + oldAmount;
+
+                        decimal newMethodBalance = paymentMethod == oldMethod
+                            ? revertedOldBalance
+                            : GetBalanceInTransaction(conn, transaction, paymentMethod);
+
+                        if (amount > newMethodBalance)
+                            throw new InsufficientBalanceException(paymentMethod, newMethodBalance);
+
+                        SetBalanceInTransaction(conn, transaction, oldMethod, revertedOldBalance);
+                        SetBalanceInTransaction(conn, transaction, paymentMethod, newMethodBalance - amount);
+
+                        using (SqliteCommand cmd = new SqliteCommand("UPDATE Expenses SET AccountCode = @AccountCode, Amount = @Amount, PaymentMethod = @Method WHERE ExpenseID = @ExpenseID", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@AccountCode", accountCode);
+                            cmd.Parameters.AddWithValue("@Amount", amount);
+                            cmd.Parameters.AddWithValue("@Method", paymentMethod);
+                            cmd.Parameters.AddWithValue("@ExpenseID", expenseId);
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
                 }
             }
         }
@@ -88,10 +148,39 @@ namespace Temo_Mobile_Store
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("DELETE FROM Expenses WHERE ExpenseID = @ExpenseID", conn))
+                using (SqliteTransaction transaction = conn.BeginTransaction())
                 {
-                    cmd.Parameters.AddWithValue("@ExpenseID", expenseId);
-                    cmd.ExecuteNonQuery();
+                    try
+                    {
+                        decimal amount; string method;
+                        using (SqliteCommand cmd = new SqliteCommand("SELECT Amount, PaymentMethod FROM Expenses WHERE ExpenseID = @Id", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@Id", expenseId);
+                            using (SqliteDataReader reader = cmd.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                    throw new InvalidOperationException("لم يتم العثور على حركة المصروف.");
+                                amount = Convert.ToDecimal(reader["Amount"]);
+                                method = reader["PaymentMethod"] == DBNull.Value ? "نقدي" : reader["PaymentMethod"].ToString();
+                            }
+                        }
+
+                        decimal currentBalance = GetBalanceInTransaction(conn, transaction, method);
+                        SetBalanceInTransaction(conn, transaction, method, currentBalance + amount);
+
+                        using (SqliteCommand cmd = new SqliteCommand("DELETE FROM Expenses WHERE ExpenseID = @ExpenseID", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@ExpenseID", expenseId);
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
                 }
             }
         }
@@ -104,10 +193,11 @@ namespace Temo_Mobile_Store
                 new DataColumn("كود الحساب"),
                 new DataColumn("اسم بند المصروف"),
                 new DataColumn("المبلغ ج.م"),
+                new DataColumn("وسيلة الدفع"),
                 new DataColumn("التاريخ والوقت ⏰")
             });
 
-            string query = @"SELECT E.ExpenseID, E.AccountCode, A.AccountName, E.Amount, E.ExpenseDate
+            string query = @"SELECT E.ExpenseID, E.AccountCode, A.AccountName, E.Amount, E.PaymentMethod, E.ExpenseDate
                              FROM Expenses E
                              INNER JOIN AccountsTree A ON E.AccountCode = A.AccountCode
                              ORDER BY E.ExpenseID ASC";
@@ -119,7 +209,7 @@ namespace Temo_Mobile_Store
                 using (SqliteDataReader reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
-                        dt.Rows.Add(reader["ExpenseID"], reader["AccountCode"], reader["AccountName"], reader["Amount"], reader["ExpenseDate"]);
+                        dt.Rows.Add(reader["ExpenseID"], reader["AccountCode"], reader["AccountName"], reader["Amount"], reader["PaymentMethod"] == DBNull.Value ? "نقدي" : reader["PaymentMethod"], reader["ExpenseDate"]);
                 }
             }
             return dt;

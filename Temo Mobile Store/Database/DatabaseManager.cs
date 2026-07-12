@@ -223,6 +223,54 @@ namespace Temo_Mobile_Store.Database
                         cmd.ExecuteNonQuery();
                     }
                 }
+
+                EnsureExpensesPaymentMethodColumn(conn);
+            }
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود PaymentMethod لجدول Expenses (كان ناقص من الأول، عشان كده
+        // تسجيل مصروف كان بيسجل بس من غير ما يأثر على رصيد أي وسيلة دفع). بيضيف
+        // العمود لو مش موجود، وبيربط أي مصروفات قديمة بوسيلة "نقدي" مع خصم
+        // إجماليها مرة واحدة بس من رصيدها (مايتكررش في المرات الجاية، لأن
+        // بعد أول مرة كل الصفوف بيبقى ليها PaymentMethod محدد).
+        // ==========================================================================
+        private static void EnsureExpensesPaymentMethodColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(Expenses);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "PaymentMethod", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE Expenses ADD COLUMN PaymentMethod TEXT;");
+
+            decimal unassignedTotal = 0;
+            using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM Expenses WHERE PaymentMethod IS NULL;", conn))
+            {
+                var result = cmd.ExecuteScalar();
+                if (result != null && result != DBNull.Value) unassignedTotal = Convert.ToDecimal(result);
+            }
+
+            if (unassignedTotal == 0) return;
+
+            using (SqliteCommand cmd = new SqliteCommand("UPDATE Expenses SET PaymentMethod = 'نقدي' WHERE PaymentMethod IS NULL;", conn))
+                cmd.ExecuteNonQuery();
+
+            using (SqliteCommand cmd = new SqliteCommand(
+                "UPDATE PaymentMethodBalances SET CurrentBalance = CurrentBalance - @Total WHERE PaymentMethod = 'نقدي';", conn))
+            {
+                cmd.Parameters.AddWithValue("@Total", unassignedTotal);
+                cmd.ExecuteNonQuery();
             }
         }
 

@@ -30,6 +30,7 @@ namespace Temo_Mobile_Store
 
         // ---------- المصروفات ----------
         private ComboBox cmbExpenseAccounts;
+        private Guna2ComboBox cmbExpensePaymentMethod;
         private Guna2TextBox txtExpenseAmount;
         private Guna2Button btnSaveExpenseUpdate, btnEditExpenseMode, btnDeleteExpense;
         private DataGridView dgvExpenses;
@@ -62,7 +63,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         public void ShowMovementEntry(string movementType)
         {
-            cmbTreasuryOperationType.SelectedIndex = 1;
+            cmbTreasuryOperationType.SelectedIndex = movementType == "صرف" ? 2 : 1; // 0=مصروف، 1=قبض، 2=صرف
             if (cmbMovementType.Items.Contains(movementType))
                 cmbMovementType.SelectedItem = movementType;
         }
@@ -90,7 +91,7 @@ namespace Temo_Mobile_Store
         {
             Label lblOpType = new Label() { Text = "نوع العملية:", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
             cmbTreasuryOperationType = new Guna2ComboBox() { Location = new Point(130, 17), Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
-            cmbTreasuryOperationType.Items.AddRange(new string[] { "مصروف عمومي 💸", "حركة قبض/صرف 💰" });
+            cmbTreasuryOperationType.Items.AddRange(new string[] { "مصروف عمومي 💸", "قبض 💰", "صرف 💸" });
             cmbTreasuryOperationType.SelectedIndexChanged += CmbTreasuryOperationType_SelectedIndexChanged;
 
             pnlExpenseOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
@@ -109,7 +110,11 @@ namespace Temo_Mobile_Store
         {
             int idx = cmbTreasuryOperationType.SelectedIndex;
             pnlExpenseOps.Visible = idx == 0;
-            pnlMovementOps.Visible = idx == 1;
+            pnlMovementOps.Visible = idx != 0;
+
+            // idx 1 = قبض، idx 2 = صرف - بنحدد نوع الحركة تلقائيًا في بانل القبض/الصرف
+            if (idx == 1) cmbMovementType.SelectedItem = "قبض";
+            else if (idx == 2) cmbMovementType.SelectedItem = "صرف";
         }
 
         // ==========================================================================
@@ -117,28 +122,32 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildExpensesPanel()
         {
-            Guna2Panel gbAddExpense = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 360), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbAddExpense = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 410), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblExpTitleCard = new Label() { Text = "💸 تسجيل مصروف", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblExpAcc = new Label() { Text = "اختر بند الحساب المصروف:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             cmbExpenseAccounts = new ComboBox() { Location = new Point(20, 70), Width = 240, DropDownStyle = ComboBoxStyle.DropDownList };
 
-            Label lblExpAmount = new Label() { Text = "المبلغ المدفوع (ج.م):", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtExpenseAmount = new Guna2TextBox() { Location = new Point(20, 128), Width = 240, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            Label lblExpAmount = new Label() { Text = "المبلغ المدفوع (ج.م):", Location = new Point(20, 114), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtExpenseAmount = new Guna2TextBox() { Location = new Point(20, 134), Width = 240, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnAddExpense = new Guna2Button() { Text = "تسجيل مصروف جديد 💸", Location = new Point(20, 168), Width = 240, Height = 38, FillColor = ColorSuccess, Font = new Font("Segoe UI", 9, FontStyle.Bold), BorderRadius = 10 };
+            Label lblExpPaymentMethod = new Label() { Text = "اتخصم من وسيلة الدفع:", Location = new Point(20, 178), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbExpensePaymentMethod = new Guna2ComboBox() { Location = new Point(20, 198), Width = 240, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            cmbExpensePaymentMethod.Items.AddRange(UIHelpers.PaymentMethods);
+
+            Guna2Button btnAddExpense = new Guna2Button() { Text = "تسجيل مصروف جديد 💸", Location = new Point(20, 240), Width = 240, Height = 38, FillColor = ColorSuccess, Font = new Font("Segoe UI", 9, FontStyle.Bold), BorderRadius = 10 };
             btnAddExpense.Click += BtnAddExpense_Click;
 
-            btnEditExpenseMode = new Guna2Button() { Text = "تعديل البند المحدّد", Location = new Point(20, 214), Width = 240, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
+            btnEditExpenseMode = new Guna2Button() { Text = "تعديل البند المحدّد", Location = new Point(20, 286), Width = 240, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
             btnEditExpenseMode.Click += BtnEditExpenseMode_Click;
 
-            btnSaveExpenseUpdate = new Guna2Button() { Text = "حفظ تعديل المصروف 💾", Location = new Point(20, 254), Width = 240, Height = 34, FillColor = ColorWarning, Font = new Font("Segoe UI", 9, FontStyle.Bold), Enabled = false, BorderRadius = 9 };
+            btnSaveExpenseUpdate = new Guna2Button() { Text = "حفظ تعديل المصروف 💾", Location = new Point(20, 326), Width = 240, Height = 34, FillColor = ColorWarning, Font = new Font("Segoe UI", 9, FontStyle.Bold), Enabled = false, BorderRadius = 9 };
             btnSaveExpenseUpdate.Click += BtnSaveExpenseUpdate_Click;
 
-            btnDeleteExpense = new Guna2Button() { Text = "حذف بند المصروف", Location = new Point(20, 296), Width = 240, Height = 32, FillColor = ColorDanger, BorderRadius = 9 };
+            btnDeleteExpense = new Guna2Button() { Text = "حذف بند المصروف", Location = new Point(20, 368), Width = 240, Height = 32, FillColor = ColorDanger, BorderRadius = 9 };
             btnDeleteExpense.Click += BtnDeleteExpense_Click;
 
-            gbAddExpense.Controls.AddRange(new Control[] { lblExpTitleCard, lblExpAcc, cmbExpenseAccounts, lblExpAmount, txtExpenseAmount, btnAddExpense, btnEditExpenseMode, btnSaveExpenseUpdate, btnDeleteExpense });
+            gbAddExpense.Controls.AddRange(new Control[] { lblExpTitleCard, lblExpAcc, cmbExpenseAccounts, lblExpAmount, txtExpenseAmount, lblExpPaymentMethod, cmbExpensePaymentMethod, btnAddExpense, btnEditExpenseMode, btnSaveExpenseUpdate, btnDeleteExpense });
 
             Guna2Panel pnlExpGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 645), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblExpTitle = new Label() { Text = "📖 دفتر حركات المصروفات العمومية", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
@@ -248,19 +257,24 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            if (cmbExpenseAccounts.SelectedValue == null || !decimal.TryParse(txtExpenseAmount.Text, out decimal amount))
+            if (cmbExpenseAccounts.SelectedValue == null || !decimal.TryParse(txtExpenseAmount.Text, out decimal amount) || cmbExpensePaymentMethod.SelectedItem == null)
             {
-                MessageBox.Show("من فضلك اختر الحساب واكتب المبلغ بشكل صحيح!", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("من فضلك اختر الحساب ووسيلة الدفع واكتب المبلغ بشكل صحيح!", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             int selectedCode = Convert.ToInt32(cmbExpenseAccounts.SelectedValue);
+            string method = cmbExpensePaymentMethod.SelectedItem.ToString();
             try
             {
-                TreasuryRepository.AddExpense(selectedCode, amount);
+                TreasuryRepository.AddExpense(selectedCode, amount, method);
                 ClearExpenseInputs();
                 LoadExpensesData();
-                MessageBox.Show("تم تسجيل المصروف بنجاح بالتاريخ والوقت اللحظي!", "تم التسجيل", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("تم تسجيل المصروف وخصمه من الرصيد بنجاح!", "تم التسجيل", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
@@ -274,6 +288,7 @@ namespace Temo_Mobile_Store
                 selectedExpenseDate = DateTime.Parse(row.Cells["التاريخ والوقت ⏰"].Value.ToString());
                 cmbExpenseAccounts.SelectedValue = Convert.ToInt32(row.Cells["كود الحساب"].Value);
                 txtExpenseAmount.Text = row.Cells["المبلغ ج.م"].Value.ToString();
+                cmbExpensePaymentMethod.SelectedItem = row.Cells["وسيلة الدفع"].Value?.ToString();
                 btnSaveExpenseUpdate.Enabled = false;
             }
         }
@@ -290,7 +305,7 @@ namespace Temo_Mobile_Store
 
         private void BtnSaveExpenseUpdate_Click(object sender, EventArgs e)
         {
-            if (selectedExpenseID == -1 || !decimal.TryParse(txtExpenseAmount.Text, out decimal amount)) return;
+            if (selectedExpenseID == -1 || !decimal.TryParse(txtExpenseAmount.Text, out decimal amount) || cmbExpensePaymentMethod.SelectedItem == null) return;
 
             if (IsDateClosed(selectedExpenseDate))
             {
@@ -299,13 +314,18 @@ namespace Temo_Mobile_Store
             }
 
             int selectedCode = Convert.ToInt32(cmbExpenseAccounts.SelectedValue);
+            string method = cmbExpensePaymentMethod.SelectedItem.ToString();
             try
             {
-                TreasuryRepository.UpdateExpense(selectedExpenseID, selectedCode, amount);
+                TreasuryRepository.UpdateExpense(selectedExpenseID, selectedCode, amount, method);
                 btnSaveExpenseUpdate.Enabled = false;
                 ClearExpenseInputs();
                 LoadExpensesData();
                 MessageBox.Show("تم تعديل قيمة المصروف وتحديث الخلاصة المالية بنجاح!", "تم التعديل", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
@@ -337,6 +357,7 @@ namespace Temo_Mobile_Store
         {
             selectedExpenseID = -1;
             txtExpenseAmount.Clear();
+            cmbExpensePaymentMethod.SelectedIndex = -1;
             btnSaveExpenseUpdate.Enabled = false;
         }
 
