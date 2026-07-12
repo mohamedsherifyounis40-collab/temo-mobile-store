@@ -481,6 +481,11 @@ namespace Temo_Mobile_Store
                 MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+            catch (DateClosedException ex)
+            {
+                MessageBox.Show(ex.Message, "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             catch (Exception ex)
             {
                 MessageBox.Show("حصل خطأ أثناء تعديل عملية البيع: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -519,6 +524,11 @@ namespace Temo_Mobile_Store
             try
             {
                 SalesRepository.CancelSale(selectedSaleId, existing.Barcode, existing.QuantitySold, existing.IMEI);
+            }
+            catch (DateClosedException ex)
+            {
+                MessageBox.Show(ex.Message, "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
             catch (Exception ex)
             {

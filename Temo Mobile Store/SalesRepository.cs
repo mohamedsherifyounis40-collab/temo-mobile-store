@@ -16,6 +16,12 @@ namespace Temo_Mobile_Store
         }
     }
 
+    // بتترمي لما محاولة تعديل/إلغاء بيع تابع ليوم محاسبي تم إقفاله بالفعل
+    public class DateClosedException : Exception
+    {
+        public DateClosedException(string message) : base(message) { }
+    }
+
     public class ProductForSale
     {
         public string ProductName;
@@ -235,8 +241,8 @@ namespace Temo_Mobile_Store
                 {
                     try
                     {
-                        string barcode; int oldQty; decimal price;
-                        using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, QuantitySold, Price FROM Sales WHERE SaleID = @Id", conn, transaction))
+                        string barcode; int oldQty; decimal price; string saleDate;
+                        using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, QuantitySold, Price, SaleDate FROM Sales WHERE SaleID = @Id", conn, transaction))
                         {
                             cmd.Parameters.AddWithValue("@Id", saleId);
                             using (SqliteDataReader reader = cmd.ExecuteReader())
@@ -246,8 +252,12 @@ namespace Temo_Mobile_Store
                                 barcode = reader["Barcode"].ToString();
                                 oldQty = Convert.ToInt32(reader["QuantitySold"]);
                                 price = Convert.ToDecimal(reader["Price"]);
+                                saleDate = reader["SaleDate"].ToString();
                             }
                         }
+
+                        if (UIHelpers.IsDateClosed(DateTime.Parse(saleDate).Date))
+                            throw new DateClosedException("لا يمكن تعديل عملية بيع تابعة ليوم تم إقفاله بالفعل.");
 
                         int currentStock = 0;
                         using (SqliteCommand cmd = new SqliteCommand("SELECT Quantity FROM Products WHERE Barcode = @Barcode", conn, transaction))
@@ -299,6 +309,19 @@ namespace Temo_Mobile_Store
                 {
                     try
                     {
+                        string saleDate;
+                        using (SqliteCommand cmdSaleDate = new SqliteCommand("SELECT SaleDate FROM Sales WHERE SaleID = @Id", conn, transaction))
+                        {
+                            cmdSaleDate.Parameters.AddWithValue("@Id", saleId);
+                            var res = cmdSaleDate.ExecuteScalar();
+                            if (res == null)
+                                throw new InvalidOperationException("لم يتم العثور على عملية البيع.");
+                            saleDate = res.ToString();
+                        }
+
+                        if (UIHelpers.IsDateClosed(DateTime.Parse(saleDate).Date))
+                            throw new DateClosedException("لا يمكن إلغاء عملية بيع تابعة ليوم تم إقفاله بالفعل.");
+
                         using (SqliteCommand cmdUpdateStock = new SqliteCommand("UPDATE Products SET Quantity = Quantity + @Qty WHERE Barcode = @Barcode", conn, transaction))
                         {
                             cmdUpdateStock.Parameters.AddWithValue("@Qty", quantitySold);
