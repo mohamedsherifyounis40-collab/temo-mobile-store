@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using Microsoft.Data.Sqlite;
 
@@ -33,9 +34,14 @@ namespace Temo_Mobile_Store
             dgv.DefaultCellStyle.BackColor = Color.White;
             dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(200, 210, 230);
             dgv.DefaultCellStyle.SelectionForeColor = ColorPrimary;
+            dgv.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dgv.AlternatingRowsDefaultCellStyle.BackColor = ColorBackground;
-            dgv.GridColor = Color.FromArgb(230, 230, 230);
-            dgv.RowTemplate.Height = 32;
+            dgv.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgv.CellBorderStyle = DataGridViewCellBorderStyle.None;
+            dgv.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+            dgv.RowHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+            dgv.GridColor = Color.White;
+            dgv.RowTemplate.Height = 38;
             dgv.BorderStyle = BorderStyle.None;
             dgv.BackgroundColor = Color.White;
             dgv.RowHeadersVisible = true;
@@ -44,15 +50,63 @@ namespace Temo_Mobile_Store
             dgv.RowHeadersDefaultCellStyle.ForeColor = Color.White;
             dgv.RowHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
             dgv.RowHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            const int headerCornerRadius = 10;
             dgv.CellPainting += (s, e) =>
             {
-                if (e.ColumnIndex == -1)
+                bool isRowHeaderCol = e.ColumnIndex == -1;
+                bool isHeaderRow = e.RowIndex == -1;
+                bool isRightToLeft = dgv.RightToLeft == RightToLeft.Yes;
+
+                if (isRowHeaderCol && !isHeaderRow)
                 {
                     e.PaintBackground(e.ClipBounds, true);
-                    var rowNumber = e.RowIndex == -1 ? "م" : (e.RowIndex + 1).ToString();
+                    var rowNumber = (e.RowIndex + 1).ToString();
                     TextRenderer.DrawText(e.Graphics, rowNumber, new Font("Segoe UI", 9, FontStyle.Bold), e.CellBounds, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                     e.Handled = true;
+                    return;
                 }
+
+                if (!isHeaderRow) return;
+
+                // الخلية دي طرف الشريط الكحلي بتاع عناوين الأعمدة؟ لو كده نديها زاوية علوية مدورة
+                // (بدل الشكل المربع القديم) بدل ما نسيبها للرسم الافتراضي.
+                bool roundLeft, roundRight;
+                if (isRowHeaderCol)
+                {
+                    roundLeft = !isRightToLeft;
+                    roundRight = isRightToLeft;
+                }
+                else
+                {
+                    var lastVisibleCol = dgv.Columns.GetLastColumn(DataGridViewElementStates.Visible, DataGridViewElementStates.None);
+                    bool isOuterEnd = lastVisibleCol != null && e.ColumnIndex == lastVisibleCol.Index;
+                    if (!isOuterEnd) return;
+                    roundLeft = isRightToLeft;
+                    roundRight = !isRightToLeft;
+                }
+
+                var r = e.CellBounds;
+                int d = headerCornerRadius * 2;
+                using (var path = new GraphicsPath())
+                {
+                    if (roundLeft) path.AddArc(r.X, r.Y, d, d, 180, 90);
+                    path.AddLine(roundLeft ? r.X + headerCornerRadius : r.X, r.Y, roundRight ? r.Right - headerCornerRadius : r.Right, r.Y);
+                    if (roundRight) path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+                    path.AddLine(r.Right, roundRight ? r.Y + headerCornerRadius : r.Y, r.Right, r.Bottom);
+                    path.AddLine(r.Right, r.Bottom, r.X, r.Bottom);
+                    path.AddLine(r.X, r.Bottom, r.X, roundLeft ? r.Y + headerCornerRadius : r.Y);
+                    path.CloseFigure();
+
+                    var oldSmoothing = e.Graphics.SmoothingMode;
+                    e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                    using (var brush = new SolidBrush(ColorPrimary))
+                        e.Graphics.FillPath(brush, path);
+                    e.Graphics.SmoothingMode = oldSmoothing;
+                }
+
+                var headerText = isRowHeaderCol ? "م" : dgv.Columns[e.ColumnIndex].HeaderText;
+                TextRenderer.DrawText(e.Graphics, headerText, e.CellStyle.Font, e.CellBounds, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                e.Handled = true;
             };
         }
 
