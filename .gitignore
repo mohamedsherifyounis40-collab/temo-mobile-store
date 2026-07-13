@@ -23,3 +23,6 @@ CatalogWebsite/catalog.db-wal
 
 # سيكرت التشغيل المحلي (SYNC_SECRET/ADMIN_PASSWORD الحقيقية) - منفعش تتحط في git خالص
 CatalogWebsite/secrets.local.json
+
+# ناتج بناء المُنصِّب (Setup.exe) - ملف تنفيذي كبير بيتبني من الكود، مش سورس
+installer/Output/
