@@ -151,7 +151,18 @@ namespace Temo_Mobile_Store
             autoRefreshTimer.Start();
 
             // إيقاف التايمر لما الفورم تتقفل عشان منسيبش حاجة شغالة في الخلفية من غير داعي
-            this.FormClosed += (s, e) => { autoRefreshTimer.Stop(); WebCatalogSyncService.Stop(); };
+            // + نسخة احتياطية تلقائية عند قفل البرنامج
+            this.FormClosed += (s, e) =>
+            {
+                autoRefreshTimer.Stop();
+                WebCatalogSyncService.Stop();
+                try
+                {
+                    BackupManager.CreateBackupFile();
+                    BackupManager.PruneOldBackups();
+                }
+                catch { }
+            };
         }
 
         // ==========================================================================

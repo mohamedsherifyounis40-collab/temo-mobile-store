@@ -28,7 +28,7 @@ namespace Temo_Mobile_Store
         private string CurrentStoreAddress = "";
         private byte[] CurrentStoreLogo = null;
 
-        private string BackupFolderPath => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TemoStore_Backups");
+        private string BackupFolderPath => BackupManager.BackupFolderPath;
 
         private Guna2ComboBox cmbSettingsViewType;
         private Panel pnlStoreSettings, pnlBackup, pnlUsers;
@@ -335,83 +335,11 @@ namespace Temo_Mobile_Store
             LoadBackupsGrid();
         }
 
-        private void EnsureBackupFolderExists()
-        {
-            if (!System.IO.Directory.Exists(BackupFolderPath))
-                System.IO.Directory.CreateDirectory(BackupFolderPath);
-        }
+        private void EnsureBackupFolderExists() => BackupManager.EnsureBackupFolderExists();
 
-        private string CreateBackupFile()
-        {
-            EnsureBackupFolderExists();
-            string fileName = $"TemoStoreDB_Backup_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.db";
-            string destPath = System.IO.Path.Combine(BackupFolderPath, fileName);
+        private string CreateBackupFile() => BackupManager.CreateBackupFile();
 
-            SettingsRepository.BackupDatabaseTo(destPath);
-
-            TryCopyToCloudBackup(destPath, fileName);
-            return destPath;
-        }
-
-        private string GetCloudBackupFolder()
-        {
-            try
-            {
-                string oneDrive = Environment.GetEnvironmentVariable("OneDrive")
-                    ?? Environment.GetEnvironmentVariable("OneDriveConsumer")
-                    ?? Environment.GetEnvironmentVariable("OneDriveCommercial");
-                if (!string.IsNullOrEmpty(oneDrive) && System.IO.Directory.Exists(oneDrive))
-                    return System.IO.Path.Combine(oneDrive, "TemoStore_Backups_Cloud");
-
-                foreach (var drive in System.IO.DriveInfo.GetDrives())
-                {
-                    if (!drive.IsReady) continue;
-                    try
-                    {
-                        string candidate = System.IO.Path.Combine(drive.RootDirectory.FullName, "My Drive");
-                        if (System.IO.Directory.Exists(candidate))
-                            return System.IO.Path.Combine(candidate, "TemoStore_Backups_Cloud");
-                    }
-                    catch { }
-                }
-
-                string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                string googleDriveClassic = System.IO.Path.Combine(userProfile, "Google Drive");
-                if (System.IO.Directory.Exists(googleDriveClassic))
-                    return System.IO.Path.Combine(googleDriveClassic, "TemoStore_Backups_Cloud");
-            }
-            catch { }
-            return null;
-        }
-
-        private void TryCopyToCloudBackup(string sourcePath, string fileName)
-        {
-            try
-            {
-                string cloudFolder = GetCloudBackupFolder();
-                if (cloudFolder == null) return;
-
-                if (!System.IO.Directory.Exists(cloudFolder))
-                    System.IO.Directory.CreateDirectory(cloudFolder);
-
-                string destPath = System.IO.Path.Combine(cloudFolder, fileName);
-                System.IO.File.Copy(sourcePath, destPath, true);
-            }
-            catch { }
-        }
-
-        private void PruneOldBackups(int keepCount = 30)
-        {
-            var files = System.IO.Directory.GetFiles(BackupFolderPath, "*.db")
-                .Select(f => new System.IO.FileInfo(f))
-                .OrderByDescending(f => f.CreationTime)
-                .ToList();
-
-            for (int i = keepCount; i < files.Count; i++)
-            {
-                try { files[i].Delete(); } catch { }
-            }
-        }
+        private string GetCloudBackupFolder() => BackupManager.GetCloudBackupFolder();
 
         private void LoadBackupsGrid()
         {
@@ -454,7 +382,7 @@ namespace Temo_Mobile_Store
             try
             {
                 CreateBackupFile();
-                PruneOldBackups();
+                BackupManager.PruneOldBackups();
                 LoadBackupsGrid();
                 MessageBox.Show("تم عمل نسخة احتياطية بنجاح ✅", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }

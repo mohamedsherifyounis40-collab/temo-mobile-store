@@ -13,6 +13,14 @@ namespace Temo_Mobile_Store
             // ---------- إنشاء كل جداول قاعدة البيانات تلقائيًا لو الجهاز جديد ----------
             Temo_Mobile_Store.Database.DatabaseManager.EnsureSchema();
 
+            // ---------- نسخة احتياطية تلقائية عند فتح البرنامج ----------
+            try
+            {
+                BackupManager.CreateBackupFile();
+                BackupManager.PruneOldBackups();
+            }
+            catch { }
+
             // ---------- فحص الترخيص - قبل أي حاجة تانية ----------
             if (!LicenseManager.CheckSavedLicense(out DateTime? expiration, out string licenseMessage))
             {
