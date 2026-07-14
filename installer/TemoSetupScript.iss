@@ -12,7 +12,7 @@
 ; ==========================================================================
 
 #define MyAppName "Temo Mobile Store"
-#define MyAppVersion "1.1"
+#define MyAppVersion "1.2"
 #define MyAppPublisher "Temo Mobile Store"
 #define MyAppExeName "Temo Mobile Store.exe"
 
