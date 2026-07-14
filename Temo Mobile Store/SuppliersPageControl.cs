@@ -167,7 +167,7 @@ namespace Temo_Mobile_Store
             Label lblSalePrice = new Label() { Text = "سعر البيع المقترح (لو منتج جديد بس):", Location = new Point(0, 482), Size = new Size(260, 20), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtPurchaseSalePrice = new Guna2TextBox() { Location = new Point(0, 502), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnAddToCart = new Guna2Button() { Text = "إضافة للفاتورة ➕", Location = new Point(0, 538), Width = 260, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnAddToCart = new Guna2Button() { Text = "إضافة للمخزن ➕", Location = new Point(0, 538), Width = 260, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
             btnAddToCart.Click += BtnAddPurchaseItem_Click;
 
             dgvPurchaseCart = new DataGridView() { Location = new Point(0, 578), Size = new Size(260, 130), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
