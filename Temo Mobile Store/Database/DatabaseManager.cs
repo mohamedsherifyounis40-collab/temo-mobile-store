@@ -291,6 +291,7 @@ namespace Temo_Mobile_Store.Database
                     (5300, "كهرباء ومياه"),
                     (5400, "مرتبات"),
                     (5500, "تكلفة البضاعة المباعة"),
+                    (5600, "فروق وتسويات المخزون"),
                 };
                 foreach (var acc in defaultAccounts)
                 {
