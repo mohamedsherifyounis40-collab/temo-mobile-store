@@ -17,6 +17,7 @@ namespace TemoStore.Engines.Handlers
         public const int Cogs = 5500;
         public const int Salaries = 5400;
         public const int EmployeeAdvances = 1400;
+        public const int InventoryAdjustment = 5600;
 
         public static int ForPaymentMethod(string method) => method switch
         {
@@ -170,21 +171,40 @@ namespace TemoStore.Engines.Handlers
 
             decimal newTotal = sale.Price * command.NewQuantity;
             decimal totalDelta = newTotal - sale.Total;
+            // فرق التكلفة (COGS) بيتحرك مع فرق الكمية بنفس الاتجاه - زوّدت الكمية يبقى
+            // تكلفة إضافية اتحمّلت، قلّلتها يبقى تكلفة بترجع للمخزون
+            decimal costDelta = sale.CostPrice * (command.NewQuantity - sale.QuantitySold);
 
-            if (sale.PaymentType == "Cash" && sale.PaymentMethod != null && totalDelta != 0)
+            var lines = new List<JournalLineRequest>();
+
+            if (totalDelta != 0)
             {
-                if (totalDelta > 0)
-                    _cashDrawer.Credit(sale.PaymentMethod, totalDelta, $"تسوية كاش بسبب تعديل الكمية في عملية بيع رقم {command.SaleId}", uow, saleId: command.SaleId, accountCode: AccountCodes.SalesRevenue);
-                else
-                    _cashDrawer.Debit(sale.PaymentMethod, -totalDelta, $"تسوية كاش بسبب تعديل الكمية في عملية بيع رقم {command.SaleId}", uow, saleId: command.SaleId, accountCode: AccountCodes.SalesRevenue);
-
-                var lines = new List<JournalLineRequest>
+                if (sale.PaymentType == "Cash" && sale.PaymentMethod != null)
                 {
-                    new() { AccountCode = AccountCodes.ForPaymentMethod(sale.PaymentMethod), Debit = totalDelta > 0 ? totalDelta : 0, Credit = totalDelta < 0 ? -totalDelta : 0 },
-                    new() { AccountCode = AccountCodes.SalesRevenue, Debit = totalDelta < 0 ? -totalDelta : 0, Credit = totalDelta > 0 ? totalDelta : 0 }
-                };
-                _accounting.Post(new JournalEntryRequest { SourceType = "SaleAdjustment", SourceId = command.SaleId, Description = $"تعديل كمية بيع رقم {command.SaleId}", Lines = lines }, command.PerformedBy, uow);
+                    if (totalDelta > 0)
+                        _cashDrawer.Credit(sale.PaymentMethod, totalDelta, $"تسوية كاش بسبب تعديل الكمية في عملية بيع رقم {command.SaleId}", uow, saleId: command.SaleId, accountCode: AccountCodes.SalesRevenue);
+                    else
+                        _cashDrawer.Debit(sale.PaymentMethod, -totalDelta, $"تسوية كاش بسبب تعديل الكمية في عملية بيع رقم {command.SaleId}", uow, saleId: command.SaleId, accountCode: AccountCodes.SalesRevenue);
+
+                    lines.Add(new() { AccountCode = AccountCodes.ForPaymentMethod(sale.PaymentMethod), Debit = totalDelta > 0 ? totalDelta : 0, Credit = totalDelta < 0 ? -totalDelta : 0 });
+                    lines.Add(new() { AccountCode = AccountCodes.SalesRevenue, Debit = totalDelta < 0 ? -totalDelta : 0, Credit = totalDelta > 0 ? totalDelta : 0 });
+                }
+                else if (sale.PaymentType == "Credit")
+                {
+                    // بيع آجل: مفيش كاش يتحرك، الفرق كله بيروح لرصيد العميل (1300) بدل وسيلة الدفع
+                    lines.Add(new() { AccountCode = AccountCodes.Customers, Debit = totalDelta > 0 ? totalDelta : 0, Credit = totalDelta < 0 ? -totalDelta : 0 });
+                    lines.Add(new() { AccountCode = AccountCodes.SalesRevenue, Debit = totalDelta < 0 ? -totalDelta : 0, Credit = totalDelta > 0 ? totalDelta : 0 });
+                }
             }
+
+            if (costDelta != 0)
+            {
+                lines.Add(new() { AccountCode = AccountCodes.Cogs, Debit = costDelta > 0 ? costDelta : 0, Credit = costDelta < 0 ? -costDelta : 0 });
+                lines.Add(new() { AccountCode = AccountCodes.Inventory, Debit = costDelta < 0 ? -costDelta : 0, Credit = costDelta > 0 ? costDelta : 0 });
+            }
+
+            if (lines.Count > 0)
+                _accounting.Post(new JournalEntryRequest { SourceType = "SaleAdjustment", SourceId = command.SaleId, Description = $"تعديل كمية بيع رقم {command.SaleId}", Lines = lines }, command.PerformedBy, uow);
 
             uow.Sales.UpdateQuantityAndTotal(command.SaleId, command.NewQuantity, newTotal);
             int stockAdjustment = sale.QuantitySold - command.NewQuantity;
@@ -235,23 +255,30 @@ namespace TemoStore.Engines.Handlers
             if (sale.Imei != null)
                 _inventory.MarkImeiInStock(sale.Imei, uow);
 
-            if (sale.PaymentType == "Cash" && sale.PaymentMethod != null)
+            // عكس أثر البيع بالكامل في الدفتر - الإيراد والتكلفة/المخزون بيترجعوا دايمًا
+            // بغض النظر عن نوع البيع، والفرق الوحيد هو الطرف التاني للإيراد (كاش أو عميل)
+            var lines = new List<JournalLineRequest>();
+
+            if (sale.Total != 0)
             {
+                lines.Add(new() { AccountCode = AccountCodes.SalesRevenue, Debit = sale.Total, Credit = 0 });
+                if (sale.PaymentType == "Cash" && sale.PaymentMethod != null)
+                    lines.Add(new() { AccountCode = AccountCodes.ForPaymentMethod(sale.PaymentMethod), Debit = 0, Credit = sale.Total });
+                else
+                    lines.Add(new() { AccountCode = AccountCodes.Customers, Debit = 0, Credit = sale.Total });
+            }
+
+            if (sale.PaymentType == "Cash" && sale.PaymentMethod != null && sale.Total != 0)
                 _cashDrawer.Debit(sale.PaymentMethod, sale.Total, $"قيد عكسي - إلغاء عملية بيع رقم {command.SaleId}", uow, saleId: command.SaleId, accountCode: AccountCodes.SalesRevenue);
 
-                decimal cost = sale.CostPrice * sale.QuantitySold;
-                var lines = new List<JournalLineRequest>
-                {
-                    new() { AccountCode = AccountCodes.SalesRevenue, Debit = sale.Total, Credit = 0 },
-                    new() { AccountCode = AccountCodes.ForPaymentMethod(sale.PaymentMethod), Debit = 0, Credit = sale.Total }
-                };
-                if (cost > 0)
-                {
-                    lines.Add(new JournalLineRequest { AccountCode = AccountCodes.Inventory, Debit = cost, Credit = 0 });
-                    lines.Add(new JournalLineRequest { AccountCode = AccountCodes.Cogs, Debit = 0, Credit = cost });
-                }
-                _accounting.Post(new JournalEntryRequest { SourceType = "SaleCancellation", SourceId = command.SaleId, Description = $"إلغاء بيع رقم {command.SaleId}", Lines = lines }, command.PerformedBy, uow);
+            decimal cost = sale.CostPrice * sale.QuantitySold;
+            if (cost > 0)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = AccountCodes.Inventory, Debit = cost, Credit = 0 });
+                lines.Add(new JournalLineRequest { AccountCode = AccountCodes.Cogs, Debit = 0, Credit = cost });
             }
+            if (lines.Count > 0)
+                _accounting.Post(new JournalEntryRequest { SourceType = "SaleCancellation", SourceId = command.SaleId, Description = $"إلغاء بيع رقم {command.SaleId}", Lines = lines }, command.PerformedBy, uow);
 
             uow.Sales.Delete(command.SaleId);
 
