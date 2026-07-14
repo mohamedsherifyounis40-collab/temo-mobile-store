@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using Microsoft.Data.Sqlite;
+using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
 {

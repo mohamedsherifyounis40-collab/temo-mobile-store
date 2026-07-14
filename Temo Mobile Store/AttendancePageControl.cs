@@ -3,6 +3,7 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
+using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
 {

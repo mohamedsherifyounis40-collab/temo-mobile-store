@@ -1,24 +1,10 @@
 using System;
 using System.Data;
 using Microsoft.Data.Sqlite;
+using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
 {
-    // بتترمي لما حركة "صرف" تتعدى الرصيد المتاح في وسيلة الدفع - الشاشة بتمسكها
-    // وتعرض رسالة ودّية بدل ما تسيب استثناء عام يوصل للمستخدم
-    public class InsufficientBalanceException : Exception
-    {
-        public string PaymentMethod { get; }
-        public decimal AvailableBalance { get; }
-
-        public InsufficientBalanceException(string paymentMethod, decimal availableBalance)
-            : base($"الرصيد المتاح في \"{paymentMethod}\" هو {availableBalance} فقط، لا يمكن صرف مبلغ أكبر منه.")
-        {
-            PaymentMethod = paymentMethod;
-            AvailableBalance = availableBalance;
-        }
-    }
-
     public class CashMovementRecord
     {
         public int Id;
