@@ -126,13 +126,19 @@ namespace TemoStore.Engines.Handlers
         }
     }
 
+    // بيعدّل مصروف موجود - القيد بيتسجل كعكس كامل للقيد القديم + إثبات القيد الجديد
+    // في نفس العملية (4 بنود: رجوع الكاش القديم/إلغاء المصروف القديم/إثبات المصروف
+    // الجديد/خروج الكاش الجديد) - يفضل متزن دايمًا حتى لو الحساب أو وسيلة الدفع
+    // اتغيرت أو فضلت زي ما هي
     public class UpdateExpenseCommandHandler : ICommandHandler<UpdateExpenseCommand, bool>
     {
         private readonly IUnitOfWorkFactory _uowFactory;
+        private readonly IAccountingEngine _accounting;
 
-        public UpdateExpenseCommandHandler(IUnitOfWorkFactory uowFactory)
+        public UpdateExpenseCommandHandler(IUnitOfWorkFactory uowFactory, IAccountingEngine accounting)
         {
             _uowFactory = uowFactory;
+            _accounting = accounting;
         }
 
         public bool Handle(UpdateExpenseCommand command)
@@ -155,6 +161,15 @@ namespace TemoStore.Engines.Handlers
             uow.CashDrawer.SetBalance(command.PaymentMethod, newMethodBalance - command.Amount);
             uow.Expenses.Update(command.ExpenseId, command.AccountCode, command.Amount, command.PaymentMethod);
 
+            var lines = new List<JournalLineRequest>
+            {
+                new() { AccountCode = AccountCodes.ForPaymentMethod(existing.PaymentMethod), Debit = existing.Amount, Credit = 0 },
+                new() { AccountCode = existing.AccountCode, Debit = 0, Credit = existing.Amount },
+                new() { AccountCode = command.AccountCode, Debit = command.Amount, Credit = 0 },
+                new() { AccountCode = AccountCodes.ForPaymentMethod(command.PaymentMethod), Debit = 0, Credit = command.Amount }
+            };
+            _accounting.Post(new JournalEntryRequest { SourceType = "ExpenseEdit", SourceId = command.ExpenseId, Description = "تعديل مصروف عمومي", Lines = lines }, command.PerformedBy, uow);
+
             uow.Commit();
             return true;
         }
@@ -163,10 +178,12 @@ namespace TemoStore.Engines.Handlers
     public class DeleteExpenseCommandHandler : ICommandHandler<DeleteExpenseCommand, bool>
     {
         private readonly IUnitOfWorkFactory _uowFactory;
+        private readonly IAccountingEngine _accounting;
 
-        public DeleteExpenseCommandHandler(IUnitOfWorkFactory uowFactory)
+        public DeleteExpenseCommandHandler(IUnitOfWorkFactory uowFactory, IAccountingEngine accounting)
         {
             _uowFactory = uowFactory;
+            _accounting = accounting;
         }
 
         public bool Handle(DeleteExpenseCommand command)
@@ -178,6 +195,13 @@ namespace TemoStore.Engines.Handlers
             decimal currentBalance = uow.CashDrawer.GetBalance(existing.PaymentMethod);
             uow.CashDrawer.SetBalance(existing.PaymentMethod, currentBalance + existing.Amount);
             uow.Expenses.Delete(command.ExpenseId);
+
+            var lines = new List<JournalLineRequest>
+            {
+                new() { AccountCode = AccountCodes.ForPaymentMethod(existing.PaymentMethod), Debit = existing.Amount, Credit = 0 },
+                new() { AccountCode = existing.AccountCode, Debit = 0, Credit = existing.Amount }
+            };
+            _accounting.Post(new JournalEntryRequest { SourceType = "ExpenseDeletion", SourceId = command.ExpenseId, Description = "حذف مصروف عمومي", Lines = lines }, command.PerformedBy, uow);
 
             uow.Commit();
             return true;
@@ -227,14 +251,17 @@ namespace TemoStore.Engines.Handlers
         }
     }
 
-    // بيلغي تحويل بين وسائل دفع (حركتين مرتبطتين) مع بعض - بيرجّع الرصيدين لحالتهم قبل التحويل
+    // بيلغي تحويل بين وسائل دفع (حركتين مرتبطتين) مع بعض - بيرجّع الرصيدين لحالتهم قبل
+    // التحويل، وبيعكس القيد الأصلي (اللي كان مدين "لـ" / دائن "من") بعكسه بالظبط
     public class CancelTransferCommandHandler : ICommandHandler<CancelTransferCommand, bool>
     {
         private readonly IUnitOfWorkFactory _uowFactory;
+        private readonly IAccountingEngine _accounting;
 
-        public CancelTransferCommandHandler(IUnitOfWorkFactory uowFactory)
+        public CancelTransferCommandHandler(IUnitOfWorkFactory uowFactory, IAccountingEngine accounting)
         {
             _uowFactory = uowFactory;
+            _accounting = accounting;
         }
 
         public bool Handle(CancelTransferCommand command)
@@ -259,19 +286,33 @@ namespace TemoStore.Engines.Handlers
             uow.CashDrawer.DeleteMovement(first.Id);
             uow.CashDrawer.DeleteMovement(second.Id);
 
+            var fromLeg = first.MovementType == "صرف" ? first : second;
+            var toLeg = first.MovementType == "قبض" ? first : second;
+            var lines = new List<JournalLineRequest>
+            {
+                new() { AccountCode = AccountCodes.ForPaymentMethod(fromLeg.PaymentMethod), Debit = fromLeg.Amount, Credit = 0 },
+                new() { AccountCode = AccountCodes.ForPaymentMethod(toLeg.PaymentMethod), Debit = 0, Credit = toLeg.Amount }
+            };
+            _accounting.Post(new JournalEntryRequest { SourceType = "TransferCancellation", Description = $"إلغاء تحويل من {fromLeg.PaymentMethod} إلى {toLeg.PaymentMethod}", Lines = lines }, command.PerformedBy, uow);
+
             uow.Commit();
             return true;
         }
     }
 
-    // حركة قبض/صرف عامة (مش مربوطة ببند مصروف) - تسجيل يدوي حر بحساب اختياري
+    // حركة قبض/صرف عامة (مش مربوطة ببند مصروف) - تسجيل يدوي حر بحساب اختياري ("الحساب
+    // المرتبط" فعلًا اختياري في الشاشة). لو المستخدم مصنّفهاش على أي حساب، بيتسجل الرصيد
+    // زي ما هو من غير قيد محاسبي - مفيش "حساب مقابل" معروف نسجل بيه، فالقيد لو اتسجل
+    // كان هيكون تصنيف اختراعي مش حقيقي. لو فيه حساب، القيد بيتسجل عادي زي أي عملية تانية.
     public class AddMovementCommandHandler : ICommandHandler<AddMovementCommand, PaymentResult>
     {
         private readonly IUnitOfWorkFactory _uowFactory;
+        private readonly IAccountingEngine _accounting;
 
-        public AddMovementCommandHandler(IUnitOfWorkFactory uowFactory)
+        public AddMovementCommandHandler(IUnitOfWorkFactory uowFactory, IAccountingEngine accounting)
         {
             _uowFactory = uowFactory;
+            _accounting = accounting;
         }
 
         public PaymentResult Handle(AddMovementCommand command)
@@ -295,18 +336,39 @@ namespace TemoStore.Engines.Handlers
             decimal newBalance = command.Type == "قبض" ? currentBalance + command.Amount : currentBalance - command.Amount;
             uow.CashDrawer.SetBalance(command.Method, newBalance);
 
+            if (command.AccountCode.HasValue)
+            {
+                var lines = command.Type == "قبض"
+                    ? new List<JournalLineRequest>
+                    {
+                        new() { AccountCode = AccountCodes.ForPaymentMethod(command.Method), Debit = command.Amount, Credit = 0 },
+                        new() { AccountCode = command.AccountCode.Value, Debit = 0, Credit = command.Amount }
+                    }
+                    : new List<JournalLineRequest>
+                    {
+                        new() { AccountCode = command.AccountCode.Value, Debit = command.Amount, Credit = 0 },
+                        new() { AccountCode = AccountCodes.ForPaymentMethod(command.Method), Debit = 0, Credit = command.Amount }
+                    };
+                _accounting.Post(new JournalEntryRequest { SourceType = "Movement", SourceId = movementId, Description = command.Description, Lines = lines }, command.PerformedBy, uow);
+            }
+
             uow.Commit();
             return new PaymentResult { MovementId = movementId };
         }
     }
 
+    // بيعدّل حركة قبض/صرف - القيد المسجّل (لو كانت الحركة القديمة و/أو الجديدة مصنّفة على
+    // حساب) بيتبني كعكس القديم (لو موجود) + إثبات الجديد (لو موجود) في قيد واحد متزن.
+    // لو الاتنين من غير حساب، مفيش قيد يتسجل خالص (نفس منطق الإضافة).
     public class UpdateMovementCommandHandler : ICommandHandler<UpdateMovementCommand, bool>
     {
         private readonly IUnitOfWorkFactory _uowFactory;
+        private readonly IAccountingEngine _accounting;
 
-        public UpdateMovementCommandHandler(IUnitOfWorkFactory uowFactory)
+        public UpdateMovementCommandHandler(IUnitOfWorkFactory uowFactory, IAccountingEngine accounting)
         {
             _uowFactory = uowFactory;
+            _accounting = accounting;
         }
 
         public bool Handle(UpdateMovementCommand command)
@@ -333,6 +395,36 @@ namespace TemoStore.Engines.Handlers
 
             uow.CashDrawer.UpdateMovement(command.MovementId, command.NewType, command.NewMethod, command.NewAmount, command.Reference, command.Description, command.AccountCode);
 
+            var lines = new List<JournalLineRequest>();
+            if (existing.AccountCode.HasValue)
+            {
+                if (existing.MovementType == "قبض")
+                {
+                    lines.Add(new() { AccountCode = existing.AccountCode.Value, Debit = existing.Amount, Credit = 0 });
+                    lines.Add(new() { AccountCode = AccountCodes.ForPaymentMethod(existing.PaymentMethod), Debit = 0, Credit = existing.Amount });
+                }
+                else
+                {
+                    lines.Add(new() { AccountCode = AccountCodes.ForPaymentMethod(existing.PaymentMethod), Debit = existing.Amount, Credit = 0 });
+                    lines.Add(new() { AccountCode = existing.AccountCode.Value, Debit = 0, Credit = existing.Amount });
+                }
+            }
+            if (command.AccountCode.HasValue)
+            {
+                if (command.NewType == "قبض")
+                {
+                    lines.Add(new() { AccountCode = AccountCodes.ForPaymentMethod(command.NewMethod), Debit = command.NewAmount, Credit = 0 });
+                    lines.Add(new() { AccountCode = command.AccountCode.Value, Debit = 0, Credit = command.NewAmount });
+                }
+                else
+                {
+                    lines.Add(new() { AccountCode = command.AccountCode.Value, Debit = command.NewAmount, Credit = 0 });
+                    lines.Add(new() { AccountCode = AccountCodes.ForPaymentMethod(command.NewMethod), Debit = 0, Credit = command.NewAmount });
+                }
+            }
+            if (lines.Count > 0)
+                _accounting.Post(new JournalEntryRequest { SourceType = "MovementEdit", SourceId = command.MovementId, Description = command.Description, Lines = lines }, command.PerformedBy, uow);
+
             uow.Commit();
             return true;
         }
@@ -341,10 +433,12 @@ namespace TemoStore.Engines.Handlers
     public class CancelMovementCommandHandler : ICommandHandler<CancelMovementCommand, bool>
     {
         private readonly IUnitOfWorkFactory _uowFactory;
+        private readonly IAccountingEngine _accounting;
 
-        public CancelMovementCommandHandler(IUnitOfWorkFactory uowFactory)
+        public CancelMovementCommandHandler(IUnitOfWorkFactory uowFactory, IAccountingEngine accounting)
         {
             _uowFactory = uowFactory;
+            _accounting = accounting;
         }
 
         public bool Handle(CancelMovementCommand command)
@@ -359,6 +453,22 @@ namespace TemoStore.Engines.Handlers
             decimal newBalance = existing.MovementType == "قبض" ? currentBalance - existing.Amount : currentBalance + existing.Amount;
             uow.CashDrawer.SetBalance(existing.PaymentMethod, newBalance);
             uow.CashDrawer.DeleteMovement(command.MovementId);
+
+            if (existing.AccountCode.HasValue)
+            {
+                var lines = existing.MovementType == "قبض"
+                    ? new List<JournalLineRequest>
+                    {
+                        new() { AccountCode = existing.AccountCode.Value, Debit = existing.Amount, Credit = 0 },
+                        new() { AccountCode = AccountCodes.ForPaymentMethod(existing.PaymentMethod), Debit = 0, Credit = existing.Amount }
+                    }
+                    : new List<JournalLineRequest>
+                    {
+                        new() { AccountCode = AccountCodes.ForPaymentMethod(existing.PaymentMethod), Debit = existing.Amount, Credit = 0 },
+                        new() { AccountCode = existing.AccountCode.Value, Debit = 0, Credit = existing.Amount }
+                    };
+                _accounting.Post(new JournalEntryRequest { SourceType = "MovementCancellation", SourceId = command.MovementId, Description = existing.Description, Lines = lines }, command.PerformedBy, uow);
+            }
 
             uow.Commit();
             return true;
