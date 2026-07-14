@@ -13,6 +13,9 @@ namespace Temo_Mobile_Store
             // ---------- إنشاء كل جداول قاعدة البيانات تلقائيًا لو الجهاز جديد ----------
             Temo_Mobile_Store.Database.DatabaseManager.EnsureSchema();
 
+            // ---------- تجهيز كل المحركات (Core/Business Engines) قبل أي حاجة تانية ----------
+            AppServices.Initialize();
+
             // ---------- نسخة احتياطية تلقائية عند فتح البرنامج ----------
             try
             {

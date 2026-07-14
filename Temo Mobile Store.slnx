@@ -1,4 +1,8 @@
 <Solution>
   <Project Path="CatalogWebsite/CatalogWebsite.csproj" />
   <Project Path="Temo Mobile Store/Temo Mobile Store.csproj" />
+  <Project Path="src/TemoStore.Core/TemoStore.Core.csproj" />
+  <Project Path="src/TemoStore.EventBus/TemoStore.EventBus.csproj" />
+  <Project Path="src/TemoStore.Engines/TemoStore.Engines.csproj" />
+  <Project Path="src/TemoStore.Data/TemoStore.Data.csproj" />
 </Solution>
