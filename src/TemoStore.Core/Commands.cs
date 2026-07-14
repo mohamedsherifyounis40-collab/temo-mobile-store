@@ -229,4 +229,33 @@ namespace TemoStore.Core.Commands
         public required List<InventoryAdjustmentLine> Rows { get; set; }
         public required string PerformedBy { get; set; }
     }
+
+    // ==========================================================================
+    // شاشة الصيانة
+    // ==========================================================================
+
+    public class ReceiveDeviceCommand : ICommand<bool>
+    {
+        public required string CustomerName { get; set; }
+        public string? CustomerPhone { get; set; }
+        public required string DeviceInfo { get; set; }
+        public string? IssueDescription { get; set; }
+        public required decimal EstimatedCost { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class UpdateMaintenanceStatusCommand : ICommand<bool>
+    {
+        public required int TicketId { get; set; }
+        public required string NewStatus { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class DeliverMaintenanceDeviceCommand : ICommand<bool>
+    {
+        public required int TicketId { get; set; }
+        public required decimal ActualCost { get; set; }
+        public required string Method { get; set; }
+        public required string PerformedBy { get; set; }
+    }
 }

@@ -17,6 +17,7 @@ namespace TemoStore.Core.Abstractions
         IAuditRepository Audit { get; }
         IExpenseRepository Expenses { get; }
         IInventoryAdjustmentRepository InventoryAdjustments { get; }
+        IMaintenanceRepository Maintenance { get; }
 
         void Commit();
         void Rollback();
@@ -52,6 +53,14 @@ namespace TemoStore.Core.Abstractions
     public interface IInventoryAdjustmentRepository
     {
         void InsertAdjustmentLog(string barcode, string productName, int systemQtyBefore, int countedQty, int difference);
+    }
+
+    public interface IMaintenanceRepository
+    {
+        int Insert(string customerName, string? customerPhone, string deviceInfo, string? issueDescription, decimal estimatedCost);
+        void UpdateStatus(int ticketId, string newStatus);
+        string? GetCustomerName(int ticketId);
+        void SetDelivered(int ticketId, decimal actualCost);
     }
 
     public interface ISaleRepository

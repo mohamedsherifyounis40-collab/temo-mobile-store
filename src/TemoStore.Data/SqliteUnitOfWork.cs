@@ -29,6 +29,7 @@ namespace TemoStore.Data
             Audit = new AuditRepository();
             Expenses = new ExpenseRepository(_conn, _tx);
             InventoryAdjustments = new InventoryAdjustmentRepository(_conn, _tx);
+            Maintenance = new MaintenanceTicketRepository(_conn, _tx);
         }
 
         public IProductRepository Products { get; }
@@ -41,6 +42,7 @@ namespace TemoStore.Data
         public IAuditRepository Audit { get; }
         public IExpenseRepository Expenses { get; }
         public IInventoryAdjustmentRepository InventoryAdjustments { get; }
+        public IMaintenanceRepository Maintenance { get; }
 
         public void Commit()
         {

@@ -3,6 +3,7 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
+using TemoStore.Core.Commands;
 
 namespace Temo_Mobile_Store
 {
@@ -160,12 +161,15 @@ namespace Temo_Mobile_Store
 
             try
             {
-                MaintenanceRepository.ReceiveDevice(
-                    txtMaintCustomerName.Text.Trim(),
-                    string.IsNullOrWhiteSpace(txtMaintCustomerPhone.Text) ? null : txtMaintCustomerPhone.Text.Trim(),
-                    txtMaintDeviceInfo.Text.Trim(),
-                    string.IsNullOrWhiteSpace(txtMaintIssueDescription.Text) ? null : txtMaintIssueDescription.Text.Trim(),
-                    estimatedCost);
+                AppServices.CoreEngine.Execute(new ReceiveDeviceCommand
+                {
+                    CustomerName = txtMaintCustomerName.Text.Trim(),
+                    CustomerPhone = string.IsNullOrWhiteSpace(txtMaintCustomerPhone.Text) ? null : txtMaintCustomerPhone.Text.Trim(),
+                    DeviceInfo = txtMaintDeviceInfo.Text.Trim(),
+                    IssueDescription = string.IsNullOrWhiteSpace(txtMaintIssueDescription.Text) ? null : txtMaintIssueDescription.Text.Trim(),
+                    EstimatedCost = estimatedCost,
+                    PerformedBy = AuthManager.CurrentUsername
+                });
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
@@ -226,7 +230,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                MaintenanceRepository.UpdateStatus(selectedTicketId, newStatus);
+                AppServices.CoreEngine.Execute(new UpdateMaintenanceStatusCommand { TicketId = selectedTicketId, NewStatus = newStatus, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
@@ -262,7 +266,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                MaintenanceRepository.DeliverDevice(selectedTicketId, actualCost, method);
+                AppServices.CoreEngine.Execute(new DeliverMaintenanceDeviceCommand { TicketId = selectedTicketId, ActualCost = actualCost, Method = method, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 

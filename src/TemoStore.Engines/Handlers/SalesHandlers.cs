@@ -13,7 +13,9 @@ namespace TemoStore.Engines.Handlers
         public const int Customers = 1300;
         public const int Suppliers = 2100;
         public const int SalesRevenue = 4100;
+        public const int MaintenanceRevenue = 4200;
         public const int Cogs = 5500;
+        public const int Salaries = 5400;
 
         public static int ForPaymentMethod(string method) => method switch
         {
