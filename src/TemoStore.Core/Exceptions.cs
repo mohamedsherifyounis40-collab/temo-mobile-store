@@ -42,6 +42,25 @@ namespace TemoStore.Core.Exceptions
         public DateClosedException(string message) : base(message) { }
     }
 
+    // بترمي لما حد يحاول يعدّل حضور يوم تابع لشهر اتقفل بالفعل لهذا الموظف
+    public class PayrollMonthClosedException : Exception
+    {
+        public PayrollMonthClosedException(string message) : base(message) { }
+    }
+
+    // بترمي لما حد يحاول يصرف "دفعة من المستحق" بمبلغ أكبر من رصيد الموظف الفعلي -
+    // دفعة المستحق لازم تكون في حدود اللي اتكسب فعليًا، أي مبلغ زيادة لازم يكون "سلفة" بدل كده
+    public class InsufficientEarnedBalanceException : Exception
+    {
+        public decimal AvailableBalance { get; }
+
+        public InsufficientEarnedBalanceException(decimal availableBalance)
+            : base($"المستحق الحالي للموظف هو {availableBalance:N2} ج.م فقط، لا يمكن صرف دفعة أكبر منه. لو عايز تصرف أكتر من المستحق، استخدم نوع \"سلفة\" بدل \"دفعة من المستحق\".")
+        {
+            AvailableBalance = availableBalance;
+        }
+    }
+
     // بترمي لو قيد محاسبي اتبنى وإجمالي المدين ≠ إجمالي الدائن - القيد ده مينفعش يتحفظ خالص
     public class AccountingImbalanceException : Exception
     {

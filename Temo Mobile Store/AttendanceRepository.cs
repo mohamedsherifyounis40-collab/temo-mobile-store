@@ -1,7 +1,6 @@
 using System;
 using System.Data;
 using Microsoft.Data.Sqlite;
-using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
 {
@@ -13,33 +12,11 @@ namespace Temo_Mobile_Store
     // = قيمة اليوم × (أيام الحضور + أيام الإجازة المدفوعة). يعني الراتب بيتراكم يوم بيوم
     // مع كل تسجيل حضور، مش بيبدأ من المرتب الكامل وينقص منه بالغياب.
     // ==========================================================================
-    // بتترمي لما حد يحاول يعدّل حضور يوم تابع لشهر اتقفل بالفعل لهذا الموظف
-    public class PayrollMonthClosedException : Exception
-    {
-        public PayrollMonthClosedException(string message) : base(message) { }
-    }
-
-    // بتترمي لما حد يحاول يصرف "دفعة من المستحق" بمبلغ أكبر من رصيد الموظف الفعلي -
-    // دفعة المستحق لازم تكون في حدود اللي اتكسب فعليًا، أي مبلغ زيادة لازم يكون "سلفة" بدل كده
-    public class InsufficientEarnedBalanceException : Exception
-    {
-        public decimal AvailableBalance { get; }
-
-        public InsufficientEarnedBalanceException(decimal availableBalance)
-            : base($"المستحق الحالي للموظف هو {availableBalance:N2} ج.م فقط، لا يمكن صرف دفعة أكبر منه. لو عايز تصرف أكتر من المستحق، استخدم نوع \"سلفة\" بدل \"دفعة من المستحق\".")
-        {
-            AvailableBalance = availableBalance;
-        }
-    }
-
     public static class AttendanceRepository
     {
         public const string StatusPresent = "حاضر";
         public const string StatusAbsent = "غائب";
         public const string StatusLeave = "إجازة";
-
-        // حساب "مرتبات" الأساسي في شجرة الحسابات - كل الصرف لموظفين بيتسجل عليه
-        public const int SalariesAccountCode = 5400;
 
         public static DataTable GetEmployees()
         {
@@ -82,41 +59,6 @@ namespace Temo_Mobile_Store
             return dt;
         }
 
-        public static void AddEmployee(string fullName, string phone, decimal monthlySalary, DateTime hireDate)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand(
-                    "INSERT INTO Employees (FullName, Phone, MonthlySalary, HireDate) VALUES (@N, @P, @S, @H)", conn))
-                {
-                    cmd.Parameters.AddWithValue("@N", fullName);
-                    cmd.Parameters.AddWithValue("@P", string.IsNullOrEmpty(phone) ? (object)DBNull.Value : phone);
-                    cmd.Parameters.AddWithValue("@S", monthlySalary);
-                    cmd.Parameters.AddWithValue("@H", hireDate.ToString("yyyy-MM-dd"));
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
-        public static void UpdateEmployee(int employeeId, string fullName, string phone, decimal monthlySalary, DateTime hireDate)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand(
-                    "UPDATE Employees SET FullName = @N, Phone = @P, MonthlySalary = @S, HireDate = @H WHERE EmployeeId = @Id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@N", fullName);
-                    cmd.Parameters.AddWithValue("@P", string.IsNullOrEmpty(phone) ? (object)DBNull.Value : phone);
-                    cmd.Parameters.AddWithValue("@S", monthlySalary);
-                    cmd.Parameters.AddWithValue("@H", hireDate.ToString("yyyy-MM-dd"));
-                    cmd.Parameters.AddWithValue("@Id", employeeId);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
         // فيه شهور رواتب مقفولة أو صرف مسجّل لهذا الموظف؟ لو أيوه، مينفعش يتحذف (زي
         // بالظبط منع حذف مورد/عميل ليه فواتير - عشان مايتفقدش الأثر المحاسبي لمبالغ اتصرفت فعليًا)
         public static bool HasPayrollHistory(int employeeId)
@@ -135,39 +77,6 @@ namespace Temo_Mobile_Store
                     if (Convert.ToInt32(cmd.ExecuteScalar()) > 0) return true;
                 }
                 return false;
-            }
-        }
-
-        // بيحذف الموظف وكل سجلات حضوره جوه Transaction واحدة عشان مايفضلش سجلات يتيمة.
-        // ملحوظة: الاستدعاء بيفترض إن الشاشة أصلاً منعت الحذف لو HasPayrollHistory رجعت true،
-        // زي ما بيحصل مع الموردين والعملاء.
-        public static void DeleteEmployee(int employeeId)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteTransaction transaction = conn.BeginTransaction())
-                {
-                    try
-                    {
-                        using (SqliteCommand cmd = new SqliteCommand("DELETE FROM AttendanceRecords WHERE EmployeeId = @Id", conn, transaction))
-                        {
-                            cmd.Parameters.AddWithValue("@Id", employeeId);
-                            cmd.ExecuteNonQuery();
-                        }
-                        using (SqliteCommand cmd = new SqliteCommand("DELETE FROM Employees WHERE EmployeeId = @Id", conn, transaction))
-                        {
-                            cmd.Parameters.AddWithValue("@Id", employeeId);
-                            cmd.ExecuteNonQuery();
-                        }
-                        transaction.Commit();
-                    }
-                    catch
-                    {
-                        transaction.Rollback();
-                        throw;
-                    }
-                }
             }
         }
 
@@ -198,41 +107,6 @@ namespace Temo_Mobile_Store
                 }
             }
             return dt;
-        }
-
-        // بيسجّل/يعدّل حالة حضور موظف في تاريخ معين (upsert بالاعتماد على UNIQUE(EmployeeId, AttendanceDate)).
-        // بيرمي PayrollMonthClosedException لو شهر التاريخ ده اتقفل بالفعل لهذا الموظف.
-        public static void SetAttendanceStatus(int employeeId, DateTime date, string status)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-
-                if (IsMonthClosed(conn, null, employeeId, date.Year, date.Month))
-                    throw new PayrollMonthClosedException($"شهر {date.Month}/{date.Year} مقفول بالفعل لهذا الموظف، لا يمكن تعديل الحضور فيه.");
-
-                using (SqliteCommand cmd = new SqliteCommand(
-                    @"INSERT INTO AttendanceRecords (EmployeeId, AttendanceDate, Status) VALUES (@Id, @Date, @Status)
-                      ON CONFLICT(EmployeeId, AttendanceDate) DO UPDATE SET Status = excluded.Status", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Id", employeeId);
-                    cmd.Parameters.AddWithValue("@Date", date.ToString("yyyy-MM-dd"));
-                    cmd.Parameters.AddWithValue("@Status", status);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
-        private static bool IsMonthClosed(SqliteConnection conn, SqliteTransaction transaction, int employeeId, int year, int month)
-        {
-            using (SqliteCommand cmd = new SqliteCommand(
-                "SELECT COUNT(*) FROM PayrollClosures WHERE EmployeeId = @Id AND Year = @Y AND Month = @M", conn, transaction))
-            {
-                cmd.Parameters.AddWithValue("@Id", employeeId);
-                cmd.Parameters.AddWithValue("@Y", year);
-                cmd.Parameters.AddWithValue("@M", month);
-                return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
-            }
         }
 
         // ---------- كشف الرواتب ----------
@@ -332,83 +206,6 @@ namespace Temo_Mobile_Store
             // نسي يسجّله) مايتحسبش للموظف تلقائيًا زي ما كان بيحصل قبل كده.
             row.NetSalary = row.DayValue * (row.PresentDays + row.LeaveDays);
             row.IsClosed = false;
-        }
-
-        // بيقفل شهر معين لكل الموظفين (بيتخطى أي موظف مقفول بالفعل لنفس الشهر) ويجمّد أرقامه
-        // في PayrollClosures نهائيًا. بيرجع عدد الموظفين اللي اتقفلوا فعليًا في الاستدعاء ده.
-        public static int ClosePayrollMonthForAll(int year, int month)
-        {
-            int closedCount = 0;
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteTransaction transaction = conn.BeginTransaction())
-                {
-                    try
-                    {
-                        var employees = new System.Collections.Generic.List<(int Id, string Name, decimal Salary)>();
-                        using (SqliteCommand cmd = new SqliteCommand("SELECT EmployeeId, FullName, MonthlySalary FROM Employees ORDER BY FullName", conn, transaction))
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                employees.Add((Convert.ToInt32(reader["EmployeeId"]), reader["FullName"].ToString(), Convert.ToDecimal(reader["MonthlySalary"])));
-                        }
-
-                        foreach (var emp in employees)
-                        {
-                            if (IsMonthClosed(conn, transaction, emp.Id, year, month)) continue;
-
-                            var row = new PayrollRow { EmployeeId = emp.Id, FullName = emp.Name, MonthlySalary = emp.Salary };
-                            FillPayrollRow(conn, transaction, row, year, month);
-
-                            using (SqliteCommand cmdInsert = new SqliteCommand(
-                                @"INSERT INTO PayrollClosures (EmployeeId, Year, Month, MonthlySalary, DayValue, PresentDays, AbsentDays, LeaveDays, NetSalary)
-                                  VALUES (@Id, @Y, @M, @Salary, @DayValue, @Present, @Absent, @Leave, @Net)", conn, transaction))
-                            {
-                                cmdInsert.Parameters.AddWithValue("@Id", emp.Id);
-                                cmdInsert.Parameters.AddWithValue("@Y", year);
-                                cmdInsert.Parameters.AddWithValue("@M", month);
-                                cmdInsert.Parameters.AddWithValue("@Salary", row.MonthlySalary);
-                                cmdInsert.Parameters.AddWithValue("@DayValue", row.DayValue);
-                                cmdInsert.Parameters.AddWithValue("@Present", row.PresentDays);
-                                cmdInsert.Parameters.AddWithValue("@Absent", row.AbsentDays);
-                                cmdInsert.Parameters.AddWithValue("@Leave", row.LeaveDays);
-                                cmdInsert.Parameters.AddWithValue("@Net", row.NetSalary);
-                                cmdInsert.ExecuteNonQuery();
-                            }
-                            closedCount++;
-                        }
-
-                        transaction.Commit();
-                    }
-                    catch
-                    {
-                        transaction.Rollback();
-                        throw;
-                    }
-                }
-            }
-            return closedCount;
-        }
-
-        // بيلغي قفل شهر معين لكل الموظفين اللي كانوا مقفولين فيه (لتصحيح خطأ حصل وقت القفل).
-        // بعد الإلغاء، الشهر بيرجع "مفتوح" وبيتحسب حي تاني من سجلات الحضور، وأي تصحيح جديد
-        // للحضور بقى ممكن. ملحوظة: ده بيغيّر رصيد الموظف المستحق فورًا (لأن الشهر ده مابقاش
-        // محسوب ضمن "المكتسب" لحد ما يتقفل تاني)، فلو فيه سلف/دفعات اتصرفت بالفعل بناءً على
-        // الرقم القديم، الرصيد هيبان مختلف لحد ما يتقفل الشهر تاني بالرقم الصح.
-        // بيرجع عدد الموظفين اللي اتلغى قفلهم فعليًا.
-        public static int ReopenPayrollMonthForAll(int year, int month)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("DELETE FROM PayrollClosures WHERE Year = @Y AND Month = @M", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Y", year);
-                    cmd.Parameters.AddWithValue("@M", month);
-                    return cmd.ExecuteNonQuery();
-                }
-            }
         }
 
         // ---------- كشف حساب الموظف (المستحق ناقص السلف/الدفعات) ----------
@@ -530,59 +327,5 @@ namespace Temo_Mobile_Store
             return dt;
         }
 
-        // بيسجّل صرف مرتب لموظف من رصيد وسيلة دفع معينة، جوه Transaction واحدة.
-        // isAdvance = false ("دفعة من المستحق"): لازم المبلغ يكون في حدود رصيد الموظف الفعلي،
-        // وبيرمي InsufficientEarnedBalanceException لو المبلغ أكبر من المستحق.
-        // isAdvance = true ("سلفة"): مفيش حد أقصى مرتبط بالمستحق - بيسمح يتصرف أكتر من المستحق
-        // فعليًا (وده يظهر كرصيد سالب في كشف حسابه لحد ما يتقفل شهر جديد).
-        // في الحالتين، بيرمي InsufficientBalanceException لو رصيد وسيلة الدفع نفسها مايكفيش.
-        public static void PayEmployee(int employeeId, string employeeName, string method, decimal amount, string description, bool isAdvance)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteTransaction transaction = conn.BeginTransaction())
-                {
-                    try
-                    {
-                        if (!isAdvance)
-                        {
-                            decimal earnedBalance = GetEmployeeBalanceInTransaction(conn, transaction, employeeId);
-                            if (amount > earnedBalance)
-                                throw new InsufficientEarnedBalanceException(earnedBalance);
-                        }
-
-                        decimal currentBalance = TreasuryRepository.GetBalanceInTransaction(conn, transaction, method);
-                        if (amount > currentBalance)
-                            throw new InsufficientBalanceException(method, currentBalance);
-
-                        using (SqliteCommand cmd = new SqliteCommand(
-                            @"INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, EmployeeId, IsAdvance)
-                              VALUES (@Date, 'صرف', @Method, @Amount, @Ref, @Desc, @CreatedAt, @AccountCode, @EmployeeId, @IsAdvance)", conn, transaction))
-                        {
-                            cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
-                            cmd.Parameters.AddWithValue("@Method", method);
-                            cmd.Parameters.AddWithValue("@Amount", amount);
-                            cmd.Parameters.AddWithValue("@Ref", "");
-                            cmd.Parameters.AddWithValue("@Desc", string.IsNullOrWhiteSpace(description) ? ("صرف مرتب لـ " + employeeName) : description);
-                            cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                            cmd.Parameters.AddWithValue("@AccountCode", SalariesAccountCode);
-                            cmd.Parameters.AddWithValue("@EmployeeId", employeeId);
-                            cmd.Parameters.AddWithValue("@IsAdvance", isAdvance ? 1 : 0);
-                            cmd.ExecuteNonQuery();
-                        }
-
-                        TreasuryRepository.SetBalanceInTransaction(conn, transaction, method, currentBalance - amount);
-
-                        transaction.Commit();
-                    }
-                    catch
-                    {
-                        transaction.Rollback();
-                        throw;
-                    }
-                }
-            }
-        }
     }
 }

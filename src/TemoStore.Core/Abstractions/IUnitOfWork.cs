@@ -18,6 +18,8 @@ namespace TemoStore.Core.Abstractions
         IExpenseRepository Expenses { get; }
         IInventoryAdjustmentRepository InventoryAdjustments { get; }
         IMaintenanceRepository Maintenance { get; }
+        IEmployeeRepository Employees { get; }
+        IAttendanceRepository Attendance { get; }
 
         void Commit();
         void Rollback();
@@ -61,6 +63,28 @@ namespace TemoStore.Core.Abstractions
         void UpdateStatus(int ticketId, string newStatus);
         string? GetCustomerName(int ticketId);
         void SetDelivered(int ticketId, decimal actualCost);
+    }
+
+    public interface IEmployeeRepository
+    {
+        void Add(string fullName, string? phone, decimal monthlySalary, DateTime hireDate);
+        void Update(int employeeId, string fullName, string? phone, decimal monthlySalary, DateTime hireDate);
+        void Delete(int employeeId);
+        IReadOnlyList<EmployeeRecord> GetAll();
+    }
+
+    // حضور الموظفين وقفل/فتح كشف الرواتب الشهري - نفس معادلة الراتب الموجودة في
+    // AttendancePageControl/AttendanceRepository القديمة: قيمة اليوم = المرتب ÷ عدد
+    // أيام الشهر، والراتب الصافي = قيمة اليوم × (أيام الحضور + أيام الإجازة المدفوعة)
+    public interface IAttendanceRepository
+    {
+        void UpsertStatus(int employeeId, DateTime date, string status);
+        bool IsMonthClosed(int employeeId, int year, int month);
+        (int Present, int Absent, int Leave) GetAttendanceCounts(int employeeId, int year, int month);
+        void InsertClosure(int employeeId, int year, int month, decimal monthlySalary, decimal dayValue, int presentDays, int absentDays, int leaveDays, decimal netSalary);
+        int DeleteClosuresForMonth(int year, int month);
+        void DeleteAttendanceForEmployee(int employeeId);
+        decimal GetEmployeeBalance(int employeeId);
     }
 
     public interface ISaleRepository

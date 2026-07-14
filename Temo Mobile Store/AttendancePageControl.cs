@@ -3,6 +3,7 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
+using TemoStore.Core.Commands;
 using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
@@ -164,7 +165,7 @@ namespace Temo_Mobile_Store
                     if (string.IsNullOrEmpty(status)) continue;
 
                     int employeeId = Convert.ToInt32(dr["EmployeeId"]);
-                    AttendanceRepository.SetAttendanceStatus(employeeId, dtpAttendanceDate.Value.Date, status);
+                    AppServices.CoreEngine.Execute(new SetAttendanceStatusCommand { EmployeeId = employeeId, Date = dtpAttendanceDate.Value.Date, Status = status, PerformedBy = AuthManager.CurrentUsername });
                     savedCount++;
                 }
             }
@@ -256,7 +257,7 @@ namespace Temo_Mobile_Store
             int closedCount;
             try
             {
-                closedCount = AttendanceRepository.ClosePayrollMonthForAll(year, month);
+                closedCount = AppServices.CoreEngine.Execute(new ClosePayrollMonthCommand { Year = year, Month = month, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex)
             {
@@ -286,7 +287,7 @@ namespace Temo_Mobile_Store
             int reopenedCount;
             try
             {
-                reopenedCount = AttendanceRepository.ReopenPayrollMonthForAll(year, month);
+                reopenedCount = AppServices.CoreEngine.Execute(new ReopenPayrollMonthCommand { Year = year, Month = month, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex)
             {
@@ -428,7 +429,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                AttendanceRepository.PayEmployee(employeeId, employeeName, method, amount, txtPayDescription.Text.Trim(), isAdvance);
+                AppServices.CoreEngine.Execute(new PayEmployeeCommand { EmployeeId = employeeId, EmployeeName = employeeName, Method = method, Amount = amount, Description = txtPayDescription.Text.Trim(), IsAdvance = isAdvance, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (InsufficientEarnedBalanceException ex)
             {
@@ -543,7 +544,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                AttendanceRepository.AddEmployee(txtEmployeeName.Text.Trim(), string.IsNullOrWhiteSpace(txtEmployeePhone.Text) ? null : txtEmployeePhone.Text.Trim(), salary, dtpEmployeeHireDate.Value.Date);
+                AppServices.CoreEngine.Execute(new AddEmployeeCommand { FullName = txtEmployeeName.Text.Trim(), Phone = string.IsNullOrWhiteSpace(txtEmployeePhone.Text) ? null : txtEmployeePhone.Text.Trim(), MonthlySalary = salary, HireDate = dtpEmployeeHireDate.Value.Date, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
@@ -561,7 +562,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                AttendanceRepository.UpdateEmployee(selectedEmployeeId, txtEmployeeName.Text.Trim(), string.IsNullOrWhiteSpace(txtEmployeePhone.Text) ? null : txtEmployeePhone.Text.Trim(), salary, dtpEmployeeHireDate.Value.Date);
+                AppServices.CoreEngine.Execute(new UpdateEmployeeCommand { EmployeeId = selectedEmployeeId, FullName = txtEmployeeName.Text.Trim(), Phone = string.IsNullOrWhiteSpace(txtEmployeePhone.Text) ? null : txtEmployeePhone.Text.Trim(), MonthlySalary = salary, HireDate = dtpEmployeeHireDate.Value.Date, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
@@ -591,7 +592,7 @@ namespace Temo_Mobile_Store
                 if (MessageBox.Show("هل أنت متأكد من حذف هذا الموظف؟ هيتحذف معاه كل سجلات حضوره.", "تأكيد الحذف", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
                     return;
 
-                AttendanceRepository.DeleteEmployee(selectedEmployeeId);
+                AppServices.CoreEngine.Execute(new DeleteEmployeeCommand { EmployeeId = selectedEmployeeId, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 

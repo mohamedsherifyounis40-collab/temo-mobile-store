@@ -69,6 +69,15 @@ namespace TemoStore.Core.Entities
         public int? SaleId { get; set; }
         public int? CustomerId { get; set; }
         public int? SupplierId { get; set; }
+        public int? EmployeeId { get; set; }
+        public bool IsAdvance { get; set; }
+    }
+
+    public class EmployeeRecord
+    {
+        public int EmployeeId { get; set; }
+        public string FullName { get; set; } = "";
+        public decimal MonthlySalary { get; set; }
     }
 
     public class JournalLineRequest

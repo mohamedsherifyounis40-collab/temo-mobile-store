@@ -51,8 +51,8 @@ namespace TemoStore.Data.Repositories
         public int InsertMovement(CashMovementRecord movement)
         {
             using (var cmd = new SqliteCommand(
-                "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, CustomerId, SupplierId, PurchaseId, SaleId, LinkedMovementId) " +
-                "VALUES (@Date, @Type, @Method, @Amount, @Ref, @Desc, @CreatedAt, @AccountCode, @CustomerId, @SupplierId, @PurchaseId, @SaleId, @LinkedId)", _conn, _tx))
+                "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, CustomerId, SupplierId, PurchaseId, SaleId, LinkedMovementId, EmployeeId, IsAdvance) " +
+                "VALUES (@Date, @Type, @Method, @Amount, @Ref, @Desc, @CreatedAt, @AccountCode, @CustomerId, @SupplierId, @PurchaseId, @SaleId, @LinkedId, @EmployeeId, @IsAdvance)", _conn, _tx))
             {
                 cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
                 cmd.Parameters.AddWithValue("@Type", movement.MovementType);
@@ -67,6 +67,8 @@ namespace TemoStore.Data.Repositories
                 cmd.Parameters.AddWithValue("@PurchaseId", (object?)movement.PurchaseId ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@SaleId", (object?)movement.SaleId ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@LinkedId", (object?)movement.LinkedMovementId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@EmployeeId", (object?)movement.EmployeeId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@IsAdvance", movement.IsAdvance ? 1 : 0);
                 cmd.ExecuteNonQuery();
             }
             using var cmdId = new SqliteCommand("SELECT last_insert_rowid();", _conn, _tx);
@@ -76,7 +78,7 @@ namespace TemoStore.Data.Repositories
         public CashMovementRecord? GetMovementById(int id)
         {
             using var cmd = new SqliteCommand(
-                "SELECT MovementType, PaymentMethod, Amount, ReferenceNumber, Description, AccountCode, MovementDate, LinkedMovementId, PurchaseId, SaleId, CustomerId, SupplierId FROM CashMovements WHERE Id = @Id", _conn, _tx);
+                "SELECT MovementType, PaymentMethod, Amount, ReferenceNumber, Description, AccountCode, MovementDate, LinkedMovementId, PurchaseId, SaleId, CustomerId, SupplierId, EmployeeId, IsAdvance FROM CashMovements WHERE Id = @Id", _conn, _tx);
             cmd.Parameters.AddWithValue("@Id", id);
             using var reader = cmd.ExecuteReader();
             if (!reader.Read()) return null;
@@ -94,7 +96,9 @@ namespace TemoStore.Data.Repositories
                 PurchaseId = reader["PurchaseId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["PurchaseId"]),
                 SaleId = reader["SaleId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["SaleId"]),
                 CustomerId = reader["CustomerId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["CustomerId"]),
-                SupplierId = reader["SupplierId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["SupplierId"])
+                SupplierId = reader["SupplierId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["SupplierId"]),
+                EmployeeId = reader["EmployeeId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["EmployeeId"]),
+                IsAdvance = reader["IsAdvance"] != DBNull.Value && Convert.ToInt32(reader["IsAdvance"]) == 1
             };
         }
 

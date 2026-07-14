@@ -258,4 +258,66 @@ namespace TemoStore.Core.Commands
         public required string Method { get; set; }
         public required string PerformedBy { get; set; }
     }
+
+    // ==========================================================================
+    // شاشة الحضور والمرتبات
+    // ==========================================================================
+
+    public class SetAttendanceStatusCommand : ICommand<bool>
+    {
+        public required int EmployeeId { get; set; }
+        public required DateTime Date { get; set; }
+        public required string Status { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class ClosePayrollMonthCommand : ICommand<int>
+    {
+        public required int Year { get; set; }
+        public required int Month { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class ReopenPayrollMonthCommand : ICommand<int>
+    {
+        public required int Year { get; set; }
+        public required int Month { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class PayEmployeeCommand : ICommand<bool>
+    {
+        public required int EmployeeId { get; set; }
+        public required string EmployeeName { get; set; }
+        public required string Method { get; set; }
+        public required decimal Amount { get; set; }
+        public string? Description { get; set; }
+        public required bool IsAdvance { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class AddEmployeeCommand : ICommand<bool>
+    {
+        public required string FullName { get; set; }
+        public string? Phone { get; set; }
+        public required decimal MonthlySalary { get; set; }
+        public required DateTime HireDate { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class UpdateEmployeeCommand : ICommand<bool>
+    {
+        public required int EmployeeId { get; set; }
+        public required string FullName { get; set; }
+        public string? Phone { get; set; }
+        public required decimal MonthlySalary { get; set; }
+        public required DateTime HireDate { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class DeleteEmployeeCommand : ICommand<bool>
+    {
+        public required int EmployeeId { get; set; }
+        public required string PerformedBy { get; set; }
+    }
 }

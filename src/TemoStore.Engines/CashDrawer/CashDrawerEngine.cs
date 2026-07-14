@@ -11,7 +11,7 @@ namespace TemoStore.Engines.CashDrawer
     {
         public decimal GetBalance(string paymentMethod, IUnitOfWork uow) => uow.CashDrawer.GetBalance(paymentMethod);
 
-        public int Credit(string paymentMethod, decimal amount, string reason, IUnitOfWork uow, int? saleId = null, int? purchaseId = null, int? customerId = null, int? supplierId = null, int? accountCode = null)
+        public int Credit(string paymentMethod, decimal amount, string reason, IUnitOfWork uow, int? saleId = null, int? purchaseId = null, int? customerId = null, int? supplierId = null, int? accountCode = null, int? employeeId = null, bool isAdvance = false)
         {
             decimal currentBalance = uow.CashDrawer.GetBalance(paymentMethod);
             int movementId = uow.CashDrawer.InsertMovement(new CashMovementRecord
@@ -24,13 +24,15 @@ namespace TemoStore.Engines.CashDrawer
                 SaleId = saleId,
                 PurchaseId = purchaseId,
                 CustomerId = customerId,
-                SupplierId = supplierId
+                SupplierId = supplierId,
+                EmployeeId = employeeId,
+                IsAdvance = isAdvance
             });
             uow.CashDrawer.SetBalance(paymentMethod, currentBalance + amount);
             return movementId;
         }
 
-        public int Debit(string paymentMethod, decimal amount, string reason, IUnitOfWork uow, int? saleId = null, int? purchaseId = null, int? customerId = null, int? supplierId = null, int? accountCode = null)
+        public int Debit(string paymentMethod, decimal amount, string reason, IUnitOfWork uow, int? saleId = null, int? purchaseId = null, int? customerId = null, int? supplierId = null, int? accountCode = null, int? employeeId = null, bool isAdvance = false)
         {
             decimal currentBalance = uow.CashDrawer.GetBalance(paymentMethod);
             if (amount > currentBalance)
@@ -46,7 +48,9 @@ namespace TemoStore.Engines.CashDrawer
                 SaleId = saleId,
                 PurchaseId = purchaseId,
                 CustomerId = customerId,
-                SupplierId = supplierId
+                SupplierId = supplierId,
+                EmployeeId = employeeId,
+                IsAdvance = isAdvance
             });
             uow.CashDrawer.SetBalance(paymentMethod, currentBalance - amount);
             return movementId;

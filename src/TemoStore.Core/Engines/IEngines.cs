@@ -46,8 +46,8 @@ namespace TemoStore.Core.Engines
     public interface ICashDrawerEngine
     {
         decimal GetBalance(string paymentMethod, IUnitOfWork uow);
-        int Credit(string paymentMethod, decimal amount, string reason, IUnitOfWork uow, int? saleId = null, int? purchaseId = null, int? customerId = null, int? supplierId = null, int? accountCode = null);
-        int Debit(string paymentMethod, decimal amount, string reason, IUnitOfWork uow, int? saleId = null, int? purchaseId = null, int? customerId = null, int? supplierId = null, int? accountCode = null);
+        int Credit(string paymentMethod, decimal amount, string reason, IUnitOfWork uow, int? saleId = null, int? purchaseId = null, int? customerId = null, int? supplierId = null, int? accountCode = null, int? employeeId = null, bool isAdvance = false);
+        int Debit(string paymentMethod, decimal amount, string reason, IUnitOfWork uow, int? saleId = null, int? purchaseId = null, int? customerId = null, int? supplierId = null, int? accountCode = null, int? employeeId = null, bool isAdvance = false);
         (int fromMovementId, int toMovementId) Transfer(string fromMethod, string toMethod, decimal amount, string? description, IUnitOfWork uow);
     }
 
