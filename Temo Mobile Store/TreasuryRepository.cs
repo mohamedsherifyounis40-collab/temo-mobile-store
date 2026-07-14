@@ -29,6 +29,7 @@ namespace Temo_Mobile_Store
         public string Description;
         public int? AccountCode;
         public string MovementDate;
+        public int? LinkedMovementId;
     }
 
     // ==========================================================================
@@ -376,7 +377,7 @@ namespace Temo_Mobile_Store
 
         private static CashMovementRecord GetMovementInTransaction(SqliteConnection conn, SqliteTransaction transaction, int id)
         {
-            using (SqliteCommand cmd = new SqliteCommand("SELECT MovementType, PaymentMethod, Amount, ReferenceNumber, Description, AccountCode, MovementDate FROM CashMovements WHERE Id = @Id", conn, transaction))
+            using (SqliteCommand cmd = new SqliteCommand("SELECT MovementType, PaymentMethod, Amount, ReferenceNumber, Description, AccountCode, MovementDate, LinkedMovementId FROM CashMovements WHERE Id = @Id", conn, transaction))
             {
                 cmd.Parameters.AddWithValue("@Id", id);
                 using (SqliteDataReader reader = cmd.ExecuteReader())
@@ -391,8 +392,129 @@ namespace Temo_Mobile_Store
                         ReferenceNumber = reader["ReferenceNumber"] == DBNull.Value ? null : reader["ReferenceNumber"].ToString(),
                         Description = reader["Description"] == DBNull.Value ? null : reader["Description"].ToString(),
                         AccountCode = reader["AccountCode"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["AccountCode"]),
-                        MovementDate = reader["MovementDate"].ToString()
+                        MovementDate = reader["MovementDate"].ToString(),
+                        LinkedMovementId = reader["LinkedMovementId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["LinkedMovementId"])
                     };
+                }
+            }
+        }
+
+        // بيحوّل مبلغ من وسيلة دفع لوسيلة تانية (زي تغذية ماكينة POS أو محفظة فودافون كاش من الدرج) -
+        // بيسجّل حركتين مرتبطتين (صرف من المصدر + قبض في الهدف) عشان يفضل أثر واضح في السجل
+        public static void TransferBetweenMethods(string fromMethod, string toMethod, decimal amount, string description)
+        {
+            if (fromMethod == toMethod)
+                throw new InvalidOperationException("لازم تختار وسيلتين مختلفتين للتحويل.");
+
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteTransaction transaction = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        decimal fromBalance = GetBalanceInTransaction(conn, transaction, fromMethod);
+                        if (amount > fromBalance)
+                            throw new InsufficientBalanceException(fromMethod, fromBalance);
+
+                        string desc = string.IsNullOrWhiteSpace(description) ? "" : " - " + description.Trim();
+                        string nowDate = DateTime.Now.ToString("yyyy-MM-dd");
+                        string nowDateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+                        int outId;
+                        using (SqliteCommand cmd = new SqliteCommand(
+                            "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt) VALUES (@Date, 'صرف', @Method, @Amount, @Ref, @Desc, @CreatedAt)", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@Date", nowDate);
+                            cmd.Parameters.AddWithValue("@Method", fromMethod);
+                            cmd.Parameters.AddWithValue("@Amount", amount);
+                            cmd.Parameters.AddWithValue("@Ref", "تحويل داخلي");
+                            cmd.Parameters.AddWithValue("@Desc", $"تحويل إلى \"{toMethod}\"{desc}");
+                            cmd.Parameters.AddWithValue("@CreatedAt", nowDateTime);
+                            cmd.ExecuteNonQuery();
+                        }
+                        using (SqliteCommand cmdId = new SqliteCommand("SELECT last_insert_rowid();", conn, transaction))
+                            outId = Convert.ToInt32(cmdId.ExecuteScalar());
+
+                        int inId;
+                        using (SqliteCommand cmd = new SqliteCommand(
+                            "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, LinkedMovementId) VALUES (@Date, 'قبض', @Method, @Amount, @Ref, @Desc, @CreatedAt, @LinkedId)", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@Date", nowDate);
+                            cmd.Parameters.AddWithValue("@Method", toMethod);
+                            cmd.Parameters.AddWithValue("@Amount", amount);
+                            cmd.Parameters.AddWithValue("@Ref", "تحويل داخلي");
+                            cmd.Parameters.AddWithValue("@Desc", $"تحويل من \"{fromMethod}\"{desc}");
+                            cmd.Parameters.AddWithValue("@CreatedAt", nowDateTime);
+                            cmd.Parameters.AddWithValue("@LinkedId", outId);
+                            cmd.ExecuteNonQuery();
+                        }
+                        using (SqliteCommand cmdId = new SqliteCommand("SELECT last_insert_rowid();", conn, transaction))
+                            inId = Convert.ToInt32(cmdId.ExecuteScalar());
+
+                        using (SqliteCommand cmd = new SqliteCommand("UPDATE CashMovements SET LinkedMovementId = @InId WHERE Id = @OutId", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@InId", inId);
+                            cmd.Parameters.AddWithValue("@OutId", outId);
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        SetBalanceInTransaction(conn, transaction, fromMethod, fromBalance - amount);
+                        decimal toBalance = GetBalanceInTransaction(conn, transaction, toMethod);
+                        SetBalanceInTransaction(conn, transaction, toMethod, toBalance + amount);
+
+                        transaction.Commit();
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
+                }
+            }
+        }
+
+        // بيلغي تحويل بين وسائل دفع (حركتين مرتبطتين) مع بعض - بيرجّع الرصيدين لحالتهم قبل التحويل
+        public static void CancelTransfer(int movementId)
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteTransaction transaction = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        CashMovementRecord first = GetMovementInTransaction(conn, transaction, movementId)
+                            ?? throw new InvalidOperationException("لم يتم العثور على الحركة.");
+                        if (first.LinkedMovementId == null)
+                            throw new InvalidOperationException("الحركة دي مش جزء من عملية تحويل.");
+
+                        CashMovementRecord second = GetMovementInTransaction(conn, transaction, first.LinkedMovementId.Value)
+                            ?? throw new InvalidOperationException("لم يتم العثور على الحركة المرتبطة بالتحويل.");
+
+                        foreach (var rec in new[] { first, second })
+                        {
+                            decimal currentBalance = GetBalanceInTransaction(conn, transaction, rec.PaymentMethod);
+                            decimal newBalance = rec.MovementType == "قبض" ? currentBalance - rec.Amount : currentBalance + rec.Amount;
+                            if (newBalance < 0)
+                                throw new InsufficientBalanceException(rec.PaymentMethod, currentBalance);
+                            SetBalanceInTransaction(conn, transaction, rec.PaymentMethod, newBalance);
+                        }
+
+                        using (SqliteCommand cmd = new SqliteCommand("DELETE FROM CashMovements WHERE Id = @Id1 OR Id = @Id2", conn, transaction))
+                        {
+                            cmd.Parameters.AddWithValue("@Id1", first.Id);
+                            cmd.Parameters.AddWithValue("@Id2", second.Id);
+                            cmd.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                    }
+                    catch
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
                 }
             }
         }

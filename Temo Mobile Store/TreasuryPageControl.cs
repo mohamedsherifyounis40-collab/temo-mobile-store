@@ -26,7 +26,12 @@ namespace Temo_Mobile_Store
 
         // ---------- عناصر عامة ----------
         private Guna2ComboBox cmbTreasuryOperationType;
-        private Panel pnlExpenseOps, pnlMovementOps;
+        private Panel pnlExpenseOps, pnlMovementOps, pnlTransferOps;
+
+        // ---------- تحويل بين وسائل الدفع ----------
+        private Guna2ComboBox cmbTransferFromMethod, cmbTransferToMethod;
+        private Guna2TextBox txtTransferAmount, txtTransferDescription;
+        private Label lblTransferFromBalance;
 
         // ---------- المصروفات ----------
         private ComboBox cmbExpenseAccounts;
@@ -91,17 +96,20 @@ namespace Temo_Mobile_Store
         {
             Label lblOpType = new Label() { Text = "نوع العملية:", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
             cmbTreasuryOperationType = new Guna2ComboBox() { Location = new Point(130, 17), Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
-            cmbTreasuryOperationType.Items.AddRange(new string[] { "مصروف عمومي 💸", "قبض 💰", "صرف 💸" });
+            cmbTreasuryOperationType.Items.AddRange(new string[] { "مصروف عمومي 💸", "قبض 💰", "صرف 💸", "تحويل بين وسائل 🔄" });
             cmbTreasuryOperationType.SelectedIndexChanged += CmbTreasuryOperationType_SelectedIndexChanged;
 
             pnlExpenseOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
             pnlMovementOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
+            pnlTransferOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
 
             BuildExpensesPanel();
             BuildMovementsPanel();
+            BuildTransferPanel();
             pnlMovementOps.Visible = false;
+            pnlTransferOps.Visible = false;
 
-            this.Controls.AddRange(new Control[] { lblOpType, cmbTreasuryOperationType, pnlExpenseOps, pnlMovementOps });
+            this.Controls.AddRange(new Control[] { lblOpType, cmbTreasuryOperationType, pnlExpenseOps, pnlMovementOps, pnlTransferOps });
 
             cmbTreasuryOperationType.SelectedIndex = 0;
         }
@@ -110,7 +118,8 @@ namespace Temo_Mobile_Store
         {
             int idx = cmbTreasuryOperationType.SelectedIndex;
             pnlExpenseOps.Visible = idx == 0;
-            pnlMovementOps.Visible = idx != 0;
+            pnlMovementOps.Visible = idx == 1 || idx == 2;
+            pnlTransferOps.Visible = idx == 3;
 
             // idx 1 = قبض، idx 2 = صرف - بنحدد نوع الحركة تلقائيًا في بانل القبض/الصرف
             if (idx == 1) cmbMovementType.SelectedItem = "قبض";
@@ -212,6 +221,96 @@ namespace Temo_Mobile_Store
             pnlMovGridCard.Controls.AddRange(new Control[] { lblMovGridTitle, dgvCashMovements });
 
             pnlMovementOps.Controls.AddRange(new Control[] { gbMovement, pnlMovGridCard });
+        }
+
+        // ==========================================================================
+        // بانل التحويل بين وسائل الدفع (زي تغذية ماكينة POS أو محفظة فودافون كاش من الدرج) -
+        // بيسجل حركتين مرتبطتين (صرف من المصدر + قبض في الهدف) عن طريق TreasuryRepository.TransferBetweenMethods
+        // ==========================================================================
+        private void BuildTransferPanel()
+        {
+            Guna2Panel gbTransfer = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 420), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Label lblTransferTitle = new Label() { Text = "🔄 تحويل بين وسائل الدفع", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
+
+            Label lblFrom = new Label() { Text = "من وسيلة:", Location = new Point(20, 55), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbTransferFromMethod = new Guna2ComboBox() { Location = new Point(20, 75), Width = 240, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            cmbTransferFromMethod.Items.AddRange(UIHelpers.PaymentMethods);
+            cmbTransferFromMethod.SelectedIndexChanged += CmbTransferFromMethod_SelectedIndexChanged;
+
+            lblTransferFromBalance = new Label() { Text = "الرصيد الحالي: --", Location = new Point(20, 113), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold), ForeColor = ColorPrimary };
+
+            Label lblTo = new Label() { Text = "لـ وسيلة:", Location = new Point(20, 145), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbTransferToMethod = new Guna2ComboBox() { Location = new Point(20, 165), Width = 240, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            cmbTransferToMethod.Items.AddRange(UIHelpers.PaymentMethods);
+
+            Label lblTransferAmount = new Label() { Text = "المبلغ:", Location = new Point(20, 203), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtTransferAmount = new Guna2TextBox() { Location = new Point(20, 223), Width = 240, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+
+            Label lblTransferDesc = new Label() { Text = "الوصف (اختياري):", Location = new Point(20, 261), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtTransferDescription = new Guna2TextBox() { Location = new Point(20, 281), Width = 240, Height = 55, Multiline = true, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+
+            Guna2Button btnSaveTransfer = new Guna2Button() { Text = "تسجيل التحويل ✅", Location = new Point(20, 348), Width = 240, Height = 38, FillColor = ColorSuccess, BorderRadius = 10 };
+            btnSaveTransfer.Click += BtnSaveTransfer_Click;
+
+            gbTransfer.Controls.AddRange(new Control[] { lblTransferTitle, lblFrom, cmbTransferFromMethod, lblTransferFromBalance, lblTo, cmbTransferToMethod, lblTransferAmount, txtTransferAmount, lblTransferDesc, txtTransferDescription, btnSaveTransfer });
+
+            pnlTransferOps.Controls.Add(gbTransfer);
+        }
+
+        private void CmbTransferFromMethod_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (cmbTransferFromMethod.SelectedItem == null) return;
+            try
+            {
+                decimal balance = TreasuryRepository.GetPaymentMethodBalance(cmbTransferFromMethod.SelectedItem.ToString());
+                lblTransferFromBalance.Text = $"الرصيد الحالي: {balance:N2} ج.م";
+            }
+            catch { lblTransferFromBalance.Text = "الرصيد الحالي: --"; }
+        }
+
+        private void BtnSaveTransfer_Click(object sender, EventArgs e)
+        {
+            if (IsTodayClosed())
+            {
+                MessageBox.Show("تم إقفال اليوم بالفعل، لا يمكن تسجيل تحويلات جديدة.", "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (cmbTransferFromMethod.SelectedItem == null || cmbTransferToMethod.SelectedItem == null || !decimal.TryParse(txtTransferAmount.Text, out decimal amount) || amount <= 0)
+            {
+                MessageBox.Show("من فضلك اختر الوسيلتين وأدخل مبلغ صحيح.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string fromMethod = cmbTransferFromMethod.SelectedItem.ToString();
+            string toMethod = cmbTransferToMethod.SelectedItem.ToString();
+
+            if (fromMethod == toMethod)
+            {
+                MessageBox.Show("لازم تختار وسيلتين مختلفتين للتحويل.", "بيانات خاطئة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                TreasuryRepository.TransferBetweenMethods(fromMethod, toMethod, amount, txtTransferDescription.Text);
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("حصل خطأ أثناء تسجيل التحويل: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            MessageBox.Show($"تم تحويل {amount:N2} ج.م من \"{fromMethod}\" إلى \"{toMethod}\" بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            txtTransferAmount.Clear();
+            txtTransferDescription.Clear();
+            CmbTransferFromMethod_SelectedIndexChanged(null, EventArgs.Empty);
+            LoadCashMovements();
         }
 
         // ==========================================================================
@@ -490,6 +589,12 @@ namespace Temo_Mobile_Store
                 return;
             }
 
+            if (existing.LinkedMovementId != null)
+            {
+                MessageBox.Show("الحركة دي جزء من عملية تحويل بين وسائل الدفع، مينفعش تتعدل مباشرة. لو عايز تصحح مبلغ التحويل، إلغي التحويل الحالي (هيرجّع الرصيدين) واعمل تحويل جديد صحيح.", "غير مسموح", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             btnSaveMovementEdit.Enabled = true;
         }
 
@@ -571,12 +676,25 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            if (MessageBox.Show("هل أنت متأكد من إلغاء هذه الحركة؟ سيتم عكس أثرها على الرصيد.", "تأكيد الإلغاء", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            bool isTransferLeg = existing.LinkedMovementId != null;
+            string confirmMessage = isTransferLeg
+                ? "الحركة دي جزء من عملية تحويل بين وسائل الدفع. هل أنت متأكد من إلغاء التحويل بالكامل؟ الحركتين (الصرف والقبض) هيترجعوا مع بعض."
+                : "هل أنت متأكد من إلغاء هذه الحركة؟ سيتم عكس أثرها على الرصيد.";
+
+            if (MessageBox.Show(confirmMessage, "تأكيد الإلغاء", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
             try
             {
-                TreasuryRepository.CancelMovement(selectedMovementId, existing.MovementType, existing.PaymentMethod, existing.Amount);
+                if (isTransferLeg)
+                    TreasuryRepository.CancelTransfer(selectedMovementId);
+                else
+                    TreasuryRepository.CancelMovement(selectedMovementId, existing.MovementType, existing.PaymentMethod, existing.Amount);
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
             catch (Exception ex)
             {

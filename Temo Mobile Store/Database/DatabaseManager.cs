@@ -271,6 +271,7 @@ namespace Temo_Mobile_Store.Database
                 EnsureCashMovementsIsAdvanceColumn(conn);
                 EnsureCashMovementsPurchaseIdColumn(conn);
                 EnsureCashMovementsSaleIdColumn(conn);
+                EnsureCashMovementsLinkedMovementIdColumn(conn);
                 EnsureSalesPaymentMethodColumn(conn);
                 EnsureStoreSettingsCatalogSyncColumns(conn);
             }
@@ -393,6 +394,31 @@ namespace Temo_Mobile_Store.Database
 
             if (!columnExists)
                 ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN SaleId INTEGER;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود LinkedMovementId لجدول CashMovements - بيربط الحركتين اللي
+        // بيسجلهم "التحويل بين وسائل الدفع" ببعض (صرف من وسيلة + قبض في وسيلة تانية)
+        // عشان لو حد لغى واحدة منهم، الاتنين يترجعوا مع بعض بشكل صحيح.
+        // ==========================================================================
+        private static void EnsureCashMovementsLinkedMovementIdColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(CashMovements);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "LinkedMovementId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN LinkedMovementId INTEGER;");
         }
 
         // ==========================================================================
