@@ -63,7 +63,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         public void ShowMovementEntry(string movementType)
         {
-            cmbTreasuryOperationType.SelectedIndex = movementType == "صرف" ? 2 : 1; // 0=مصروف، 1=قبض، 2=صرف
+            cmbTreasuryOperationType.SelectedIndex = movementType == "صرف" ? 2 : movementType == "قبض" ? 1 : 0; // 0=مصروف، 1=قبض، 2=صرف
             if (cmbMovementType.Items.Contains(movementType))
                 cmbMovementType.SelectedItem = movementType;
         }

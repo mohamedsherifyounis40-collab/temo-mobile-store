@@ -795,12 +795,12 @@ namespace Temo_Mobile_Store
                 BackColor = ColorContentBg
             };
 
-            flow.Controls.Add(CreateKpiCard("💰", Color.FromArgb(41, 98, 189), "إجمالي المبيعات", todaySales.ToString("N2") + " ج.م"));
-            flow.Controls.Add(CreateKpiCard("🧾", Color.FromArgb(142, 68, 173), "إجمالي المشتريات", todayPurchases.ToString("N2") + " ج.م"));
-            flow.Controls.Add(CreateKpiCard("💸", Color.FromArgb(192, 57, 43), "إجمالي المصروفات", todayExpenses.ToString("N2") + " ج.م"));
-            flow.Controls.Add(CreateKpiCard("📈", Color.FromArgb(39, 174, 96), "صافي الربح", todayProfit.ToString("N2") + " ج.م"));
-            flow.Controls.Add(CreateKpiCard("📄", Color.FromArgb(22, 160, 133), "عدد الفواتير", invoiceCount.ToString()));
-            flow.Controls.Add(CreateKpiCard("🔧", Color.FromArgb(230, 126, 34), "طلبات الصيانة", maintenanceCount.ToString()));
+            flow.Controls.Add(CreateKpiCard("💰", Color.FromArgb(41, 98, 189), "إجمالي المبيعات", todaySales.ToString("N2") + " ج.م", () => NavigateToPageKey(PageKeys.Sales)));
+            flow.Controls.Add(CreateKpiCard("🧾", Color.FromArgb(142, 68, 173), "إجمالي المشتريات", todayPurchases.ToString("N2") + " ج.م", () => NavigateToPageKey(PageKeys.Suppliers)));
+            flow.Controls.Add(CreateKpiCard("💸", Color.FromArgb(192, 57, 43), "إجمالي المصروفات", todayExpenses.ToString("N2") + " ج.م", () => NavigateToPageKey(PageKeys.Treasury, "مصروف")));
+            flow.Controls.Add(CreateKpiCard("📈", Color.FromArgb(39, 174, 96), "صافي الربح", todayProfit.ToString("N2") + " ج.م", () => NavigateToPageKey(PageKeys.Reports)));
+            flow.Controls.Add(CreateKpiCard("📄", Color.FromArgb(22, 160, 133), "عدد الفواتير", invoiceCount.ToString(), () => NavigateToPageKey(PageKeys.Sales)));
+            flow.Controls.Add(CreateKpiCard("🔧", Color.FromArgb(230, 126, 34), "طلبات الصيانة", maintenanceCount.ToString(), () => NavigateToPageKey(PageKeys.Maintenance)));
 
             Label lblBalancesTitle = new Label
             {
@@ -822,7 +822,7 @@ namespace Temo_Mobile_Store
                 BackColor = ColorContentBg
             };
 
-            flowBalances.Controls.Add(CreateKpiCard("🏦", ColorTitleText, "الإجمالي (كل الوسائل)", totalBalance.ToString("N2") + " ج.م"));
+            flowBalances.Controls.Add(CreateKpiCard("🏦", ColorTitleText, "الإجمالي (كل الوسائل)", totalBalance.ToString("N2") + " ج.م", () => NavigateToPageKey(PageKeys.Treasury)));
             var methodIcons = new Dictionary<string, string> { { "نقدي", "💵" }, { "فوري", "📲" }, { "أمان", "🔒" }, { "سهولة", "✅" }, { "فودافون كاش", "🔴" }, { "إنستاباي", "🏛️" } };
             var methodColors = new Dictionary<string, Color> {
                 { "نقدي", Color.FromArgb(39, 174, 96) }, { "فوري", Color.FromArgb(230, 126, 34) },
@@ -830,7 +830,7 @@ namespace Temo_Mobile_Store
                 { "فودافون كاش", Color.FromArgb(192, 57, 43) }, { "إنستاباي", Color.FromArgb(142, 68, 173) }
             };
             foreach (var mb in methodBalances)
-                flowBalances.Controls.Add(CreateKpiCard(methodIcons[mb.Method], methodColors[mb.Method], mb.Method, mb.Balance.ToString("N2") + " ج.م"));
+                flowBalances.Controls.Add(CreateKpiCard(methodIcons[mb.Method], methodColors[mb.Method], mb.Method, mb.Balance.ToString("N2") + " ج.م", () => NavigateToPageKey(PageKeys.Treasury)));
 
             // ---------- الرسم البياني: المبيعات خلال آخر 7 أيام ----------
             var salesTrend = GetLast7DaysSales();
@@ -1015,7 +1015,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         // بناء كارت KPI واحد (أيقونة + عنوان + قيمة)
         // ==========================================================================
-        private Panel CreateKpiCard(string icon, Color accentColor, string title, string value)
+        private Panel CreateKpiCard(string icon, Color accentColor, string title, string value, Action onClick = null)
         {
             Guna2Panel card = new Guna2Panel
             {
@@ -1067,6 +1067,18 @@ namespace Temo_Mobile_Store
             card.Controls.Add(lblIcon);
             card.Controls.Add(lblTitle);
             card.Controls.Add(lblValue);
+
+            if (onClick != null)
+            {
+                EventHandler handler = (s, e) => onClick();
+                card.Cursor = Cursors.Hand;
+                card.Click += handler;
+                foreach (Control child in new Control[] { lblIcon, lblIconText, lblTitle, lblValue })
+                {
+                    child.Cursor = Cursors.Hand;
+                    child.Click += handler;
+                }
+            }
 
             return card;
         }
