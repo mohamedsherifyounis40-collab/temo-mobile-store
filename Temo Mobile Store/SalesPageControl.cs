@@ -5,6 +5,8 @@ using System.Drawing;
 using System.Drawing.Printing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
+using TemoStore.Core.Commands;
+using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
 {
@@ -402,13 +404,29 @@ namespace Temo_Mobile_Store
             int dailyInvoiceNumber;
             try
             {
-                dailyInvoiceNumber = SalesRepository.AddSale(
-                    txtSaleBarcode.Text, txtSaleName.Text, Convert.ToDecimal(txtCustomerPrice.Text), qtySold,
-                    Convert.ToDecimal(txtSaleTotal.Text), customerIdParam, paymentType, selectedImei, paymentMethod);
+                var result = AppServices.CoreEngine.Execute(new CreateSaleCommand
+                {
+                    Barcode = txtSaleBarcode.Text,
+                    ProductName = txtSaleName.Text,
+                    UnitPrice = Convert.ToDecimal(txtCustomerPrice.Text),
+                    Quantity = qtySold,
+                    Total = Convert.ToDecimal(txtSaleTotal.Text),
+                    CustomerId = customerIdParam == DBNull.Value ? (int?)null : Convert.ToInt32(customerIdParam),
+                    PaymentType = paymentType,
+                    PaymentMethod = paymentMethod,
+                    Imei = selectedImei,
+                    PerformedBy = AuthManager.CurrentUsername
+                });
+                dailyInvoiceNumber = result.DailyInvoiceNumber;
             }
             catch (InsufficientStockException ex)
             {
                 MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            catch (ValidationException ex)
+            {
+                MessageBox.Show(string.Join(Environment.NewLine, ex.Errors), "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             catch (Exception ex)
@@ -491,7 +509,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                SalesRepository.UpdateSaleQuantity(selectedSaleId, newQty);
+                AppServices.CoreEngine.Execute(new UpdateSaleQuantityCommand { SaleId = selectedSaleId, NewQuantity = newQty, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (InsufficientStockException ex)
             {
@@ -545,7 +563,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                SalesRepository.CancelSale(selectedSaleId, existing.Barcode, existing.QuantitySold, existing.IMEI);
+                AppServices.CoreEngine.Execute(new CancelSaleCommand { SaleId = selectedSaleId, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (DateClosedException ex)
             {
