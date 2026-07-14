@@ -196,7 +196,7 @@ namespace Temo_Mobile_Store
             Guna2Panel pnlNote = new Guna2Panel() { Location = new Point(0, 150), Size = new Size(280, 200), FillColor = Color.FromArgb(248, 249, 251), BorderRadius = 12 };
             Label lblNote = new Label()
             {
-                Text = "ℹ️ ملحوظة محاسبية مهمة: الميزان ده بيعرض لحظة حالية (دلوقتي)، مش تاريخ معين. لو المدين ما يساويش الدائن بالظبط، الفرق بيعكس حركات لسه مش مربوطة بحساب في شجرة الحسابات.",
+                Text = "ℹ️ ملحوظة محاسبية: الميزان ده بيعرض لحظة حالية (دلوقتي)، مش تاريخ معين. الأرقام كلها من الدفتر المحاسبي الحقيقي (القيود)، فالمدين بيساوي الدائن دايمًا بالضمان.",
                 Location = new Point(15, 12),
                 Size = new Size(250, 175),
                 Font = new Font("Segoe UI", 8F),

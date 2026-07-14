@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.Sqlite;
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Temo_Mobile_Store.Database
@@ -312,6 +313,304 @@ namespace Temo_Mobile_Store.Database
                 EnsureCashMovementsLinkedMovementIdColumn(conn);
                 EnsureSalesPaymentMethodColumn(conn);
                 EnsureStoreSettingsCatalogSyncColumns(conn);
+
+                BackfillHistoricalJournalEntries(conn);
+            }
+        }
+
+        // ==========================================================================
+        // ترحيل بأثر رجعي (مرة واحدة فقط في عمر البرنامج، محمي بعلامة BackfillMarker):
+        // الدفتر المحاسبي (JournalEntries/JournalLines) اتبنى في وقت متأخر عن أول بيانات
+        // حقيقية اتسجلت في البرنامج (مبيعات/مشتريات/مصروفات/حركات خزينة قديمة من غير أي
+        // قيد محاسبي خالص). الترحيل ده بيمشي على كل صف قديم زي ما هو دلوقتي (الحالة
+        // النهائية بتاعته، مش تاريخ كل خطوة وسطية حصلت فيه) ويبني له القيد المناسب،
+        // عشان الدفتر يبقى مصدر صحيح وكامل من أول يوم مش بس من النهارده.
+        //
+        // أهم حاجة هنا: الترحيل ده بيتنفذ مرة واحدة بس (لو لقى علامة BackfillMarker
+        // موجودة، بيطلع فورًا من غير ما يلمس حاجة). العمليات الجديدة (اللي بتتسجل من
+        // خلال ICoreEngine بعد النهارده) بيتسجل لها قيد حي لحظة حدوثها زي ما هو، فمفيش
+        // داعي (ولا يصح أبدًا) نمرّ عليها هنا تاني في أي تشغيل لاحق - لو مرّينا عليها,
+        // هيتضاعف كل رقم في الدفتر مع كل عملية جديدة بعد أول Restart للبرنامج.
+        // ==========================================================================
+        private static readonly Dictionary<string, int> HistoricalPaymentMethodAccountCodes = new Dictionary<string, int>
+        {
+            { "نقدي", 1100 }, { "فوري", 1110 }, { "أمان", 1120 }, { "سهولة", 1130 }, { "فودافون كاش", 1140 }, { "إنستاباي", 1150 }
+        };
+
+        private static int HistoricalPaymentMethodAccountCode(string method) =>
+            !string.IsNullOrEmpty(method) && HistoricalPaymentMethodAccountCodes.TryGetValue(method, out int code) ? code : 1100;
+
+        private static string DatePartOf(string dateTimeText) =>
+            !string.IsNullOrEmpty(dateTimeText) && dateTimeText.Length >= 10 ? dateTimeText.Substring(0, 10) : DateTime.Now.ToString("yyyy-MM-dd");
+
+        private static void BackfillHistoricalJournalEntries(SqliteConnection conn)
+        {
+            using (var checkCmd = new SqliteCommand("SELECT COUNT(*) FROM JournalEntries WHERE SourceType = 'BackfillMarker'", conn))
+            {
+                if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0) return;
+            }
+
+            using (var tx = conn.BeginTransaction())
+            {
+                try
+                {
+                    BackfillSales(conn, tx);
+                    BackfillPurchases(conn, tx);
+                    BackfillExpenses(conn, tx);
+                    BackfillTransfers(conn, tx);
+                    BackfillRemainingCashMovements(conn, tx);
+
+                    InsertJournalEntry(conn, tx, DateTime.Now.ToString("yyyy-MM-dd"), "BackfillMarker", 1, "علامة انتهاء ترحيل القيود التاريخية - ما تتحذفش", "ترحيل-تاريخي");
+
+                    tx.Commit();
+                }
+                catch
+                {
+                    tx.Rollback();
+                    throw;
+                }
+            }
+        }
+
+        // كل عملية بيع لسه موجودة في الجدول (الحالة النهائية بتاعتها) وملهاش قيد حي بالفعل
+        private static void BackfillSales(SqliteConnection conn, SqliteTransaction tx)
+        {
+            var rows = new List<(int SaleId, decimal CostPrice, int Qty, decimal Total, string PaymentType, string PaymentMethod, string SaleDate)>();
+            using (var cmd = new SqliteCommand(@"
+                SELECT SaleID, CostPrice, QuantitySold, Total, PaymentType, PaymentMethod, SaleDate
+                FROM Sales
+                WHERE NOT EXISTS (SELECT 1 FROM JournalEntries J WHERE J.SourceType = 'Sale' AND J.SourceId = Sales.SaleID)", conn, tx))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    rows.Add((
+                        Convert.ToInt32(reader["SaleID"]),
+                        Convert.ToDecimal(reader["CostPrice"]),
+                        Convert.ToInt32(reader["QuantitySold"]),
+                        Convert.ToDecimal(reader["Total"]),
+                        reader["PaymentType"] == DBNull.Value ? "" : reader["PaymentType"].ToString(),
+                        reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
+                        reader["SaleDate"].ToString()));
+                }
+            }
+
+            foreach (var s in rows)
+            {
+                // بيع كاش من غير وسيلة دفع معروفة (بيانات قديمة من قبل ما "وسيلة الدفع"
+                // تتضاف للمبيعات) بيتفترض "نقدي" كافتراضي معقول، زي AccountCodes.ForPaymentMethod
+                int otherAccount = s.PaymentType == "Cash"
+                    ? HistoricalPaymentMethodAccountCode(s.PaymentMethod ?? "نقدي")
+                    : 1300;
+
+                decimal cost = s.CostPrice * s.Qty;
+                int journalId = InsertJournalEntry(conn, tx, DatePartOf(s.SaleDate), "Sale", s.SaleId, $"ترحيل تاريخي - بيع رقم {s.SaleId}", "ترحيل-تاريخي");
+                InsertJournalLine(conn, tx, journalId, otherAccount, s.Total, 0);
+                InsertJournalLine(conn, tx, journalId, 4100, 0, s.Total);
+                if (cost > 0)
+                {
+                    InsertJournalLine(conn, tx, journalId, 5500, cost, 0);
+                    InsertJournalLine(conn, tx, journalId, 1200, 0, cost);
+                }
+            }
+        }
+
+        // كل فاتورة شراء لسه موجودة، ملهاش قيد حي بالفعل - لو فيها حركة "صرف" مرتبطة
+        // بيها (سداد كاش فوري)، بناخد آخر وحدة دفع اتسجلت بيها (أدق تمثيل للحالة الحالية
+        // لو الفاتورة اتعدّلت أكتر من مرة)، وإلا هي فاتورة آجلة (موردون)
+        private static void BackfillPurchases(SqliteConnection conn, SqliteTransaction tx)
+        {
+            var rows = new List<(int PurchaseId, decimal TotalAmount, string PurchaseDate)>();
+            using (var cmd = new SqliteCommand(@"
+                SELECT PurchaseId, TotalAmount, PurchaseDate
+                FROM Purchases
+                WHERE NOT EXISTS (SELECT 1 FROM JournalEntries J WHERE J.SourceType = 'Purchase' AND J.SourceId = Purchases.PurchaseId)", conn, tx))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                    rows.Add((Convert.ToInt32(reader["PurchaseId"]), Convert.ToDecimal(reader["TotalAmount"]), reader["PurchaseDate"].ToString()));
+            }
+
+            foreach (var p in rows)
+            {
+                string cashMethod = null;
+                using (var cmd = new SqliteCommand(
+                    "SELECT PaymentMethod FROM CashMovements WHERE PurchaseId = @Id AND MovementType = 'صرف' ORDER BY Id DESC LIMIT 1", conn, tx))
+                {
+                    cmd.Parameters.AddWithValue("@Id", p.PurchaseId);
+                    var res = cmd.ExecuteScalar();
+                    if (res != null && res != DBNull.Value) cashMethod = res.ToString();
+                }
+
+                int otherAccount = cashMethod != null ? HistoricalPaymentMethodAccountCode(cashMethod) : 2100;
+
+                int journalId = InsertJournalEntry(conn, tx, DatePartOf(p.PurchaseDate), "Purchase", p.PurchaseId, $"ترحيل تاريخي - فاتورة شراء رقم {p.PurchaseId}", "ترحيل-تاريخي");
+                InsertJournalLine(conn, tx, journalId, 1200, p.TotalAmount, 0);
+                InsertJournalLine(conn, tx, journalId, otherAccount, 0, p.TotalAmount);
+            }
+        }
+
+        // كل مصروف عمومي لسه موجود، ملهوش قيد حي بالفعل. لو AccountCode فاضي (بيانات
+        // تالفة/قديمة جدًا) بيتجاهل - مفيش حساب مصروف نعرفه نسجل عليه
+        private static void BackfillExpenses(SqliteConnection conn, SqliteTransaction tx)
+        {
+            var rows = new List<(int ExpenseId, int? AccountCode, decimal Amount, string PaymentMethod, string ExpenseDate)>();
+            using (var cmd = new SqliteCommand(@"
+                SELECT ExpenseID, AccountCode, Amount, PaymentMethod, ExpenseDate
+                FROM Expenses
+                WHERE NOT EXISTS (SELECT 1 FROM JournalEntries J WHERE J.SourceType = 'Expense' AND J.SourceId = Expenses.ExpenseID)", conn, tx))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    rows.Add((
+                        Convert.ToInt32(reader["ExpenseID"]),
+                        reader["AccountCode"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["AccountCode"]),
+                        Convert.ToDecimal(reader["Amount"]),
+                        reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
+                        reader["ExpenseDate"].ToString()));
+                }
+            }
+
+            foreach (var e in rows)
+            {
+                if (!e.AccountCode.HasValue) continue;
+
+                int methodAccount = HistoricalPaymentMethodAccountCode(e.PaymentMethod ?? "نقدي");
+                int journalId = InsertJournalEntry(conn, tx, DatePartOf(e.ExpenseDate), "Expense", e.ExpenseId, "ترحيل تاريخي - مصروف عمومي", "ترحيل-تاريخي");
+                InsertJournalLine(conn, tx, journalId, e.AccountCode.Value, e.Amount, 0);
+                InsertJournalLine(conn, tx, journalId, methodAccount, 0, e.Amount);
+            }
+        }
+
+        // تحويلات بين وسائل الدفع - كل زوج حركات مرتبطة (LinkedMovementId) بيتترحّل
+        // كقيد واحد. Sale/Purchase ملهمش تحويلات، فمش محتاجين نستثنيهم هنا
+        private static void BackfillTransfers(SqliteConnection conn, SqliteTransaction tx)
+        {
+            var legsById = new Dictionary<int, (int LinkedId, string Type, string Method, decimal Amount, string Date)>();
+            using (var cmd = new SqliteCommand(
+                "SELECT Id, LinkedMovementId, MovementType, PaymentMethod, Amount, MovementDate FROM CashMovements WHERE LinkedMovementId IS NOT NULL", conn, tx))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    legsById[Convert.ToInt32(reader["Id"])] = (
+                        Convert.ToInt32(reader["LinkedMovementId"]),
+                        reader["MovementType"].ToString(),
+                        reader["PaymentMethod"].ToString(),
+                        Convert.ToDecimal(reader["Amount"]),
+                        reader["MovementDate"].ToString());
+                }
+            }
+
+            var processedPairs = new HashSet<int>();
+            foreach (var kvp in legsById)
+            {
+                int id = kvp.Key;
+                var leg = kvp.Value;
+                int pairKey = Math.Min(id, leg.LinkedId);
+                if (!processedPairs.Add(pairKey)) continue;
+                if (!legsById.TryGetValue(leg.LinkedId, out var otherLeg)) continue; // رابط تالف/يتيم - تجاهله بأمان
+
+                using (var checkCmd = new SqliteCommand("SELECT COUNT(*) FROM JournalEntries WHERE SourceType = 'Transfer' AND SourceId = @Id", conn, tx))
+                {
+                    checkCmd.Parameters.AddWithValue("@Id", pairKey);
+                    if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0) continue;
+                }
+
+                var fromLeg = leg.Type == "صرف" ? leg : otherLeg;
+                var toLeg = leg.Type == "قبض" ? leg : otherLeg;
+
+                int journalId = InsertJournalEntry(conn, tx, DatePartOf(leg.Date), "Transfer", pairKey, $"ترحيل تاريخي - تحويل من {fromLeg.Method} إلى {toLeg.Method}", "ترحيل-تاريخي");
+                InsertJournalLine(conn, tx, journalId, HistoricalPaymentMethodAccountCode(toLeg.Method), toLeg.Amount, 0);
+                InsertJournalLine(conn, tx, journalId, HistoricalPaymentMethodAccountCode(fromLeg.Method), 0, fromLeg.Amount);
+            }
+        }
+
+        // باقي حركات الخزينة (مش مرتبطة ببيع/شراء/تحويل): تحصيل من عميل، سداد لمورد،
+        // صرف/سلفة مرتب، أو حركة قبض/صرف عامة مصنّفة على حساب. لو الحركة مش مصنّفة على
+        // أي حساب معروف (لا AccountCode ولا عميل/مورد/موظف)، بتتجاهل - نفس مبدأ
+        // AddMovementCommand: مفيش حساب مقابل حقيقي نخترعه.
+        //
+        // ملحوظة تصحيح: الكود القديم (قبل commit 162bb24) كان بيسجّل السلف والدفعات
+        // العادية للموظفين على نفس حساب المرتبات (5400) - القيم القديمة هنا بتتصحح
+        // للتصنيف الصح (1400 للسلف) بدل ما تتوارث كخطأ في الدفتر من الأول
+        private static void BackfillRemainingCashMovements(SqliteConnection conn, SqliteTransaction tx)
+        {
+            var rows = new List<(int Id, string Type, string Method, decimal Amount, int? AccountCode, int? CustomerId, int? SupplierId, int? EmployeeId, bool IsAdvance, string Date)>();
+            using (var cmd = new SqliteCommand(@"
+                SELECT Id, MovementType, PaymentMethod, Amount, AccountCode, CustomerId, SupplierId, EmployeeId, IsAdvance, MovementDate
+                FROM CashMovements
+                WHERE LinkedMovementId IS NULL AND SaleId IS NULL AND PurchaseId IS NULL", conn, tx))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    rows.Add((
+                        Convert.ToInt32(reader["Id"]),
+                        reader["MovementType"].ToString(),
+                        reader["PaymentMethod"].ToString(),
+                        Convert.ToDecimal(reader["Amount"]),
+                        reader["AccountCode"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["AccountCode"]),
+                        reader["CustomerId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["CustomerId"]),
+                        reader["SupplierId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["SupplierId"]),
+                        reader["EmployeeId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["EmployeeId"]),
+                        reader["IsAdvance"] != DBNull.Value && Convert.ToInt32(reader["IsAdvance"]) == 1,
+                        reader["MovementDate"].ToString()));
+                }
+            }
+
+            foreach (var m in rows)
+            {
+                int? otherAccount = null;
+                if (m.EmployeeId.HasValue) otherAccount = m.IsAdvance ? 1400 : 5400;
+                else if (m.AccountCode.HasValue) otherAccount = m.AccountCode.Value;
+                else if (m.CustomerId.HasValue) otherAccount = 1300;
+                else if (m.SupplierId.HasValue) otherAccount = 2100;
+
+                if (!otherAccount.HasValue) continue;
+
+                int journalId = InsertJournalEntry(conn, tx, DatePartOf(m.Date), "HistoricalMovement", m.Id, "ترحيل تاريخي - حركة خزينة", "ترحيل-تاريخي");
+                if (m.Type == "قبض")
+                {
+                    InsertJournalLine(conn, tx, journalId, HistoricalPaymentMethodAccountCode(m.Method), m.Amount, 0);
+                    InsertJournalLine(conn, tx, journalId, otherAccount.Value, 0, m.Amount);
+                }
+                else
+                {
+                    InsertJournalLine(conn, tx, journalId, otherAccount.Value, m.Amount, 0);
+                    InsertJournalLine(conn, tx, journalId, HistoricalPaymentMethodAccountCode(m.Method), 0, m.Amount);
+                }
+            }
+        }
+
+        private static int InsertJournalEntry(SqliteConnection conn, SqliteTransaction tx, string entryDate, string sourceType, int sourceId, string description, string createdBy)
+        {
+            using (var cmd = new SqliteCommand(
+                "INSERT INTO JournalEntries (EntryDate, SourceType, SourceId, Description, CreatedAt, CreatedBy) VALUES (@Date, @Type, @Id, @Desc, @CreatedAt, @By)", conn, tx))
+            {
+                cmd.Parameters.AddWithValue("@Date", entryDate);
+                cmd.Parameters.AddWithValue("@Type", sourceType);
+                cmd.Parameters.AddWithValue("@Id", sourceId);
+                cmd.Parameters.AddWithValue("@Desc", description);
+                cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.Parameters.AddWithValue("@By", createdBy);
+                cmd.ExecuteNonQuery();
+            }
+            using (var idCmd = new SqliteCommand("SELECT last_insert_rowid();", conn, tx))
+                return Convert.ToInt32(idCmd.ExecuteScalar());
+        }
+
+        private static void InsertJournalLine(SqliteConnection conn, SqliteTransaction tx, int journalEntryId, int accountCode, decimal debit, decimal credit)
+        {
+            using (var cmd = new SqliteCommand(
+                "INSERT INTO JournalLines (JournalEntryId, AccountCode, Debit, Credit) VALUES (@EntryId, @Code, @Debit, @Credit)", conn, tx))
+            {
+                cmd.Parameters.AddWithValue("@EntryId", journalEntryId);
+                cmd.Parameters.AddWithValue("@Code", accountCode);
+                cmd.Parameters.AddWithValue("@Debit", debit);
+                cmd.Parameters.AddWithValue("@Credit", credit);
+                cmd.ExecuteNonQuery();
             }
         }
 
