@@ -5,6 +5,8 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
+using TemoStore.Core.Commands;
+using TemoStore.Core.Entities;
 
 namespace Temo_Mobile_Store
 {
@@ -156,7 +158,7 @@ namespace Temo_Mobile_Store
         {
             if (!(dgvInventoryCount.DataSource is DataTable dt)) return;
 
-            var changedRows = new List<InventoryAdjustmentRow>();
+            var changedRows = new List<InventoryAdjustmentLine>();
 
             foreach (DataRow dr in dt.Rows)
             {
@@ -168,7 +170,7 @@ namespace Temo_Mobile_Store
                 int diff = countedQty - systemQty;
                 if (diff == 0) continue; // مطابق، مفيش داعي نسجله في السجل
 
-                changedRows.Add(new InventoryAdjustmentRow
+                changedRows.Add(new InventoryAdjustmentLine
                 {
                     Barcode = dr["الباركود"].ToString(),
                     ProductName = dr["اسم المنتج"].ToString(),
@@ -190,7 +192,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                InventoryRepository.SaveInventoryAdjustments(changedRows);
+                AppServices.CoreEngine.Execute(new SaveInventoryAdjustmentsCommand { Rows = changedRows, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex)
             {

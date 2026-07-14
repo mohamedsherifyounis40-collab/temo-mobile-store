@@ -174,4 +174,59 @@ namespace TemoStore.Core.Commands
         public required int MovementId { get; set; }
         public required string PerformedBy { get; set; }
     }
+
+    // ==========================================================================
+    // شاشة المخزون (إكسسوارات + أجهزة/IMEI + جرد المخزن)
+    // ==========================================================================
+
+    public class AddAccessoryProductCommand : ICommand<bool>
+    {
+        public required string Barcode { get; set; }
+        public required string ProductName { get; set; }
+        public required decimal CostPrice { get; set; }
+        public required decimal SalePrice { get; set; }
+        public required int Quantity { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class UpdateAccessoryProductCommand : ICommand<bool>
+    {
+        public required string Barcode { get; set; }
+        public required string ProductName { get; set; }
+        public required decimal CostPrice { get; set; }
+        public required decimal SalePrice { get; set; }
+        public required int Quantity { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class DeleteProductCommand : ICommand<bool>
+    {
+        public required string Barcode { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class UpdateModelPriceCommand : ICommand<bool>
+    {
+        public required string Barcode { get; set; }
+        public required string ProductName { get; set; }
+        public required decimal CostPrice { get; set; }
+        public required decimal SalePrice { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class AddDeviceCommand : ICommand<bool>
+    {
+        public required string Barcode { get; set; }
+        public required string ProductName { get; set; }
+        public required decimal CostPrice { get; set; }
+        public required decimal SalePrice { get; set; }
+        public required string Imei { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class SaveInventoryAdjustmentsCommand : ICommand<int>
+    {
+        public required List<InventoryAdjustmentLine> Rows { get; set; }
+        public required string PerformedBy { get; set; }
+    }
 }

@@ -16,6 +16,7 @@ namespace TemoStore.Core.Abstractions
         IJournalRepository Journal { get; }
         IAuditRepository Audit { get; }
         IExpenseRepository Expenses { get; }
+        IInventoryAdjustmentRepository InventoryAdjustments { get; }
 
         void Commit();
         void Rollback();
@@ -32,13 +33,25 @@ namespace TemoStore.Core.Abstractions
         void DeductQuantity(string barcode, int qty);
         void AddQuantity(string barcode, int qty);
         void UpsertOnPurchase(string barcode, string productName, decimal unitCost, decimal salePrice, int qty, bool isSerialized);
-        void InsertProductUnit(string barcode, string imei, int purchaseId);
+        void InsertProductUnit(string barcode, string imei, int? purchaseId = null);
         void MarkImeiSold(string imei, int saleId);
         void MarkImeiInStock(string imei);
         bool ImeiExists(string imei);
         string GetImeiStatus(string imei);
         void DeleteProductUnitsForPurchase(int purchaseId);
         IReadOnlyList<ProductRecord> GetBelowThreshold(int threshold);
+        void InsertAccessory(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity);
+        void UpdateAccessory(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity);
+        void DeleteByBarcode(string barcode);
+        void UpdateModelPrice(string barcode, string productName, decimal costPrice, decimal salePrice);
+        void SetQuantity(string barcode, int newQuantity);
+    }
+
+    // سجل تسويات الجرد - جدول InventoryAdjustments منفصل عن Products، بيوثّق كل فرق
+    // بين الكمية بالنظام والكمية المعدودة فعليًا وقت عملية جرد
+    public interface IInventoryAdjustmentRepository
+    {
+        void InsertAdjustmentLog(string barcode, string productName, int systemQtyBefore, int countedQty, int difference);
     }
 
     public interface ISaleRepository

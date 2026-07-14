@@ -76,5 +76,50 @@ namespace TemoStore.Engines.Inventory
                 alerts.Add(new LowStockAlert { Barcode = p.Barcode, ProductName = p.ProductName, CurrentQuantity = p.Quantity, Threshold = threshold });
             return alerts;
         }
+
+        public void AddAccessory(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity, IUnitOfWork uow)
+        {
+            uow.Products.InsertAccessory(barcode, productName, costPrice, salePrice, quantity);
+        }
+
+        public void UpdateAccessory(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity, IUnitOfWork uow)
+        {
+            uow.Products.UpdateAccessory(barcode, productName, costPrice, salePrice, quantity);
+        }
+
+        public void DeleteProduct(string barcode, IUnitOfWork uow)
+        {
+            uow.Products.DeleteByBarcode(barcode);
+        }
+
+        public void UpdateModelPrice(string barcode, string productName, decimal costPrice, decimal salePrice, IUnitOfWork uow)
+        {
+            uow.Products.UpdateModelPrice(barcode, productName, costPrice, salePrice);
+        }
+
+        // بيضيف جهاز جديد بالـ IMEI يدويًا (مش من فاتورة شراء) - لو الباركود موجود بيزوّد
+        // كميته، لو مش موجود بينشئ منتج جديد. بيرمي DuplicateImeiException لو الرقم مسجل قبل كده.
+        // بيستخدم UpsertOnPurchase نفسه (زي مسار الشراء) لأن سلوكه مطابق تمامًا للمنطق
+        // القديم هنا: لو الباركود موجود بيزوّد الكمية+1 ويحدّث السعر ويفرض IsSerialized=1
+        // من غير ما يلمس الاسم/سعر البيع القديمين، ولو مش موجود بينشئ صنف جديد بالكامل.
+        public void AddDeviceManually(string barcode, string productName, decimal costPrice, decimal salePrice, string imei, IUnitOfWork uow)
+        {
+            if (uow.Products.ImeiExists(imei))
+                throw new DuplicateImeiException(imei);
+
+            string finalBarcode = string.IsNullOrEmpty(barcode) ? ("NEW-" + DateTime.Now.Ticks) : barcode;
+            uow.Products.UpsertOnPurchase(finalBarcode, productName, costPrice, salePrice, 1, true);
+            uow.Products.InsertProductUnit(finalBarcode, imei, null);
+        }
+
+        public int ApplyInventoryCount(IReadOnlyList<InventoryAdjustmentLine> rows, IUnitOfWork uow)
+        {
+            foreach (var row in rows)
+            {
+                uow.Products.SetQuantity(row.Barcode, row.CountedQty);
+                uow.InventoryAdjustments.InsertAdjustmentLog(row.Barcode, row.ProductName, row.SystemQty, row.CountedQty, row.Difference);
+            }
+            return rows.Count;
+        }
     }
 }

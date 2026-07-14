@@ -3,6 +3,7 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
+using TemoStore.Core.Commands;
 using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
@@ -267,7 +268,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                InventoryRepository.AddAccessoryProduct(txtBarcode.Text, txtProductName.Text, costPrice, salePrice, quantity);
+                AppServices.CoreEngine.Execute(new AddAccessoryProductCommand { Barcode = txtBarcode.Text, ProductName = txtProductName.Text, CostPrice = costPrice, SalePrice = salePrice, Quantity = quantity, PerformedBy = AuthManager.CurrentUsername });
                 LoadProductsData();
                 ClearInputs();
                 MessageBox.Show("تم إضافة المنتج بنجاح!", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -305,7 +306,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                InventoryRepository.UpdateAccessoryProduct(txtBarcode.Text, txtProductName.Text, costPrice, salePrice, quantity);
+                AppServices.CoreEngine.Execute(new UpdateAccessoryProductCommand { Barcode = txtBarcode.Text, ProductName = txtProductName.Text, CostPrice = costPrice, SalePrice = salePrice, Quantity = quantity, PerformedBy = AuthManager.CurrentUsername });
                 LoadProductsData();
                 btnSaveUpdate.Enabled = false;
                 MessageBox.Show("تم تعديل المنتج!", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -330,7 +331,7 @@ namespace Temo_Mobile_Store
             if (string.IsNullOrEmpty(txtBarcode.Text)) return;
             if (MessageBox.Show("حذف المنتج؟", "تحذير", MessageBoxButtons.YesNo) == DialogResult.Yes)
             {
-                try { InventoryRepository.DeleteProduct(txtBarcode.Text); LoadProductsData(); ClearInputs(); }
+                try { AppServices.CoreEngine.Execute(new DeleteProductCommand { Barcode = txtBarcode.Text, PerformedBy = AuthManager.CurrentUsername }); LoadProductsData(); ClearInputs(); }
                 catch (Exception ex) { MessageBox.Show(ex.Message); }
             }
         }
@@ -470,7 +471,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                InventoryRepository.UpdateModelPrice(selectedDeviceBarcode, txtQaProductName.Text, costPrice, salePrice);
+                AppServices.CoreEngine.Execute(new UpdateModelPriceCommand { Barcode = selectedDeviceBarcode, ProductName = txtQaProductName.Text, CostPrice = costPrice, SalePrice = salePrice, PerformedBy = AuthManager.CurrentUsername });
                 MessageBox.Show("تم تعديل سعر الموديل بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LoadImeiUnitsGrid();
                 ClearDeviceInputs();
@@ -496,7 +497,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                InventoryRepository.AddDevice(barcode, txtQaProductName.Text.Trim(), costPrice, salePrice, imei);
+                AppServices.CoreEngine.Execute(new AddDeviceCommand { Barcode = barcode, ProductName = txtQaProductName.Text.Trim(), CostPrice = costPrice, SalePrice = salePrice, Imei = imei, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (DuplicateImeiException ex)
             {

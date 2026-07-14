@@ -2,19 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using Microsoft.Data.Sqlite;
-using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
 {
-    public class InventoryAdjustmentRow
-    {
-        public string Barcode;
-        public string ProductName;
-        public int SystemQty;
-        public int CountedQty;
-        public int Difference;
-    }
-
     // نفس شكل ProductDto في CatalogWebsite - مستخدمة وقت المزامنة مع موقع الكتالوج البارة
     public class CatalogProductDto
     {
@@ -75,53 +65,6 @@ namespace Temo_Mobile_Store
             return result;
         }
 
-        public static void AddAccessoryProduct(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Products (Barcode, ProductName, Price, SalePrice, Quantity, IsSerialized) VALUES (@Barcode, @ProductName, @Price, @SalePrice, @Quantity, 0)", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Barcode", barcode);
-                    cmd.Parameters.AddWithValue("@ProductName", productName);
-                    cmd.Parameters.AddWithValue("@Price", costPrice);
-                    cmd.Parameters.AddWithValue("@SalePrice", salePrice);
-                    cmd.Parameters.AddWithValue("@Quantity", quantity);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
-        public static void UpdateAccessoryProduct(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE Products SET ProductName = @ProductName, Price = @Price, SalePrice = @SalePrice, Quantity = @Quantity WHERE Barcode = @Barcode", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Barcode", barcode);
-                    cmd.Parameters.AddWithValue("@ProductName", productName);
-                    cmd.Parameters.AddWithValue("@Price", costPrice);
-                    cmd.Parameters.AddWithValue("@SalePrice", salePrice);
-                    cmd.Parameters.AddWithValue("@Quantity", quantity);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
-        public static void DeleteProduct(string barcode)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("DELETE FROM Products WHERE Barcode = @Barcode", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Barcode", barcode);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
         // ---------- الأجهزة والسريالات (موبايلات بـ IMEI) ----------
 
         public static DataTable GetImeiUnits(string statusFilter, string search)
@@ -179,93 +122,6 @@ namespace Temo_Mobile_Store
             }
         }
 
-        public static void UpdateModelPrice(string barcode, string productName, decimal costPrice, decimal salePrice)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE Products SET ProductName = @Name, Price = @Cost, SalePrice = @Sale WHERE Barcode = @Barcode", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Name", productName);
-                    cmd.Parameters.AddWithValue("@Cost", costPrice);
-                    cmd.Parameters.AddWithValue("@Sale", salePrice);
-                    cmd.Parameters.AddWithValue("@Barcode", barcode);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
-        // بيضيف جهاز جديد بالـ IMEI - لو الباركود موجود بيزوّد كميته، لو مش موجود بينشئ منتج جديد.
-        // بيرمي DuplicateImeiException لو الرقم مسجل قبل كده
-        public static void AddDevice(string barcode, string productName, decimal costPrice, decimal salePrice, string imei)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteTransaction transaction = conn.BeginTransaction())
-                {
-                    try
-                    {
-                        using (SqliteCommand cmdCheckImei = new SqliteCommand("SELECT COUNT(*) FROM ProductUnits WHERE IMEI = @IMEI", conn, transaction))
-                        {
-                            cmdCheckImei.Parameters.AddWithValue("@IMEI", imei);
-                            if (Convert.ToInt32(cmdCheckImei.ExecuteScalar()) > 0)
-                                throw new DuplicateImeiException(imei);
-                        }
-
-                        bool productExists = false;
-                        if (!string.IsNullOrEmpty(barcode))
-                        {
-                            using (SqliteCommand cmdCheck = new SqliteCommand("SELECT COUNT(*) FROM Products WHERE Barcode = @B", conn, transaction))
-                            {
-                                cmdCheck.Parameters.AddWithValue("@B", barcode);
-                                productExists = Convert.ToInt32(cmdCheck.ExecuteScalar()) > 0;
-                            }
-                        }
-
-                        string finalBarcode = barcode;
-
-                        if (productExists)
-                        {
-                            using (SqliteCommand cmd = new SqliteCommand("UPDATE Products SET Quantity = Quantity + 1, Price = @U, IsSerialized = 1 WHERE Barcode = @B", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@U", costPrice);
-                                cmd.Parameters.AddWithValue("@B", barcode);
-                                cmd.ExecuteNonQuery();
-                            }
-                        }
-                        else
-                        {
-                            finalBarcode = string.IsNullOrEmpty(barcode) ? ("NEW-" + DateTime.Now.Ticks) : barcode;
-                            using (SqliteCommand cmd = new SqliteCommand("INSERT INTO Products (Barcode, ProductName, Price, SalePrice, Quantity, IsSerialized) VALUES (@B, @N, @U, @S, 1, 1)", conn, transaction))
-                            {
-                                cmd.Parameters.AddWithValue("@B", finalBarcode);
-                                cmd.Parameters.AddWithValue("@N", productName);
-                                cmd.Parameters.AddWithValue("@U", costPrice);
-                                cmd.Parameters.AddWithValue("@S", salePrice);
-                                cmd.ExecuteNonQuery();
-                            }
-                        }
-
-                        using (SqliteCommand cmd = new SqliteCommand("INSERT INTO ProductUnits (Barcode, IMEI, Status, PurchaseId, CreatedAt) VALUES (@B, @IMEI, 'InStock', NULL, @C)", conn, transaction))
-                        {
-                            cmd.Parameters.AddWithValue("@B", finalBarcode);
-                            cmd.Parameters.AddWithValue("@IMEI", imei);
-                            cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                            cmd.ExecuteNonQuery();
-                        }
-
-                        transaction.Commit();
-                    }
-                    catch
-                    {
-                        transaction.Rollback();
-                        throw;
-                    }
-                }
-            }
-        }
-
         // ---------- جرد المخزن ----------
 
         public static DataTable GetProductsForCount()
@@ -288,48 +144,6 @@ namespace Temo_Mobile_Store
                 }
             }
             return dt;
-        }
-
-        // بيحفظ نتيجة الجرد: يعدّل كمية كل صنف اتغيّر ويسجّل الفرق في سجل التسويات، جوه Transaction واحدة
-        public static void SaveInventoryAdjustments(List<InventoryAdjustmentRow> changedRows)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (var transaction = conn.BeginTransaction())
-                {
-                    try
-                    {
-                        string nowStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                        foreach (var r in changedRows)
-                        {
-                            using (SqliteCommand cmdUpdate = new SqliteCommand("UPDATE Products SET Quantity = @NewQty WHERE Barcode = @Barcode", conn, transaction))
-                            {
-                                cmdUpdate.Parameters.AddWithValue("@NewQty", r.CountedQty);
-                                cmdUpdate.Parameters.AddWithValue("@Barcode", r.Barcode);
-                                cmdUpdate.ExecuteNonQuery();
-                            }
-
-                            using (SqliteCommand cmdLog = new SqliteCommand("INSERT INTO InventoryAdjustments (Barcode, ProductName, SystemQuantityBefore, CountedQuantity, Difference, AdjustmentDate) VALUES (@Barcode, @Name, @Before, @Counted, @Diff, @Date)", conn, transaction))
-                            {
-                                cmdLog.Parameters.AddWithValue("@Barcode", r.Barcode);
-                                cmdLog.Parameters.AddWithValue("@Name", r.ProductName);
-                                cmdLog.Parameters.AddWithValue("@Before", r.SystemQty);
-                                cmdLog.Parameters.AddWithValue("@Counted", r.CountedQty);
-                                cmdLog.Parameters.AddWithValue("@Diff", r.Difference);
-                                cmdLog.Parameters.AddWithValue("@Date", nowStr);
-                                cmdLog.ExecuteNonQuery();
-                            }
-                        }
-                        transaction.Commit();
-                    }
-                    catch
-                    {
-                        transaction.Rollback();
-                        throw;
-                    }
-                }
-            }
         }
 
         public static DataTable GetAdjustmentsLog()

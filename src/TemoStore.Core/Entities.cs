@@ -112,6 +112,15 @@ namespace TemoStore.Core.Entities
         public decimal Amount { get; set; }
     }
 
+    public class InventoryAdjustmentLine
+    {
+        public string Barcode { get; set; } = "";
+        public string ProductName { get; set; } = "";
+        public int SystemQty { get; set; }
+        public int CountedQty { get; set; }
+        public int Difference { get; set; }
+    }
+
     public class LowStockAlert
     {
         public string Barcode { get; set; } = "";

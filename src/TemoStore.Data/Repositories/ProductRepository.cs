@@ -83,13 +83,13 @@ namespace TemoStore.Data.Repositories
             }
         }
 
-        public void InsertProductUnit(string barcode, string imei, int purchaseId)
+        public void InsertProductUnit(string barcode, string imei, int? purchaseId = null)
         {
             using var cmd = new SqliteCommand(
                 "INSERT INTO ProductUnits (Barcode, IMEI, Status, PurchaseId, CreatedAt) VALUES (@B, @IMEI, 'InStock', @P, @C)", _conn, _tx);
             cmd.Parameters.AddWithValue("@B", barcode);
             cmd.Parameters.AddWithValue("@IMEI", imei);
-            cmd.Parameters.AddWithValue("@P", purchaseId);
+            cmd.Parameters.AddWithValue("@P", (object?)purchaseId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             cmd.ExecuteNonQuery();
         }
@@ -150,6 +150,56 @@ namespace TemoStore.Data.Repositories
                 });
             }
             return list;
+        }
+
+        public void InsertAccessory(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity)
+        {
+            using var cmd = new SqliteCommand(
+                "INSERT INTO Products (Barcode, ProductName, Price, SalePrice, Quantity, IsSerialized) VALUES (@Barcode, @ProductName, @Price, @SalePrice, @Quantity, 0)", _conn, _tx);
+            cmd.Parameters.AddWithValue("@Barcode", barcode);
+            cmd.Parameters.AddWithValue("@ProductName", productName);
+            cmd.Parameters.AddWithValue("@Price", costPrice);
+            cmd.Parameters.AddWithValue("@SalePrice", salePrice);
+            cmd.Parameters.AddWithValue("@Quantity", quantity);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void UpdateAccessory(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity)
+        {
+            using var cmd = new SqliteCommand(
+                "UPDATE Products SET ProductName = @ProductName, Price = @Price, SalePrice = @SalePrice, Quantity = @Quantity WHERE Barcode = @Barcode", _conn, _tx);
+            cmd.Parameters.AddWithValue("@Barcode", barcode);
+            cmd.Parameters.AddWithValue("@ProductName", productName);
+            cmd.Parameters.AddWithValue("@Price", costPrice);
+            cmd.Parameters.AddWithValue("@SalePrice", salePrice);
+            cmd.Parameters.AddWithValue("@Quantity", quantity);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void DeleteByBarcode(string barcode)
+        {
+            using var cmd = new SqliteCommand("DELETE FROM Products WHERE Barcode = @Barcode", _conn, _tx);
+            cmd.Parameters.AddWithValue("@Barcode", barcode);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void UpdateModelPrice(string barcode, string productName, decimal costPrice, decimal salePrice)
+        {
+            using var cmd = new SqliteCommand(
+                "UPDATE Products SET ProductName = @Name, Price = @Cost, SalePrice = @Sale WHERE Barcode = @Barcode", _conn, _tx);
+            cmd.Parameters.AddWithValue("@Name", productName);
+            cmd.Parameters.AddWithValue("@Cost", costPrice);
+            cmd.Parameters.AddWithValue("@Sale", salePrice);
+            cmd.Parameters.AddWithValue("@Barcode", barcode);
+            cmd.ExecuteNonQuery();
+        }
+
+        public void SetQuantity(string barcode, int newQuantity)
+        {
+            using var cmd = new SqliteCommand("UPDATE Products SET Quantity = @NewQty WHERE Barcode = @Barcode", _conn, _tx);
+            cmd.Parameters.AddWithValue("@NewQty", newQuantity);
+            cmd.Parameters.AddWithValue("@Barcode", barcode);
+            cmd.ExecuteNonQuery();
         }
     }
 }
