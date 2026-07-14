@@ -269,6 +269,7 @@ namespace Temo_Mobile_Store.Database
                 EnsureExpensesPaymentMethodColumn(conn);
                 EnsureCashMovementsEmployeeIdColumn(conn);
                 EnsureCashMovementsIsAdvanceColumn(conn);
+                EnsureCashMovementsPurchaseIdColumn(conn);
                 EnsureStoreSettingsCatalogSyncColumns(conn);
             }
         }
@@ -341,6 +342,31 @@ namespace Temo_Mobile_Store.Database
 
             if (!columnExists)
                 ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN IsAdvance INTEGER NOT NULL DEFAULT 0;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود PurchaseId لجدول CashMovements - بيربط سداد كاش فوري لفاتورة
+        // شراء بالفاتورة نفسها، عشان لو الفاتورة اتلغت أو اتعدلت نقدر نلاقي حركة
+        // الكاش بتاعتها ونعمل لها قيد عكسي بالظبط من غير ما نعتمد على تحليل نص.
+        // ==========================================================================
+        private static void EnsureCashMovementsPurchaseIdColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(CashMovements);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "PurchaseId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN PurchaseId INTEGER;");
         }
 
         // ==========================================================================

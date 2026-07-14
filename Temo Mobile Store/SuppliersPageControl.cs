@@ -19,6 +19,7 @@ namespace Temo_Mobile_Store
         private static readonly Color ColorSuccess = UIHelpers.ColorSuccess;
         private static readonly Color ColorDanger = UIHelpers.ColorDanger;
         private static readonly Color ColorWarning = UIHelpers.ColorWarning;
+        private static readonly Color ColorNeutral = UIHelpers.ColorNeutral;
         private static readonly Color ColorBackground = UIHelpers.ColorBackground;
 
         // ---------- بيانات المورد ----------
@@ -38,6 +39,12 @@ namespace Temo_Mobile_Store
         private DataGridView dgvPurchaseCart;
         private Label lblPurchaseCartTotal;
         private List<PurchaseCartItem> currentPurchaseItems = new List<PurchaseCartItem>();
+        private Guna2Button btnSavePurchase, btnCancelEditPurchase;
+        private int? editingPurchaseId = null;
+
+        // ---------- تعديل/إلغاء فاتورة شراء محفوظة (من جدول كشف الحساب) ----------
+        private Guna2Button btnEditPurchaseInvoice, btnCancelPurchaseInvoice;
+        private int? selectedStatementPurchaseId = null;
 
         // ---------- سداد مورد ----------
         private Guna2ComboBox cmbPaymentSupplier, cmbSupplierPaymentMethod;
@@ -78,14 +85,14 @@ namespace Temo_Mobile_Store
             gbSupplier.Controls.AddRange(new Control[] { lblSupplierTitle, lblSupplierName, txtSupplierName, lblSupplierPhone, txtSupplierPhone, btnAddSupplier, btnSaveSupplierEdit, btnDeleteSupplier });
 
             // ---------- كارت العمليات (فاتورة شراء / سداد) ----------
-            Guna2Panel pnlOperationCard = new Guna2Panel() { Location = new Point(20, 285), Size = new Size(300, 900), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlOperationCard = new Guna2Panel() { Location = new Point(20, 285), Size = new Size(300, 930), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
 
             Label lblOpType = new Label() { Text = "نوع العملية:", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             cmbSupplierOperationType = new Guna2ComboBox() { Location = new Point(20, 38), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbSupplierOperationType.Items.AddRange(new string[] { "فاتورة شراء جديدة 📦", "سداد لمورد 💵" });
             cmbSupplierOperationType.SelectedIndexChanged += CmbSupplierOperationType_SelectedIndexChanged;
 
-            pnlNewPurchase = new Panel() { Location = new Point(20, 78), Size = new Size(260, 800), AutoScroll = false };
+            pnlNewPurchase = new Panel() { Location = new Point(20, 78), Size = new Size(260, 830), AutoScroll = false };
             pnlSupplierPayment = new Panel() { Location = new Point(20, 78), Size = new Size(260, 420) };
 
             BuildNewPurchasePanel();
@@ -103,11 +110,19 @@ namespace Temo_Mobile_Store
             pnlSuppliersGridCard.Controls.AddRange(new Control[] { lblSuppliersGridTitle, dgvSuppliers });
 
             // ---------- كارت كشف حساب المورد ----------
-            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 370), Size = new Size(780, 335), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            Label lblStatementTitle = new Label() { Text = "📋 كشف حساب المورد المحدد (دوس على أي صف فوق)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
-            dgvSupplierStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 270), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 370), Size = new Size(780, 375), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Label lblStatementTitle = new Label() { Text = "📋 كشف حساب المورد المحدد (دوس على فاتورة شراء عشان تعدلها أو تلغيها)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
+            dgvSupplierStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 230), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
+            dgvSupplierStatement.CellClick += DgvSupplierStatement_CellClick;
             StyleDataGridView(dgvSupplierStatement);
-            pnlStatementCard.Controls.AddRange(new Control[] { lblStatementTitle, dgvSupplierStatement });
+
+            btnEditPurchaseInvoice = new Guna2Button() { Text = "تعديل الفاتورة المحددة ✏️", Location = new Point(20, 290), Width = 240, Height = 34, FillColor = ColorWarning, BorderRadius = 9 };
+            btnEditPurchaseInvoice.Click += BtnEditPurchaseInvoice_Click;
+
+            btnCancelPurchaseInvoice = new Guna2Button() { Text = "إلغاء الفاتورة المحددة ❌", Location = new Point(270, 290), Width = 240, Height = 34, FillColor = ColorDanger, BorderRadius = 9 };
+            btnCancelPurchaseInvoice.Click += BtnCancelPurchaseInvoice_Click;
+
+            pnlStatementCard.Controls.AddRange(new Control[] { lblStatementTitle, dgvSupplierStatement, btnEditPurchaseInvoice, btnCancelPurchaseInvoice });
 
             this.Controls.AddRange(new Control[] { gbSupplier, pnlOperationCard, pnlSuppliersGridCard, pnlStatementCard });
 
@@ -156,14 +171,20 @@ namespace Temo_Mobile_Store
             btnAddToCart.Click += BtnAddPurchaseItem_Click;
 
             dgvPurchaseCart = new DataGridView() { Location = new Point(0, 578), Size = new Size(260, 130), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvPurchaseCart.CellDoubleClick += DgvPurchaseCart_CellDoubleClick;
             StyleDataGridView(dgvPurchaseCart);
 
-            lblPurchaseCartTotal = new Label() { Text = "إجمالي الفاتورة: 0.00 ج.م", Location = new Point(0, 716), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorSuccess };
+            Label lblCartHint = new Label() { Text = "دبل كليك على صنف في الجدول عشان تشيله من الفاتورة", Location = new Point(0, 710), Size = new Size(260, 15), Font = new Font("Segoe UI", 7F), ForeColor = Color.FromArgb(150, 155, 165) };
 
-            Guna2Button btnSavePurchase = new Guna2Button() { Text = "حفظ فاتورة الشراء 💾", Location = new Point(0, 745), Width = 260, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
+            lblPurchaseCartTotal = new Label() { Text = "إجمالي الفاتورة: 0.00 ج.م", Location = new Point(0, 728), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorSuccess };
+
+            btnSavePurchase = new Guna2Button() { Text = "حفظ فاتورة الشراء 💾", Location = new Point(0, 757), Width = 260, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
             btnSavePurchase.Click += BtnSavePurchase_Click;
 
-            pnlNewPurchase.Controls.AddRange(new Control[] { lblPurchaseSupplier, cmbPurchaseSupplier, lblPurchasePaymentTypeLbl, cmbPurchasePaymentType, lblPurchasePayMethodLbl, cmbPurchasePaymentMethod, lblBarcode, txtPurchaseBarcode, lblProductName, txtPurchaseProductName, chkPurchaseSerialized, lblQty, txtPurchaseQty, lblUnitCost, txtPurchaseUnitCost, lblImeiList, txtPurchaseImeiList, lblSalePrice, txtPurchaseSalePrice, btnAddToCart, dgvPurchaseCart, lblPurchaseCartTotal, btnSavePurchase });
+            btnCancelEditPurchase = new Guna2Button() { Text = "إلغاء التعديل ⬅️", Location = new Point(0, 797), Width = 260, Height = 30, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9, Visible = false };
+            btnCancelEditPurchase.Click += BtnCancelEditPurchase_Click;
+
+            pnlNewPurchase.Controls.AddRange(new Control[] { lblPurchaseSupplier, cmbPurchaseSupplier, lblPurchasePaymentTypeLbl, cmbPurchasePaymentType, lblPurchasePayMethodLbl, cmbPurchasePaymentMethod, lblBarcode, txtPurchaseBarcode, lblProductName, txtPurchaseProductName, chkPurchaseSerialized, lblQty, txtPurchaseQty, lblUnitCost, txtPurchaseUnitCost, lblImeiList, txtPurchaseImeiList, lblSalePrice, txtPurchaseSalePrice, btnAddToCart, dgvPurchaseCart, lblCartHint, lblPurchaseCartTotal, btnSavePurchase, btnCancelEditPurchase });
         }
 
         private void BuildSupplierPaymentPanel()
@@ -260,8 +281,18 @@ namespace Temo_Mobile_Store
             try
             {
                 dgvSupplierStatement.DataSource = SuppliersRepository.GetSupplierStatement(supplierId);
+                if (dgvSupplierStatement.Columns.Contains("PurchaseId"))
+                    dgvSupplierStatement.Columns["PurchaseId"].Visible = false;
+                selectedStatementPurchaseId = null;
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        private void DgvSupplierStatement_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            var cell = dgvSupplierStatement.Rows[e.RowIndex].Cells["PurchaseId"].Value;
+            selectedStatementPurchaseId = (cell == null || cell == DBNull.Value) ? (int?)null : Convert.ToInt32(cell);
         }
 
         // ==========================================================================
@@ -478,10 +509,14 @@ namespace Temo_Mobile_Store
 
             int supplierId = Convert.ToInt32(cmbPurchaseSupplier.SelectedValue);
             decimal totalAmount = currentPurchaseItems.Sum(x => x.LineTotal);
+            bool isEditing = editingPurchaseId.HasValue;
 
             try
             {
-                SuppliersRepository.SavePurchase(supplierId, currentPurchaseItems, payCashNow, cashMethod);
+                if (isEditing)
+                    SuppliersRepository.EditPurchase(editingPurchaseId.Value, supplierId, currentPurchaseItems, payCashNow, cashMethod);
+                else
+                    SuppliersRepository.SavePurchase(supplierId, currentPurchaseItems, payCashNow, cashMethod);
             }
             catch (DuplicateImeiException ex)
             {
@@ -493,16 +528,135 @@ namespace Temo_Mobile_Store
                 MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+            catch (DateClosedException ex)
+            {
+                MessageBox.Show(ex.Message, "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             catch (Exception ex)
             {
-                MessageBox.Show("حصل خطأ أثناء حفظ الفاتورة ولم يتم حفظ أي حاجة: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show((isEditing ? "حصل خطأ أثناء تعديل الفاتورة: " : "حصل خطأ أثناء حفظ الفاتورة ولم يتم حفظ أي حاجة: ") + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            MessageBox.Show($"تم حفظ فاتورة الشراء بنجاح بإجمالي {totalAmount:N2} ج.م، وتحديث المخزون تلقائي" + (payCashNow ? "، وتم خصم المبلغ فورًا من الرصيد." : "، وسجّلت كدين على المورد."), "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(isEditing
+                ? $"تم تعديل فاتورة الشراء بنجاح، الإجمالي الجديد {totalAmount:N2} ج.م."
+                : $"تم حفظ فاتورة الشراء بنجاح بإجمالي {totalAmount:N2} ج.م، وتحديث المخزون تلقائي" + (payCashNow ? "، وتم خصم المبلغ فورًا من الرصيد." : "، وسجّلت كدين على المورد."),
+                "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            ExitEditMode();
             currentPurchaseItems.Clear();
             RefreshPurchaseCartGrid();
             LoadSuppliersGrid();
+            if (selectedSupplierId != -1) LoadSupplierStatement(selectedSupplierId);
+        }
+
+        private void EnterEditMode(int purchaseId, int supplierId)
+        {
+            editingPurchaseId = purchaseId;
+            btnSavePurchase.Text = "حفظ التعديل ✏️";
+            btnCancelEditPurchase.Visible = true;
+            cmbSupplierOperationType.SelectedIndex = 0;
+            cmbPurchaseSupplier.SelectedValue = supplierId;
+        }
+
+        private void ExitEditMode()
+        {
+            editingPurchaseId = null;
+            btnSavePurchase.Text = "حفظ فاتورة الشراء 💾";
+            btnCancelEditPurchase.Visible = false;
+        }
+
+        private void BtnCancelEditPurchase_Click(object sender, EventArgs e)
+        {
+            ExitEditMode();
+            currentPurchaseItems.Clear();
+            RefreshPurchaseCartGrid();
+            txtPurchaseBarcode.Clear();
+            txtPurchaseProductName.Clear();
+            txtPurchaseQty.Clear();
+            txtPurchaseUnitCost.Clear();
+            txtPurchaseSalePrice.Clear();
+            txtPurchaseImeiList.Clear();
+            chkPurchaseSerialized.Checked = false;
+        }
+
+        private void DgvPurchaseCart_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= currentPurchaseItems.Count) return;
+            currentPurchaseItems.RemoveAt(e.RowIndex);
+            RefreshPurchaseCartGrid();
+        }
+
+        private void BtnEditPurchaseInvoice_Click(object sender, EventArgs e)
+        {
+            if (selectedStatementPurchaseId == null)
+            {
+                MessageBox.Show("من فضلك اختر فاتورة شراء من كشف الحساب فوق أولاً.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (selectedSupplierId == -1) return;
+
+            List<PurchaseCartItem> items;
+            try
+            {
+                items = SuppliersRepository.GetPurchaseItemsForInvoice(selectedStatementPurchaseId.Value);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (items.Count == 0)
+            {
+                MessageBox.Show("لم يتم العثور على بنود لهذه الفاتورة.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            currentPurchaseItems = items;
+            RefreshPurchaseCartGrid();
+            EnterEditMode(selectedStatementPurchaseId.Value, selectedSupplierId);
+
+            MessageBox.Show("اتحمّلت بنود الفاتورة في العربة على اليسار. تقدر تشيل أي صنف بدبل كليك عليه، أو تضيف أصناف جديدة، وبعدين اضغط \"حفظ التعديل\" أو \"إلغاء التعديل\" لو غيّرت رأيك.", "وضع التعديل", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void BtnCancelPurchaseInvoice_Click(object sender, EventArgs e)
+        {
+            if (selectedStatementPurchaseId == null)
+            {
+                MessageBox.Show("من فضلك اختر فاتورة شراء من كشف الحساب فوق أولاً.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (MessageBox.Show("هل أنت متأكد من إلغاء فاتورة الشراء دي؟ هيترجع المخزون وأي مبلغ اتسدد كاش هيرجع للخزينة تلقائيًا.", "تأكيد الإلغاء", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            try
+            {
+                SuppliersRepository.CancelPurchase(selectedStatementPurchaseId.Value);
+            }
+            catch (DateClosedException ex)
+            {
+                MessageBox.Show(ex.Message, "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "لا يمكن الإلغاء", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (editingPurchaseId == selectedStatementPurchaseId)
+            {
+                ExitEditMode();
+                currentPurchaseItems.Clear();
+                RefreshPurchaseCartGrid();
+            }
+
+            MessageBox.Show("تم إلغاء فاتورة الشراء بنجاح.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            LoadSuppliersGrid();
+            if (selectedSupplierId != -1) LoadSupplierStatement(selectedSupplierId);
         }
 
         // ==========================================================================
