@@ -108,6 +108,21 @@ namespace TemoStore.Core.Commands
         public int MovementId { get; set; }
     }
 
+    public class UpdateExpenseCommand : ICommand<bool>
+    {
+        public required int ExpenseId { get; set; }
+        public required int AccountCode { get; set; }
+        public required decimal Amount { get; set; }
+        public required string PaymentMethod { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class DeleteExpenseCommand : ICommand<bool>
+    {
+        public required int ExpenseId { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
     public class TransferFundsCommand : ICommand<TransferResult>
     {
         public required string FromMethod { get; set; }
@@ -121,5 +136,42 @@ namespace TemoStore.Core.Commands
     {
         public int FromMovementId { get; set; }
         public int ToMovementId { get; set; }
+    }
+
+    public class CancelTransferCommand : ICommand<bool>
+    {
+        public required int MovementId { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    // حركة قبض/صرف عامة (تختلف عن RecordExpenseCommand - دي بتسجل جوه CashMovements
+    // مباشرة بأي نوع/حساب اختياري، مش مربوطة ببند مصروف محدد)
+    public class AddMovementCommand : ICommand<PaymentResult>
+    {
+        public required string Type { get; set; }   // "قبض" | "صرف"
+        public required string Method { get; set; }
+        public required decimal Amount { get; set; }
+        public string? Reference { get; set; }
+        public string? Description { get; set; }
+        public int? AccountCode { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class UpdateMovementCommand : ICommand<bool>
+    {
+        public required int MovementId { get; set; }
+        public required string NewType { get; set; }
+        public required string NewMethod { get; set; }
+        public required decimal NewAmount { get; set; }
+        public string? Reference { get; set; }
+        public string? Description { get; set; }
+        public int? AccountCode { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class CancelMovementCommand : ICommand<bool>
+    {
+        public required int MovementId { get; set; }
+        public required string PerformedBy { get; set; }
     }
 }

@@ -81,7 +81,13 @@ namespace Temo_Mobile_Store
             services.AddSingleton<ICommandHandler<PaySupplierCommand, PaymentResult>, PaySupplierCommandHandler>();
             services.AddSingleton<ICommandHandler<CollectFromCustomerCommand, PaymentResult>, CollectFromCustomerCommandHandler>();
             services.AddSingleton<ICommandHandler<RecordExpenseCommand, ExpenseResult>, RecordExpenseCommandHandler>();
+            services.AddSingleton<ICommandHandler<UpdateExpenseCommand, bool>, UpdateExpenseCommandHandler>();
+            services.AddSingleton<ICommandHandler<DeleteExpenseCommand, bool>, DeleteExpenseCommandHandler>();
             services.AddSingleton<ICommandHandler<TransferFundsCommand, TransferResult>, TransferFundsCommandHandler>();
+            services.AddSingleton<ICommandHandler<CancelTransferCommand, bool>, CancelTransferCommandHandler>();
+            services.AddSingleton<ICommandHandler<AddMovementCommand, PaymentResult>, AddMovementCommandHandler>();
+            services.AddSingleton<ICommandHandler<UpdateMovementCommand, bool>, UpdateMovementCommandHandler>();
+            services.AddSingleton<ICommandHandler<CancelMovementCommand, bool>, CancelMovementCommandHandler>();
 
             // CoreEngine نفسه - محتاج IServiceProvider عشان يلاقي الـ Handler المناسب
             // لأي Command وقت التشغيل (راجع CoreEngine.Execute)

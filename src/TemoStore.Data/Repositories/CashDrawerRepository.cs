@@ -98,6 +98,20 @@ namespace TemoStore.Data.Repositories
             };
         }
 
+        public void UpdateMovement(int id, string type, string method, decimal amount, string? reference, string? description, int? accountCode)
+        {
+            using var cmd = new SqliteCommand(
+                "UPDATE CashMovements SET MovementType = @Type, PaymentMethod = @Method, Amount = @Amount, ReferenceNumber = @Ref, Description = @Desc, AccountCode = @AccountCode WHERE Id = @Id", _conn, _tx);
+            cmd.Parameters.AddWithValue("@Type", type);
+            cmd.Parameters.AddWithValue("@Method", method);
+            cmd.Parameters.AddWithValue("@Amount", amount);
+            cmd.Parameters.AddWithValue("@Ref", (object?)reference ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@Desc", (object?)description ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@AccountCode", (object?)accountCode ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@Id", id);
+            cmd.ExecuteNonQuery();
+        }
+
         public CashMovementRecord? FindByPurchaseId(int purchaseId)
         {
             using var cmd = new SqliteCommand("SELECT Id FROM CashMovements WHERE PurchaseId = @Id AND MovementType = 'صرف'", _conn, _tx);

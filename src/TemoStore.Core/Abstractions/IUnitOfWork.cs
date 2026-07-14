@@ -15,6 +15,7 @@ namespace TemoStore.Core.Abstractions
         ISupplierRepository Suppliers { get; }
         IJournalRepository Journal { get; }
         IAuditRepository Audit { get; }
+        IExpenseRepository Expenses { get; }
 
         void Commit();
         void Rollback();
@@ -67,8 +68,19 @@ namespace TemoStore.Core.Abstractions
         int InsertMovement(CashMovementRecord movement);
         CashMovementRecord? GetMovementById(int id);
         CashMovementRecord? FindByPurchaseId(int purchaseId);
+        void UpdateMovement(int id, string type, string method, decimal amount, string? reference, string? description, int? accountCode);
         void DeleteMovement(int id);
         void LinkMovements(int firstId, int secondId);
+    }
+
+    // بند مصروف عمومي - جدول Expenses منفصل عن CashMovements (اختيار تصميمي قديم
+    // موجود من الأول، بيغذّي شاشة/تقارير المصروفات بالتحديد)
+    public interface IExpenseRepository
+    {
+        int Insert(int accountCode, decimal amount, string paymentMethod);
+        (int AccountCode, decimal Amount, string PaymentMethod)? GetById(int expenseId);
+        void Update(int expenseId, int accountCode, decimal amount, string paymentMethod);
+        void Delete(int expenseId);
     }
 
     public interface ICustomerRepository

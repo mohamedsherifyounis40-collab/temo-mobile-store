@@ -27,6 +27,7 @@ namespace TemoStore.Data
             Suppliers = new SupplierRepository(_conn, _tx);
             Journal = new JournalRepository(_conn, _tx);
             Audit = new AuditRepository();
+            Expenses = new ExpenseRepository(_conn, _tx);
         }
 
         public IProductRepository Products { get; }
@@ -37,6 +38,7 @@ namespace TemoStore.Data
         public ISupplierRepository Suppliers { get; }
         public IJournalRepository Journal { get; }
         public IAuditRepository Audit { get; }
+        public IExpenseRepository Expenses { get; }
 
         public void Commit()
         {

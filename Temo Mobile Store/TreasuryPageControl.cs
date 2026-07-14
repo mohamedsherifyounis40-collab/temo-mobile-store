@@ -3,6 +3,7 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
+using TemoStore.Core.Commands;
 using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
@@ -226,7 +227,7 @@ namespace Temo_Mobile_Store
 
         // ==========================================================================
         // بانل التحويل بين وسائل الدفع (زي تغذية ماكينة POS أو محفظة فودافون كاش من الدرج) -
-        // بيسجل حركتين مرتبطتين (صرف من المصدر + قبض في الهدف) عن طريق TreasuryRepository.TransferBetweenMethods
+        // بيسجل حركتين مرتبطتين (صرف من المصدر + قبض في الهدف) عن طريق TransferFundsCommand
         // ==========================================================================
         private void BuildTransferPanel()
         {
@@ -294,7 +295,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                TreasuryRepository.TransferBetweenMethods(fromMethod, toMethod, amount, txtTransferDescription.Text);
+                AppServices.CoreEngine.Execute(new TransferFundsCommand { FromMethod = fromMethod, ToMethod = toMethod, Amount = amount, Description = txtTransferDescription.Text, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (InsufficientBalanceException ex)
             {
@@ -367,7 +368,7 @@ namespace Temo_Mobile_Store
             string method = cmbExpensePaymentMethod.SelectedItem.ToString();
             try
             {
-                TreasuryRepository.AddExpense(selectedCode, amount, method);
+                AppServices.CoreEngine.Execute(new RecordExpenseCommand { AccountCode = selectedCode, Amount = amount, PaymentMethod = method, PerformedBy = AuthManager.CurrentUsername });
                 ClearExpenseInputs();
                 LoadExpensesData();
                 MessageBox.Show("تم تسجيل المصروف وخصمه من الرصيد بنجاح!", "تم التسجيل", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -417,7 +418,7 @@ namespace Temo_Mobile_Store
             string method = cmbExpensePaymentMethod.SelectedItem.ToString();
             try
             {
-                TreasuryRepository.UpdateExpense(selectedExpenseID, selectedCode, amount, method);
+                AppServices.CoreEngine.Execute(new UpdateExpenseCommand { ExpenseId = selectedExpenseID, AccountCode = selectedCode, Amount = amount, PaymentMethod = method, PerformedBy = AuthManager.CurrentUsername });
                 btnSaveExpenseUpdate.Enabled = false;
                 ClearExpenseInputs();
                 LoadExpensesData();
@@ -444,7 +445,7 @@ namespace Temo_Mobile_Store
             {
                 try
                 {
-                    TreasuryRepository.DeleteExpense(selectedExpenseID);
+                    AppServices.CoreEngine.Execute(new DeleteExpenseCommand { ExpenseId = selectedExpenseID, PerformedBy = AuthManager.CurrentUsername });
                     ClearExpenseInputs();
                     LoadExpensesData();
                     MessageBox.Show("تم حذف حركة المصروف بنجاح!", "تم الحذف", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -494,7 +495,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                TreasuryRepository.AddMovement(type, method, amount, txtMovementReference.Text, txtMovementDescription.Text, accountCode);
+                AppServices.CoreEngine.Execute(new AddMovementCommand { Type = type, Method = method, Amount = amount, Reference = txtMovementReference.Text, Description = txtMovementDescription.Text, AccountCode = accountCode, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (InsufficientBalanceException ex)
             {
@@ -633,7 +634,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                TreasuryRepository.UpdateMovement(selectedMovementId, newType, newMethod, newAmount, txtMovementReference.Text, txtMovementDescription.Text, accountCode);
+                AppServices.CoreEngine.Execute(new UpdateMovementCommand { MovementId = selectedMovementId, NewType = newType, NewMethod = newMethod, NewAmount = newAmount, Reference = txtMovementReference.Text, Description = txtMovementDescription.Text, AccountCode = accountCode, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (InsufficientBalanceException ex)
             {
@@ -688,9 +689,9 @@ namespace Temo_Mobile_Store
             try
             {
                 if (isTransferLeg)
-                    TreasuryRepository.CancelTransfer(selectedMovementId);
+                    AppServices.CoreEngine.Execute(new CancelTransferCommand { MovementId = selectedMovementId, PerformedBy = AuthManager.CurrentUsername });
                 else
-                    TreasuryRepository.CancelMovement(selectedMovementId, existing.MovementType, existing.PaymentMethod, existing.Amount);
+                    AppServices.CoreEngine.Execute(new CancelMovementCommand { MovementId = selectedMovementId, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (InsufficientBalanceException ex)
             {
