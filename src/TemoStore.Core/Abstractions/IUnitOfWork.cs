@@ -20,6 +20,7 @@ namespace TemoStore.Core.Abstractions
         IMaintenanceRepository Maintenance { get; }
         IEmployeeRepository Employees { get; }
         IAttendanceRepository Attendance { get; }
+        IAccountRepository Accounts { get; }
 
         void Commit();
         void Rollback();
@@ -147,6 +148,13 @@ namespace TemoStore.Core.Abstractions
     {
         int InsertEntry(string sourceType, int? sourceId, string? description, string createdBy);
         void InsertLine(int journalEntryId, int accountCode, decimal debit, decimal credit);
+    }
+
+    // شجرة الحسابات - مستخدمة من AccountingEngine عشان يتأكد إن أي كود حساب بيتسجل
+    // بيه قيد فعلًا موجود في الشجرة، قبل ما يتكتب في JournalLines
+    public interface IAccountRepository
+    {
+        bool Exists(int accountCode);
     }
 
     public interface IAuditRepository

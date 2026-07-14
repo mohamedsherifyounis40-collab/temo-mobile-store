@@ -32,6 +32,7 @@ namespace TemoStore.Data
             Maintenance = new MaintenanceTicketRepository(_conn, _tx);
             Employees = new EmployeeRepository(_conn, _tx);
             Attendance = new AttendanceRecordRepository(_conn, _tx);
+            Accounts = new AccountRepository(_conn, _tx);
         }
 
         public IProductRepository Products { get; }
@@ -47,6 +48,7 @@ namespace TemoStore.Data
         public IMaintenanceRepository Maintenance { get; }
         public IEmployeeRepository Employees { get; }
         public IAttendanceRepository Attendance { get; }
+        public IAccountRepository Accounts { get; }
 
         public void Commit()
         {

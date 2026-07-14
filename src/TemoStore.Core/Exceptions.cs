@@ -61,6 +61,19 @@ namespace TemoStore.Core.Exceptions
         }
     }
 
+    // بترمي لو قيد محاسبي بيحاول يسجل على كود حساب مش موجود في شجرة الحسابات (AccountsTree) -
+    // بيمنع أي قيد "يتيم" يوصل لـ JournalLines على حساب اتحذف أو غلط رقمه
+    public class UnknownAccountException : Exception
+    {
+        public int AccountCode { get; }
+
+        public UnknownAccountException(int accountCode)
+            : base($"كود الحساب {accountCode} غير موجود في شجرة الحسابات. راجع شاشة الحسابات وتأكد إن الحساب موجود قبل ما تسجل عليه أي حركة.")
+        {
+            AccountCode = accountCode;
+        }
+    }
+
     // بترمي لو قيد محاسبي اتبنى وإجمالي المدين ≠ إجمالي الدائن - القيد ده مينفعش يتحفظ خالص
     public class AccountingImbalanceException : Exception
     {

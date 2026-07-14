@@ -12,18 +12,21 @@ namespace TemoStore.Engines.Accounting
     {
         public int Post(JournalEntryRequest request, string performedBy, IUnitOfWork uow)
         {
+            if (request.Lines.Count < 2)
+                throw new InvalidOperationException("القيد المحاسبي لازم يحتوي على بندين على الأقل (مدين ودائن).");
+
             decimal totalDebit = 0, totalCredit = 0;
             foreach (var line in request.Lines)
             {
                 totalDebit += line.Debit;
                 totalCredit += line.Credit;
+
+                if (!uow.Accounts.Exists(line.AccountCode))
+                    throw new UnknownAccountException(line.AccountCode);
             }
 
             if (Math.Round(totalDebit, 2) != Math.Round(totalCredit, 2))
                 throw new AccountingImbalanceException(totalDebit, totalCredit);
-
-            if (request.Lines.Count == 0)
-                throw new InvalidOperationException("القيد المحاسبي لازم يحتوي على بند واحد على الأقل.");
 
             int journalEntryId = uow.Journal.InsertEntry(request.SourceType, request.SourceId, request.Description, performedBy);
             foreach (var line in request.Lines)

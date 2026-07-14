@@ -94,6 +94,14 @@ namespace Temo_Mobile_Store
                     cmd.Parameters.AddWithValue("@Code", code);
                     usageCount += Convert.ToInt32(cmd.ExecuteScalar());
                 }
+                // القيد المحاسبي نفسه (JournalLines) هو المصدر الحقيقي - حساب ليه قيود
+                // فعلية بس معندوش صفوف في Expenses/CashMovements (زي عملاء/موردين/مخزون)
+                // كان ممكن يتحذف من غير أي تحذير قبل الفحص ده
+                using (SqliteCommand cmd = new SqliteCommand("SELECT COUNT(*) FROM JournalLines WHERE AccountCode = @Code", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Code", code);
+                    usageCount += Convert.ToInt32(cmd.ExecuteScalar());
+                }
                 return usageCount;
             }
         }
