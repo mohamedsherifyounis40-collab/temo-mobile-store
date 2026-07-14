@@ -38,7 +38,7 @@ namespace Temo_Mobile_Store
         // ---------- عناصر الشاشة ----------
         private Guna2TextBox txtSaleBarcode, txtSaleName, txtCustomerPrice, txtSaleQty, txtSaleTotal;
         private Label lblSaleImei;
-        private Guna2ComboBox cmbSaleImei, cmbSalePaymentType, cmbSaleCustomer, cmbInvoicePaperSize;
+        private Guna2ComboBox cmbSaleImei, cmbSalePaymentType, cmbSalePaymentMethod, cmbSaleCustomer, cmbInvoicePaperSize;
         private Guna2TextBox txtInvoiceNumber, txtInvoiceCustomer;
         private Guna2Button btnAddToBill, btnPrintInvoice, btnEditSaleMode, btnSaveSaleEdit, btnCancelSale;
         private DataGridView dgvSales;
@@ -79,7 +79,7 @@ namespace Temo_Mobile_Store
             Guna2Panel pnlCard = new Guna2Panel()
             {
                 Location = new Point(20, 20),
-                Size = new Size(300, 850),
+                Size = new Size(300, 900),
                 FillColor = Color.White,
                 BorderRadius = 14,
                 BorderColor = Color.FromArgb(230, 232, 238),
@@ -146,37 +146,41 @@ namespace Temo_Mobile_Store
             cmbSalePaymentType.SelectedIndex = 0;
             cmbSalePaymentType.SelectedIndexChanged += CmbSalePaymentType_SelectedIndexChanged;
 
-            Label lblSaleCustomer = new Label() { Text = "العميل (لازم للآجل):", Location = new Point(20, 539), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbSaleCustomer = new Guna2ComboBox() { Location = new Point(20, 559), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false, BorderRadius = 8 };
+            Label lblSalePaymentMethod = new Label() { Text = "وسيلة الدفع (لو كاش):", Location = new Point(20, 539), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbSalePaymentMethod = new Guna2ComboBox() { Location = new Point(20, 559), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            cmbSalePaymentMethod.Items.AddRange(UIHelpers.PaymentMethods);
 
-            btnAddToBill = new Guna2Button() { Text = "إتمام عملية البيع 🛒", Location = new Point(20, 601), Width = 260, Height = 42, FillColor = ColorWarning, BorderRadius = 10, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+            Label lblSaleCustomer = new Label() { Text = "العميل (لازم للآجل):", Location = new Point(20, 597), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbSaleCustomer = new Guna2ComboBox() { Location = new Point(20, 617), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false, BorderRadius = 8 };
+
+            btnAddToBill = new Guna2Button() { Text = "إتمام عملية البيع 🛒", Location = new Point(20, 659), Width = 260, Height = 42, FillColor = ColorWarning, BorderRadius = 10, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
             btnAddToBill.Click += BtnAddToBill_Click;
 
-            btnPrintInvoice = new Guna2Button() { Text = "طباعة آخر فاتورة 🖨️", Location = new Point(20, 649), Width = 260, Height = 36, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 10 };
+            btnPrintInvoice = new Guna2Button() { Text = "طباعة آخر فاتورة 🖨️", Location = new Point(20, 707), Width = 260, Height = 36, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 10 };
             btnPrintInvoice.Click += BtnPrintInvoice_Click;
 
-            Label lblPaperSize = new Label() { Text = "مقاس الطباعة:", Location = new Point(20, 694), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbInvoicePaperSize = new Guna2ComboBox() { Location = new Point(20, 714), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            Label lblPaperSize = new Label() { Text = "مقاس الطباعة:", Location = new Point(20, 752), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbInvoicePaperSize = new Guna2ComboBox() { Location = new Point(20, 772), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbInvoicePaperSize.Items.AddRange(new string[] { "80 مم (طابعة حرارية)", "58 مم (طابعة حرارية)", "A4 (طابعة عادية)" });
             cmbInvoicePaperSize.SelectedIndex = 0;
 
-            Guna2Button btnSendWhatsApp = new Guna2Button() { Text = "إرسال آخر فاتورة واتساب 📱", Location = new Point(20, 754), Width = 260, Height = 34, FillColor = Color.FromArgb(37, 211, 102), BorderRadius = 9 };
+            Guna2Button btnSendWhatsApp = new Guna2Button() { Text = "إرسال آخر فاتورة واتساب 📱", Location = new Point(20, 812), Width = 260, Height = 34, FillColor = Color.FromArgb(37, 211, 102), BorderRadius = 9 };
             btnSendWhatsApp.Click += BtnSendInvoiceWhatsApp_Click;
 
-            Guna2Button btnSavePdf = new Guna2Button() { Text = "حفظ آخر فاتورة PDF 📄", Location = new Point(20, 794), Width = 260, Height = 34, FillColor = Color.FromArgb(192, 57, 43), BorderRadius = 9 };
+            Guna2Button btnSavePdf = new Guna2Button() { Text = "حفظ آخر فاتورة PDF 📄", Location = new Point(20, 852), Width = 260, Height = 34, FillColor = Color.FromArgb(192, 57, 43), BorderRadius = 9 };
             btnSavePdf.Click += BtnSaveInvoicePdf_Click;
 
             pnlCard.Controls.AddRange(new Control[] {
                 lblCardTitle, lblBadgeInvTitle, txtInvoiceNumber, lblBadgeCustTitle, txtInvoiceCustomer,
                 lblBarcode, txtSaleBarcode, lblName, txtSaleName, lblPrice, txtCustomerPrice,
                 lblQty, txtSaleQty, lblSaleImei, cmbSaleImei, pnlTotal, lblPaymentType, cmbSalePaymentType,
-                lblSaleCustomer, cmbSaleCustomer, btnAddToBill, btnPrintInvoice, lblPaperSize, cmbInvoicePaperSize, btnSendWhatsApp, btnSavePdf
+                lblSalePaymentMethod, cmbSalePaymentMethod, lblSaleCustomer, cmbSaleCustomer, btnAddToBill, btnPrintInvoice, lblPaperSize, cmbInvoicePaperSize, btnSendWhatsApp, btnSavePdf
             });
 
             // ---------- كارت إدارة العمليات (تعديل/إلغاء) - تحت كارت البيع مباشرة ----------
             Guna2Panel pnlManage = new Guna2Panel()
             {
-                Location = new Point(20, 870),
+                Location = new Point(20, 940),
                 Size = new Size(300, 150),
                 FillColor = Color.White,
                 BorderRadius = 14,
@@ -323,7 +327,9 @@ namespace Temo_Mobile_Store
 
         private void CmbSalePaymentType_SelectedIndexChanged(object sender, EventArgs e)
         {
-            cmbSaleCustomer.Enabled = cmbSalePaymentType.SelectedItem?.ToString() == "آجل";
+            bool isCredit = cmbSalePaymentType.SelectedItem?.ToString() == "آجل";
+            cmbSaleCustomer.Enabled = isCredit;
+            cmbSalePaymentMethod.Enabled = !isCredit;
         }
 
         // ==========================================================================
@@ -382,12 +388,23 @@ namespace Temo_Mobile_Store
                 customerIdParam = Convert.ToInt32(cmbSaleCustomer.SelectedValue);
             }
 
+            string paymentMethod = null;
+            if (paymentType == "Cash")
+            {
+                if (cmbSalePaymentMethod.SelectedItem == null)
+                {
+                    MessageBox.Show("من فضلك اختار وسيلة الدفع اللي هيدفع بيها العميل.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                paymentMethod = cmbSalePaymentMethod.SelectedItem.ToString();
+            }
+
             int dailyInvoiceNumber;
             try
             {
                 dailyInvoiceNumber = SalesRepository.AddSale(
                     txtSaleBarcode.Text, txtSaleName.Text, Convert.ToDecimal(txtCustomerPrice.Text), qtySold,
-                    Convert.ToDecimal(txtSaleTotal.Text), customerIdParam, paymentType, selectedImei);
+                    Convert.ToDecimal(txtSaleTotal.Text), customerIdParam, paymentType, selectedImei, paymentMethod);
             }
             catch (InsufficientStockException ex)
             {
@@ -486,6 +503,11 @@ namespace Temo_Mobile_Store
                 MessageBox.Show(ex.Message, "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
             catch (Exception ex)
             {
                 MessageBox.Show("حصل خطأ أثناء تعديل عملية البيع: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -528,6 +550,11 @@ namespace Temo_Mobile_Store
             catch (DateClosedException ex)
             {
                 MessageBox.Show(ex.Message, "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                MessageBox.Show(ex.Message, "رصيد غير كافٍ", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
             catch (Exception ex)

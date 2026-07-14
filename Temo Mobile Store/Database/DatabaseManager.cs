@@ -270,6 +270,8 @@ namespace Temo_Mobile_Store.Database
                 EnsureCashMovementsEmployeeIdColumn(conn);
                 EnsureCashMovementsIsAdvanceColumn(conn);
                 EnsureCashMovementsPurchaseIdColumn(conn);
+                EnsureCashMovementsSaleIdColumn(conn);
+                EnsureSalesPaymentMethodColumn(conn);
                 EnsureStoreSettingsCatalogSyncColumns(conn);
             }
         }
@@ -367,6 +369,56 @@ namespace Temo_Mobile_Store.Database
 
             if (!columnExists)
                 ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN PurchaseId INTEGER;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود SaleId لجدول CashMovements - بيربط "قبض" عملية بيع كاش بالبيع
+        // نفسه، عشان لو البيع اتعدّل أو اتلغى نقدر نلاقي حركة الكاش بتاعته ونعكسها.
+        // ==========================================================================
+        private static void EnsureCashMovementsSaleIdColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(CashMovements);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "SaleId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN SaleId INTEGER;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود PaymentMethod لجدول Sales - كان ناقص من الأول، عشان كده عملية
+        // البيع الكاش ما كانتش بتأثر على رصيد أي وسيلة دفع في الخزينة خالص (باگ حقيقي:
+        // الفلوس بتتقبض فعليًا بس الخزينة معندهاش أي فكرة). العمود ده بيحدد وسيلة
+        // الدفع لأي بيع كاش عشان تقدر تتعدل/تتلغي بشكل صحيح لاحقًا.
+        // ==========================================================================
+        private static void EnsureSalesPaymentMethodColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(Sales);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "PaymentMethod", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN PaymentMethod TEXT;");
         }
 
         // ==========================================================================

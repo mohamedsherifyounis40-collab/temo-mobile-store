@@ -37,6 +37,9 @@ namespace Temo_Mobile_Store
         public string ProductName;
         public decimal Price;
         public int QuantitySold;
+        public decimal Total;
+        public string PaymentType;
+        public string PaymentMethod;
         public string SaleDate;
         public string IMEI;
     }
@@ -126,9 +129,9 @@ namespace Temo_Mobile_Store
             return dt;
         }
 
-        // بيسجل عملية بيع كاملة (فحص مخزون + إدراج + تحديث وحدة IMEI لو موجودة + تحديث الكمية)
-        // في Transaction واحدة، وبيرجع رقم فاتورة اليوم
-        public static int AddSale(string barcode, string productName, decimal salePrice, int quantitySold, decimal total, object customerId, string paymentType, string imei)
+        // بيسجل عملية بيع كاملة (فحص مخزون + إدراج + تحديث وحدة IMEI لو موجودة + تحديث الكمية
+        // + قبض في الخزينة لو البيع كاش) في Transaction واحدة، وبيرجع رقم فاتورة اليوم
+        public static int AddSale(string barcode, string productName, decimal salePrice, int quantitySold, decimal total, object customerId, string paymentType, string imei, string paymentMethod)
         {
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
@@ -151,7 +154,7 @@ namespace Temo_Mobile_Store
                             throw new InsufficientStockException(currentStock);
 
                         using (SqliteCommand cmdInsert = new SqliteCommand(
-                            "INSERT INTO Sales (Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, IMEI) VALUES (@Barcode, @ProductName, @CostPrice, @Price, @QuantitySold, @Total, @CustomerId, @PaymentType, @IMEI)", conn, transaction))
+                            "INSERT INTO Sales (Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, IMEI, PaymentMethod) VALUES (@Barcode, @ProductName, @CostPrice, @Price, @QuantitySold, @Total, @CustomerId, @PaymentType, @IMEI, @PaymentMethod)", conn, transaction))
                         {
                             cmdInsert.Parameters.AddWithValue("@Barcode", barcode);
                             cmdInsert.Parameters.AddWithValue("@ProductName", productName);
@@ -162,6 +165,7 @@ namespace Temo_Mobile_Store
                             cmdInsert.Parameters.AddWithValue("@CustomerId", customerId ?? DBNull.Value);
                             cmdInsert.Parameters.AddWithValue("@PaymentType", paymentType);
                             cmdInsert.Parameters.AddWithValue("@IMEI", (object)imei ?? DBNull.Value);
+                            cmdInsert.Parameters.AddWithValue("@PaymentMethod", paymentType == "Cash" ? (object)paymentMethod : DBNull.Value);
                             cmdInsert.ExecuteNonQuery();
                         }
 
@@ -184,6 +188,26 @@ namespace Temo_Mobile_Store
                             cmdUpdate.Parameters.AddWithValue("@Qty", quantitySold);
                             cmdUpdate.Parameters.AddWithValue("@Barcode", barcode);
                             cmdUpdate.ExecuteNonQuery();
+                        }
+
+                        if (paymentType == "Cash")
+                        {
+                            using (SqliteCommand cmd = new SqliteCommand(
+                                "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, CustomerId, SaleId) VALUES (@Date, 'قبض', @Method, @Amount, @Ref, @Desc, @CreatedAt, 4100, @CustomerId, @SaleId)", conn, transaction))
+                            {
+                                cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
+                                cmd.Parameters.AddWithValue("@Method", paymentMethod);
+                                cmd.Parameters.AddWithValue("@Amount", total);
+                                cmd.Parameters.AddWithValue("@Ref", "فاتورة بيع رقم " + newSaleId);
+                                cmd.Parameters.AddWithValue("@Desc", "قبض كاش من عملية بيع رقم " + newSaleId);
+                                cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                                cmd.Parameters.AddWithValue("@CustomerId", customerId ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@SaleId", newSaleId);
+                                cmd.ExecuteNonQuery();
+                            }
+
+                            decimal balanceBeforeSale = TreasuryRepository.GetBalanceInTransaction(conn, transaction, paymentMethod);
+                            TreasuryRepository.SetBalanceInTransaction(conn, transaction, paymentMethod, balanceBeforeSale + total);
                         }
 
                         int dailyInvoiceNumber;
@@ -210,7 +234,7 @@ namespace Temo_Mobile_Store
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, ProductName, Price, QuantitySold, SaleDate, IMEI FROM Sales WHERE SaleID = @Id", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, ProductName, Price, QuantitySold, Total, PaymentType, PaymentMethod, SaleDate, IMEI FROM Sales WHERE SaleID = @Id", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", saleId);
                     using (SqliteDataReader reader = cmd.ExecuteReader())
@@ -223,6 +247,9 @@ namespace Temo_Mobile_Store
                             ProductName = reader["ProductName"].ToString(),
                             Price = Convert.ToDecimal(reader["Price"]),
                             QuantitySold = Convert.ToInt32(reader["QuantitySold"]),
+                            Total = Convert.ToDecimal(reader["Total"]),
+                            PaymentType = reader["PaymentType"] == DBNull.Value ? null : reader["PaymentType"].ToString(),
+                            PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
                             SaleDate = reader["SaleDate"].ToString(),
                             IMEI = reader["IMEI"] == DBNull.Value ? null : reader["IMEI"].ToString()
                         };
@@ -241,8 +268,8 @@ namespace Temo_Mobile_Store
                 {
                     try
                     {
-                        string barcode; int oldQty; decimal price; string saleDate;
-                        using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, QuantitySold, Price, SaleDate FROM Sales WHERE SaleID = @Id", conn, transaction))
+                        string barcode; int oldQty; decimal price; string saleDate; decimal oldTotal; string paymentType; string paymentMethod;
+                        using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, QuantitySold, Price, Total, SaleDate, PaymentType, PaymentMethod FROM Sales WHERE SaleID = @Id", conn, transaction))
                         {
                             cmd.Parameters.AddWithValue("@Id", saleId);
                             using (SqliteDataReader reader = cmd.ExecuteReader())
@@ -252,7 +279,10 @@ namespace Temo_Mobile_Store
                                 barcode = reader["Barcode"].ToString();
                                 oldQty = Convert.ToInt32(reader["QuantitySold"]);
                                 price = Convert.ToDecimal(reader["Price"]);
+                                oldTotal = Convert.ToDecimal(reader["Total"]);
                                 saleDate = reader["SaleDate"].ToString();
+                                paymentType = reader["PaymentType"] == DBNull.Value ? null : reader["PaymentType"].ToString();
+                                paymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString();
                             }
                         }
 
@@ -272,6 +302,31 @@ namespace Temo_Mobile_Store
                             throw new InsufficientStockException(availableIfReverted);
 
                         decimal newTotal = price * newQty;
+                        decimal totalDelta = newTotal - oldTotal;
+
+                        if (paymentType == "Cash" && paymentMethod != null && totalDelta != 0)
+                        {
+                            decimal currentBalance = TreasuryRepository.GetBalanceInTransaction(conn, transaction, paymentMethod);
+                            if (totalDelta < 0 && -totalDelta > currentBalance)
+                                throw new InsufficientBalanceException(paymentMethod, currentBalance);
+
+                            using (SqliteCommand cmd = new SqliteCommand(
+                                "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, SaleId) VALUES (@Date, @Type, @Method, @Amount, @Ref, @Desc, @CreatedAt, 4100, @SaleId)", conn, transaction))
+                            {
+                                cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
+                                cmd.Parameters.AddWithValue("@Type", totalDelta > 0 ? "قبض" : "صرف");
+                                cmd.Parameters.AddWithValue("@Method", paymentMethod);
+                                cmd.Parameters.AddWithValue("@Amount", Math.Abs(totalDelta));
+                                cmd.Parameters.AddWithValue("@Ref", "تعديل فاتورة بيع رقم " + saleId);
+                                cmd.Parameters.AddWithValue("@Desc", "تسوية كاش بسبب تعديل الكمية في عملية بيع رقم " + saleId);
+                                cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                                cmd.Parameters.AddWithValue("@SaleId", saleId);
+                                cmd.ExecuteNonQuery();
+                            }
+
+                            TreasuryRepository.SetBalanceInTransaction(conn, transaction, paymentMethod, currentBalance + totalDelta);
+                        }
+
                         using (SqliteCommand cmdUpdateSale = new SqliteCommand("UPDATE Sales SET QuantitySold = @Qty, Total = @Total WHERE SaleID = @Id", conn, transaction))
                         {
                             cmdUpdateSale.Parameters.AddWithValue("@Qty", newQty);
@@ -309,18 +364,45 @@ namespace Temo_Mobile_Store
                 {
                     try
                     {
-                        string saleDate;
-                        using (SqliteCommand cmdSaleDate = new SqliteCommand("SELECT SaleDate FROM Sales WHERE SaleID = @Id", conn, transaction))
+                        string saleDate; decimal saleTotal; string paymentType; string paymentMethod;
+                        using (SqliteCommand cmdSaleDate = new SqliteCommand("SELECT SaleDate, Total, PaymentType, PaymentMethod FROM Sales WHERE SaleID = @Id", conn, transaction))
                         {
                             cmdSaleDate.Parameters.AddWithValue("@Id", saleId);
-                            var res = cmdSaleDate.ExecuteScalar();
-                            if (res == null)
-                                throw new InvalidOperationException("لم يتم العثور على عملية البيع.");
-                            saleDate = res.ToString();
+                            using (SqliteDataReader reader = cmdSaleDate.ExecuteReader())
+                            {
+                                if (!reader.Read())
+                                    throw new InvalidOperationException("لم يتم العثور على عملية البيع.");
+                                saleDate = reader["SaleDate"].ToString();
+                                saleTotal = Convert.ToDecimal(reader["Total"]);
+                                paymentType = reader["PaymentType"] == DBNull.Value ? null : reader["PaymentType"].ToString();
+                                paymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString();
+                            }
                         }
 
                         if (UIHelpers.IsDateClosed(DateTime.Parse(saleDate).Date))
                             throw new DateClosedException("لا يمكن إلغاء عملية بيع تابعة ليوم تم إقفاله بالفعل.");
+
+                        if (paymentType == "Cash" && paymentMethod != null)
+                        {
+                            decimal currentBalance = TreasuryRepository.GetBalanceInTransaction(conn, transaction, paymentMethod);
+                            if (saleTotal > currentBalance)
+                                throw new InsufficientBalanceException(paymentMethod, currentBalance);
+
+                            using (SqliteCommand cmd = new SqliteCommand(
+                                "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, SaleId) VALUES (@Date, 'صرف', @Method, @Amount, @Ref, @Desc, @CreatedAt, 4100, @SaleId)", conn, transaction))
+                            {
+                                cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
+                                cmd.Parameters.AddWithValue("@Method", paymentMethod);
+                                cmd.Parameters.AddWithValue("@Amount", saleTotal);
+                                cmd.Parameters.AddWithValue("@Ref", "إلغاء فاتورة بيع رقم " + saleId);
+                                cmd.Parameters.AddWithValue("@Desc", "قيد عكسي - إلغاء عملية بيع رقم " + saleId);
+                                cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                                cmd.Parameters.AddWithValue("@SaleId", saleId);
+                                cmd.ExecuteNonQuery();
+                            }
+
+                            TreasuryRepository.SetBalanceInTransaction(conn, transaction, paymentMethod, currentBalance - saleTotal);
+                        }
 
                         using (SqliteCommand cmdUpdateStock = new SqliteCommand("UPDATE Products SET Quantity = Quantity + @Qty WHERE Barcode = @Barcode", conn, transaction))
                         {
