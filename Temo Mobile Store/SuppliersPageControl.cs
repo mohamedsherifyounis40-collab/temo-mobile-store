@@ -5,6 +5,8 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
+using TemoStore.Core.Commands;
+using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
 {
@@ -511,12 +513,24 @@ namespace Temo_Mobile_Store
             decimal totalAmount = currentPurchaseItems.Sum(x => x.LineTotal);
             bool isEditing = editingPurchaseId.HasValue;
 
+            var lines = currentPurchaseItems.Select(x => new TemoStore.Core.Entities.PurchaseLine
+            {
+                Barcode = x.Barcode,
+                ProductName = x.ProductName,
+                Qty = x.Qty,
+                UnitCost = x.UnitCost,
+                SalePrice = x.SalePrice,
+                LineTotal = x.LineTotal,
+                IsSerialized = x.IsSerialized,
+                Imeis = x.Imeis
+            }).ToList();
+
             try
             {
                 if (isEditing)
-                    SuppliersRepository.EditPurchase(editingPurchaseId.Value, supplierId, currentPurchaseItems, payCashNow, cashMethod);
+                    AppServices.CoreEngine.Execute(new EditPurchaseCommand { PurchaseId = editingPurchaseId.Value, SupplierId = supplierId, Lines = lines, PayCashNow = payCashNow, CashMethod = cashMethod, PerformedBy = AuthManager.CurrentUsername });
                 else
-                    SuppliersRepository.SavePurchase(supplierId, currentPurchaseItems, payCashNow, cashMethod);
+                    AppServices.CoreEngine.Execute(new CreatePurchaseCommand { SupplierId = supplierId, Lines = lines, PayCashNow = payCashNow, CashMethod = cashMethod, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (DuplicateImeiException ex)
             {
@@ -531,6 +545,11 @@ namespace Temo_Mobile_Store
             catch (DateClosedException ex)
             {
                 MessageBox.Show(ex.Message, "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            catch (ValidationException ex)
+            {
+                MessageBox.Show(string.Join(Environment.NewLine, ex.Errors), "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             catch (Exception ex)
@@ -634,7 +653,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                SuppliersRepository.CancelPurchase(selectedStatementPurchaseId.Value);
+                AppServices.CoreEngine.Execute(new CancelPurchaseCommand { PurchaseId = selectedStatementPurchaseId.Value, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (DateClosedException ex)
             {
@@ -683,7 +702,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                SuppliersRepository.PaySupplier(supplierId, supplierName, method, amount);
+                AppServices.CoreEngine.Execute(new PaySupplierCommand { SupplierId = supplierId, SupplierName = supplierName, Method = method, Amount = amount, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (InsufficientBalanceException ex)
             {
