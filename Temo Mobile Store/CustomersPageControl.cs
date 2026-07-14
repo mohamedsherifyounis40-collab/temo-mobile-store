@@ -3,6 +3,7 @@ using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
+using TemoStore.Core.Commands;
 
 namespace Temo_Mobile_Store
 {
@@ -235,7 +236,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                CustomersRepository.CollectFromCustomer(customerId, customerName, method, amount);
+                AppServices.CoreEngine.Execute(new CollectFromCustomerCommand { CustomerId = customerId, CustomerName = customerName, Method = method, Amount = amount, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 

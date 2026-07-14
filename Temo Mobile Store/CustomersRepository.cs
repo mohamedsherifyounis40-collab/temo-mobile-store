@@ -152,42 +152,5 @@ namespace Temo_Mobile_Store
                 }
             }
         }
-
-        // بيسجّل تحصيل من عميل (سداد دين) ويزوّد رصيد وسيلة الدفع، جوه Transaction واحدة
-        public static void CollectFromCustomer(int customerId, string customerName, string method, decimal amount)
-        {
-            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
-            {
-                conn.Open();
-                using (SqliteTransaction transaction = conn.BeginTransaction())
-                {
-                    try
-                    {
-                        using (SqliteCommand cmd = new SqliteCommand(
-                            "INSERT INTO CashMovements (MovementDate, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt, AccountCode, CustomerId) VALUES (@Date, 'قبض', @Method, @Amount, @Ref, @Desc, @CreatedAt, 1300, @CustomerId)", conn, transaction))
-                        {
-                            cmd.Parameters.AddWithValue("@Date", DateTime.Now.ToString("yyyy-MM-dd"));
-                            cmd.Parameters.AddWithValue("@Method", method);
-                            cmd.Parameters.AddWithValue("@Amount", amount);
-                            cmd.Parameters.AddWithValue("@Ref", "");
-                            cmd.Parameters.AddWithValue("@Desc", "تحصيل من عميل: " + customerName);
-                            cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                            cmd.Parameters.AddWithValue("@CustomerId", customerId);
-                            cmd.ExecuteNonQuery();
-                        }
-
-                        decimal currentBalance = TreasuryRepository.GetBalanceInTransaction(conn, transaction, method);
-                        TreasuryRepository.SetBalanceInTransaction(conn, transaction, method, currentBalance + amount);
-
-                        transaction.Commit();
-                    }
-                    catch
-                    {
-                        transaction.Rollback();
-                        throw;
-                    }
-                }
-            }
-        }
     }
 }
