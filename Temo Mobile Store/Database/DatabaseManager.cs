@@ -139,6 +139,41 @@ namespace Temo_Mobile_Store.Database
                     AccountName TEXT NOT NULL
                 );");
 
+                // ==========================================================================
+                // دفتر اليومية (Double-entry) - كل عملية (بيع/شراء/مصروف/تحويل/سداد) بتنشئ
+                // قيد هنا تلقائيًا عن طريق Accounting Engine. القيد ممنوع يتحفظ لو
+                // إجمالي المدين ≠ إجمالي الدائن (AccountingEngine.Post بيتأكد من كده بنفسه).
+                // ==========================================================================
+                ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS JournalEntries (
+                    JournalEntryId INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EntryDate      TEXT NOT NULL,
+                    SourceType     TEXT NOT NULL,
+                    SourceId       INTEGER,
+                    Description    TEXT,
+                    CreatedAt      TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    CreatedBy      TEXT
+                );");
+
+                ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS JournalLines (
+                    JournalLineId   INTEGER PRIMARY KEY AUTOINCREMENT,
+                    JournalEntryId  INTEGER NOT NULL,
+                    AccountCode     INTEGER NOT NULL,
+                    Debit           REAL NOT NULL DEFAULT 0,
+                    Credit          REAL NOT NULL DEFAULT 0
+                );");
+
+                // سجل تدقيق (Audit) - بيتسجل بعد نجاح أي عملية (Commit)، من خلال Event Bus،
+                // مش جزء من أي Transaction مالية (راجع قسم 4 بمستند العمارة).
+                ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS AuditLog (
+                    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Username    TEXT,
+                    Screen      TEXT,
+                    Operation   TEXT,
+                    OldData     TEXT,
+                    NewData     TEXT,
+                    CreatedAt   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+                );");
+
                 ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS DailyClosures (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     ClosureDate TEXT NOT NULL,
@@ -254,6 +289,7 @@ namespace Temo_Mobile_Store.Database
                     (5200, "إيجار"),
                     (5300, "كهرباء ومياه"),
                     (5400, "مرتبات"),
+                    (5500, "تكلفة البضاعة المباعة"),
                 };
                 foreach (var acc in defaultAccounts)
                 {
