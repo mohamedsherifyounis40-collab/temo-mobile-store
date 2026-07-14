@@ -89,11 +89,13 @@ namespace TemoStore.Engines.Handlers
     // الدفع مايكفيش - زي أي عملية صرف تانية في النظام.
     //
     // النسخة القديمة كانت بتسجل الحركة في CashMovements وتزوّد الرصيد مباشرة من غير أي قيد
-    // محاسبي - نفس ثغرة الصيانة اللي اتصلحت قبل كده. دلوقتي بيتسجل قيد متزن (مدين مرتبات /
-    // دائن وسيلة الدفع) لكل صرف مرتب أو سلفة. ملحوظة: السلفة محاسبيًا الأصح إنها تتسجل في
-    // حساب "سلف موظفين" (أصل/مديونية) مش "مرتبات" (مصروف) مباشرة لحد ما الشهر يتقفل - ده
-    // محتاج حساب جديد في شجرة الحسابات مش موجود دلوقتي، فالاتنين بيتسجلوا على حساب المرتبات
-    // زي ما كان بيحصل بالظبط في تصنيف AccountCode القديم (كانت كلها SalariesAccountCode)
+    // محاسبي - نفس ثغرة الصيانة اللي اتصلحت قبل كده. دلوقتي بيتسجل قيد متزن لكل صرف مرتب أو
+    // سلفة، لكن على حسابين مختلفين حسب النوع: "دفعة من المستحق" هي مصروف مؤكد فعلًا حصل
+    // (مدين مرتبات 5400 / دائن وسيلة الدفع)، أما "سلفة" فهي مش مصروف لسه - هي مديونية على
+    // الموظف لحد ما شهر يتقفل ويستهلكها (مدين سلف الموظفين 1400 كأصل / دائن وسيلة الدفع)،
+    // فمابتأثرش على قائمة الدخل وقت الصرف نفسه. ملحوظة: مفيش حاليًا أي تحويل تلقائي من
+    // "سلف الموظفين" لـ"مرتبات" وقت قفل الشهر - ده محتاج منطق إضافي (تحديد قد إيه من السلفة
+    // القائمة بيتغطى بالشهر ده) لو الشركة عايزة محاسبة استحقاق كاملة، مش موجود دلوقتي.
     public class PayEmployeeCommandHandler : ICommandHandler<PayEmployeeCommand, bool>
     {
         private readonly IUnitOfWorkFactory _uowFactory;
@@ -118,12 +120,13 @@ namespace TemoStore.Engines.Handlers
                     throw new InsufficientEarnedBalanceException(earnedBalance);
             }
 
+            int accountCode = command.IsAdvance ? AccountCodes.EmployeeAdvances : AccountCodes.Salaries;
             string reason = string.IsNullOrWhiteSpace(command.Description) ? ("صرف مرتب لـ " + command.EmployeeName) : command.Description!;
-            _cashDrawer.Debit(command.Method, command.Amount, reason, uow, accountCode: AccountCodes.Salaries, employeeId: command.EmployeeId, isAdvance: command.IsAdvance);
+            _cashDrawer.Debit(command.Method, command.Amount, reason, uow, accountCode: accountCode, employeeId: command.EmployeeId, isAdvance: command.IsAdvance);
 
             var lines = new List<JournalLineRequest>
             {
-                new() { AccountCode = AccountCodes.Salaries, Debit = command.Amount, Credit = 0 },
+                new() { AccountCode = accountCode, Debit = command.Amount, Credit = 0 },
                 new() { AccountCode = AccountCodes.ForPaymentMethod(command.Method), Debit = 0, Credit = command.Amount }
             };
             _accounting.Post(new JournalEntryRequest { SourceType = command.IsAdvance ? "EmployeeAdvance" : "EmployeePayment", SourceId = command.EmployeeId, Description = reason, Lines = lines }, command.PerformedBy, uow);
