@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
+using System.Drawing.Printing;
 using Guna.UI2.WinForms;
 using Microsoft.Data.Sqlite;
 using LiveChartsCore;
@@ -959,6 +960,111 @@ namespace Temo_Mobile_Store
             pnlContent.Controls.Add(pnlStockRow);
             pnlContent.Controls.Add(lblStockTitle);
             pnlContent.Controls.Add(flow);
+
+            // ---------- زرار طباعة ملخص اليوم (أعلى الداشبورد) ----------
+            Panel pnlPrintRow = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 44,
+                BackColor = ColorContentBg
+            };
+            Guna2Button btnPrintSummary = new Guna2Button
+            {
+                Text = "🖨️ طباعة ملخص اليوم",
+                Dock = DockStyle.Right,
+                Width = 190,
+                Height = 34,
+                FillColor = Color.White,
+                ForeColor = ColorTitleText,
+                BorderColor = Color.FromArgb(230, 232, 238),
+                BorderThickness = 1,
+                BorderRadius = 8,
+                Font = new Font("Segoe UI", 9F),
+                Margin = new Padding(0, 5, 0, 5)
+            };
+            btnPrintSummary.Click += (s, e) => PrintHomeDashboardSummary(
+                todaySales, todayPurchases, todayExpenses, todayProfit,
+                invoiceCount, maintenanceCount, methodBalances, totalBalance);
+            pnlPrintRow.Controls.Add(btnPrintSummary);
+            pnlContent.Controls.Add(pnlPrintRow);
+        }
+
+        // ==========================================================================
+        // طباعة/تصدير ملخص اليوم (نفس أسلوب GridPrintHelper: نافذة طباعة ويندوز العادية،
+        // المستخدم يختار طابعة حقيقية أو "Microsoft Print to PDF" لحفظه كـ PDF بدون أي مكتبة خارجية)
+        // ==========================================================================
+        private void PrintHomeDashboardSummary(
+            decimal todaySales, decimal todayPurchases, decimal todayExpenses, decimal todayProfit,
+            int invoiceCount, int maintenanceCount,
+            List<(string Method, decimal Balance)> methodBalances, decimal totalBalance)
+        {
+            PrintDocument pd = new PrintDocument();
+            pd.DefaultPageSettings.Landscape = false;
+
+            pd.PrintPage += (s, e) =>
+            {
+                Graphics g = e.Graphics;
+                float left = e.MarginBounds.Left;
+                float width = e.MarginBounds.Width;
+                float y = e.MarginBounds.Top;
+
+                Font fontTitle = new Font("Arial", 16, FontStyle.Bold);
+                Font fontDate = new Font("Arial", 9);
+                Font fontSectionTitle = new Font("Arial", 10.5F, FontStyle.Bold);
+                Font fontLabel = new Font("Arial", 10);
+                Font fontValue = new Font("Arial", 10, FontStyle.Bold);
+                Font fontFooter = new Font("Arial", 8);
+
+                StringFormat sfLeft = new StringFormat { Alignment = StringAlignment.Near };
+                StringFormat sfRight = new StringFormat { Alignment = StringAlignment.Far };
+
+                g.DrawString("ملخص يومي — Temo Mobile Store", fontTitle, Brushes.Black, new RectangleF(left, y, width, 30), new StringFormat { Alignment = StringAlignment.Center });
+                y += 32;
+                g.DrawString(DateTime.Now.ToString("yyyy-MM-dd"), fontDate, Brushes.Gray, new RectangleF(left, y, width, 18), new StringFormat { Alignment = StringAlignment.Center });
+                y += 30;
+                g.DrawLine(Pens.Black, left, y, left + width, y);
+                y += 15;
+
+                void DrawRow(string label, string value)
+                {
+                    g.DrawString(label, fontLabel, Brushes.Black, new RectangleF(left, y, width, 20), sfRight);
+                    g.DrawString(value, fontValue, Brushes.Black, new RectangleF(left, y, width, 20), sfLeft);
+                    y += 24;
+                }
+
+                DrawRow("إجمالي المبيعات", todaySales.ToString("N2") + " ج.م");
+                DrawRow("إجمالي المشتريات", todayPurchases.ToString("N2") + " ج.م");
+                DrawRow("إجمالي المصروفات", todayExpenses.ToString("N2") + " ج.م");
+                DrawRow("صافي الربح", todayProfit.ToString("N2") + " ج.م");
+                DrawRow("عدد الفواتير", invoiceCount.ToString());
+                DrawRow("طلبات الصيانة", maintenanceCount.ToString());
+
+                y += 10;
+                g.DrawLine(Pens.Black, left, y, left + width, y);
+                y += 15;
+                g.DrawString("أرصدة وسائل الدفع", fontSectionTitle, Brushes.Black, new RectangleF(left, y, width, 20), sfRight);
+                y += 26;
+
+                DrawRow("الإجمالي (كل الوسائل)", totalBalance.ToString("N2") + " ج.م");
+                foreach (var mb in methodBalances)
+                    DrawRow(mb.Method, mb.Balance.ToString("N2") + " ج.م");
+
+                y += 20;
+                g.DrawLine(Pens.Black, left, y, left + width, y);
+                y += 12;
+                g.DrawString("تاريخ الطباعة: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"), fontFooter, Brushes.Gray, new RectangleF(left, y, width, 16), new StringFormat { Alignment = StringAlignment.Center });
+
+                e.HasMorePages = false;
+            };
+
+            using (PrintDialog printDialog = new PrintDialog())
+            {
+                printDialog.Document = pd;
+                printDialog.AllowSomePages = false;
+                printDialog.UseEXDialog = true;
+                if (printDialog.ShowDialog(this) == DialogResult.OK)
+                    pd.Print();
+            }
         }
 
         // ==========================================================================
