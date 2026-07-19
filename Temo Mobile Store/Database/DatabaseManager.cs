@@ -293,6 +293,7 @@ namespace Temo_Mobile_Store.Database
                     (5400, "مرتبات"),
                     (5500, "تكلفة البضاعة المباعة"),
                     (5600, "فروق وتسويات المخزون"),
+                    (5700, "عجز وزيادة الخزينة"),
                 };
                 foreach (var acc in defaultAccounts)
                 {
@@ -313,6 +314,7 @@ namespace Temo_Mobile_Store.Database
                 EnsureCashMovementsLinkedMovementIdColumn(conn);
                 EnsureSalesPaymentMethodColumn(conn);
                 EnsureStoreSettingsCatalogSyncColumns(conn);
+                EnsureDailyClosuresAdjustmentMovementIdColumn(conn);
 
                 BackfillHistoricalJournalEntries(conn);
             }
@@ -756,6 +758,32 @@ namespace Temo_Mobile_Store.Database
 
             if (!columnExists)
                 ExecuteNonQuery(conn, "ALTER TABLE CashMovements ADD COLUMN LinkedMovementId INTEGER;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود AdjustmentMovementId لجدول DailyClosures - بيربط أي فرق عجز/زيادة
+        // اتسجل وقت الإقفال (فرق العدّ الفعلي عن المتوقع) بحركة الخزينة (CashMovements)
+        // اللي اتسجلت بيه القيد المحاسبي المقابل، عشان لو حد فتح اليوم تاني نقدر نلغي
+        // الحركة دي بالظبط (وتتعكس محاسبيًا) بدل ما نرجّع الرصيد يدويًا من غير أثر محاسبي.
+        // ==========================================================================
+        private static void EnsureDailyClosuresAdjustmentMovementIdColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(DailyClosures);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "AdjustmentMovementId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE DailyClosures ADD COLUMN AdjustmentMovementId INTEGER;");
         }
 
         // ==========================================================================

@@ -6,6 +6,8 @@ using System.Text;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
 using Microsoft.Data.Sqlite;
+using TemoStore.Core.Commands;
+using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
 {
@@ -708,14 +710,46 @@ namespace Temo_Mobile_Store
                 return;
             }
 
+            decimal currentBalance;
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = @Balance WHERE PaymentMethod = @Method", conn))
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn))
                 {
-                    cmd.Parameters.AddWithValue("@Balance", newBalance);
                     cmd.Parameters.AddWithValue("@Method", method);
-                    conn.Open();
-                    cmd.ExecuteNonQuery();
+                    var res = cmd.ExecuteScalar();
+                    currentBalance = (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
+                }
+            }
+
+            decimal delta = newBalance - currentBalance;
+            if (delta != 0)
+            {
+                try
+                {
+                    // أي تعديل يدوي للرصيد لازم يتسجل كحركة حقيقية (قبض/صرف) على حساب
+                    // "عجز وزيادة الخزينة" (5700) بدل تحديث الرصيد مباشرة من غير أثر محاسبي -
+                    // نفس مبدأ فرق الإقفال اليومي (BtnCloseDay_Click) - عشان ميفضلش فرق دائم
+                    // بين رصيد الخزينة الفعلي وميزان المراجعة المحسوب من دفتر اليومية.
+                    AppServices.CoreEngine.Execute(new AddMovementCommand
+                    {
+                        Type = delta > 0 ? "قبض" : "صرف",
+                        Method = method,
+                        Amount = Math.Abs(delta),
+                        AccountCode = 5700,
+                        Description = $"تعديل يدوي لرصيد \"{method}\"",
+                        PerformedBy = AuthManager.CurrentUsername
+                    });
+                }
+                catch (InsufficientBalanceException ex)
+                {
+                    MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("حصل خطأ أثناء تحديث الرصيد: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
             }
 
@@ -800,12 +834,38 @@ namespace Temo_Mobile_Store
                 string today = DateTime.Now.ToString("yyyy-MM-dd");
                 try
                 {
+                    // أي فرق بين المتوقع والفعلي (عجز أو زيادة) لازم يتسجل كحركة قبض/صرف حقيقية
+                    // على حساب "عجز وزيادة الخزينة" (5700) عن طريق محرك الحسابات - مش تحديث مباشر
+                    // للرصيد - عشان يفضل الرصيد الفعلي متسق مع ميزان المراجعة المحسوب من دفتر
+                    // اليومية. ده بيتنفذ الأول قبل أي تسجيل لسجل الإقفال نفسه، عشان لو فشل لأي
+                    // سبب (رصيد غير كافي مثلاً)ميتسجلش إقفال ناقص.
+                    var adjustmentMovementIds = new Dictionary<string, int?>();
+                    foreach (var method in AllPaymentMethods)
+                    {
+                        decimal actual = method == "نقدي" ? actualCash : denomForm.OtherMethodsActual[method];
+                        decimal expected = summaries[method].expectedClosing;
+                        decimal delta = actual - expected;
+
+                        if (delta == 0) { adjustmentMovementIds[method] = null; continue; }
+
+                        var result = AppServices.CoreEngine.Execute(new AddMovementCommand
+                        {
+                            Type = delta > 0 ? "قبض" : "صرف",
+                            Method = method,
+                            Amount = Math.Abs(delta),
+                            AccountCode = 5700,
+                            Description = $"فرق إقفال يومي ({today})",
+                            PerformedBy = AuthManager.CurrentUsername
+                        });
+                        adjustmentMovementIds[method] = result.MovementId;
+                    }
+
                     using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
                     {
                         conn.Open();
                         using (var transaction = conn.BeginTransaction())
                         {
-                            int cashClosureId = InsertClosureRow(conn, transaction, today, "نقدي", cashSummary, actualCash);
+                            int cashClosureId = InsertClosureRow(conn, transaction, today, "نقدي", cashSummary, actualCash, adjustmentMovementIds["نقدي"]);
 
                             foreach (var kvp in denomForm.DenominationCounts)
                             {
@@ -822,26 +882,11 @@ namespace Temo_Mobile_Store
                                 }
                             }
 
-                            using (SqliteCommand cmdUpdateBalance = new SqliteCommand(
-                                "UPDATE PaymentMethodBalances SET CurrentBalance = @Actual WHERE PaymentMethod = 'نقدي'", conn, transaction))
-                            {
-                                cmdUpdateBalance.Parameters.AddWithValue("@Actual", actualCash);
-                                cmdUpdateBalance.ExecuteNonQuery();
-                            }
-
                             foreach (var method in AllPaymentMethods)
                             {
                                 if (method == "نقدي") continue;
                                 decimal actual = denomForm.OtherMethodsActual[method];
-                                InsertClosureRow(conn, transaction, today, method, summaries[method], actual);
-
-                                using (SqliteCommand cmdUpdateOther = new SqliteCommand(
-                                    "UPDATE PaymentMethodBalances SET CurrentBalance = @Actual WHERE PaymentMethod = @Method", conn, transaction))
-                                {
-                                    cmdUpdateOther.Parameters.AddWithValue("@Actual", actual);
-                                    cmdUpdateOther.Parameters.AddWithValue("@Method", method);
-                                    cmdUpdateOther.ExecuteNonQuery();
-                                }
+                                InsertClosureRow(conn, transaction, today, method, summaries[method], actual, adjustmentMovementIds[method]);
                             }
 
                             transaction.Commit();
@@ -851,6 +896,10 @@ namespace Temo_Mobile_Store
                     MessageBox.Show("تم إقفال اليوم بنجاح لكل الوسائل وتسجيله في السجل. 🔒", "تم الإقفال", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     RefreshClosureSummary();
                 }
+                catch (InsufficientBalanceException ex)
+                {
+                    MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
                 catch (Exception ex)
                 {
                     MessageBox.Show("حدث خطأ أثناء الإقفال: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -859,12 +908,12 @@ namespace Temo_Mobile_Store
         }
 
         private int InsertClosureRow(SqliteConnection conn, SqliteTransaction transaction, string date, string method,
-            (decimal opening, decimal totalIn, decimal totalOut, decimal expectedClosing) summary, decimal actual)
+            (decimal opening, decimal totalIn, decimal totalOut, decimal expectedClosing) summary, decimal actual, int? adjustmentMovementId = null)
         {
             decimal difference = actual - summary.expectedClosing;
-            string insertClosure = @"INSERT INTO DailyClosures 
-                (ClosureDate, PaymentMethod, OpeningBalance, TotalIn, TotalOut, ExpectedClosingBalance, ActualClosingBalance, Difference, ClosedAt)
-                VALUES (@Date, @Method, @Opening, @TotalIn, @TotalOut, @Expected, @Actual, @Diff, @ClosedAt)";
+            string insertClosure = @"INSERT INTO DailyClosures
+                (ClosureDate, PaymentMethod, OpeningBalance, TotalIn, TotalOut, ExpectedClosingBalance, ActualClosingBalance, Difference, ClosedAt, AdjustmentMovementId)
+                VALUES (@Date, @Method, @Opening, @TotalIn, @TotalOut, @Expected, @Actual, @Diff, @ClosedAt, @AdjustmentMovementId)";
 
             using (SqliteCommand cmd = new SqliteCommand(insertClosure, conn, transaction))
             {
@@ -877,6 +926,7 @@ namespace Temo_Mobile_Store
                 cmd.Parameters.AddWithValue("@Actual", actual);
                 cmd.Parameters.AddWithValue("@Diff", difference);
                 cmd.Parameters.AddWithValue("@ClosedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.Parameters.AddWithValue("@AdjustmentMovementId", (object)adjustmentMovementId ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
             }
 
@@ -903,26 +953,48 @@ namespace Temo_Mobile_Store
                 return;
 
             string today = DateTime.Now.ToString("yyyy-MM-dd");
+            var closureRows = new List<(int id, string method, decimal expected, int? adjustmentMovementId)>();
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-
-                var closureRows = new List<(int id, string method, decimal expected)>();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Id, PaymentMethod, ExpectedClosingBalance FROM DailyClosures WHERE ClosureDate = @Date", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT Id, PaymentMethod, ExpectedClosingBalance, AdjustmentMovementId FROM DailyClosures WHERE ClosureDate = @Date", conn))
                 {
                     cmd.Parameters.AddWithValue("@Date", today);
                     using (SqliteDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
-                            closureRows.Add((Convert.ToInt32(reader["Id"]), reader["PaymentMethod"].ToString(), Convert.ToDecimal(reader["ExpectedClosingBalance"])));
+                            closureRows.Add((Convert.ToInt32(reader["Id"]), reader["PaymentMethod"].ToString(),
+                                Convert.ToDecimal(reader["ExpectedClosingBalance"]),
+                                reader["AdjustmentMovementId"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["AdjustmentMovementId"])));
                     }
                 }
+            }
 
-                if (closureRows.Count == 0)
+            if (closureRows.Count == 0)
+            {
+                MessageBox.Show("لم يتم العثور على إقفال اليوم.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            try
+            {
+                // إلغاء حركة فرق الإقفال (لو كانت موجودة) بيرجّع الرصيد للي كان عليه ويعكس
+                // القيد المحاسبي تلقائيًا (نفس آلية إلغاء أي حركة قبض/صرف عادية في الخزينة)
+                foreach (var row in closureRows)
                 {
-                    MessageBox.Show("لم يتم العثور على إقفال اليوم.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
+                    if (row.adjustmentMovementId.HasValue)
+                        AppServices.CoreEngine.Execute(new CancelMovementCommand { MovementId = row.adjustmentMovementId.Value, PerformedBy = AuthManager.CurrentUsername });
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("حدث خطأ أثناء التراجع عن فروق الإقفال: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
 
                 foreach (var row in closureRows)
                 {
@@ -932,6 +1004,8 @@ namespace Temo_Mobile_Store
                         cmd.ExecuteNonQuery();
                     }
 
+                    // تصحيح احترازي (يفضل بلا أي أثر لو الإلغاء فوق نجح صح، لأن الرصيد هيبقى
+                    // بالفعل مساوي للمتوقع بعد عكس حركة الفرق)
                     using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = @Balance WHERE PaymentMethod = @Method", conn))
                     {
                         cmd.Parameters.AddWithValue("@Balance", row.expected);
