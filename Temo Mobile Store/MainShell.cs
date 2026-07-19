@@ -9,7 +9,9 @@ using Microsoft.Data.Sqlite;
 using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.WinForms;
+using LiveChartsCore.SkiaSharpView.Painting;
 using LiveChartsCore.Measure;
+using SkiaSharp;
 
 namespace Temo_Mobile_Store
 {
@@ -931,11 +933,216 @@ namespace Temo_Mobile_Store
 
             // ترتيب الإضافة هنا مهم: صف الشارت (Top، ارتفاع ثابت) الأول، بعدين العنوان (Top)،
             // وأخيرًا صف الكروت (Top) عشان يفضل هو أقرب حاجة لحافة الشاشة العليا
+            // ---------- حالة المخزون (Donut Chart) ----------
+            Label lblStockTitle = new Label
+            {
+                Text = "📦 حالة المخزون",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                ForeColor = ColorTitleText,
+                AutoSize = true,
+                Dock = DockStyle.Top,
+                Padding = new Padding(0, 15, 0, 8)
+            };
+
+            Panel pnlStockRow = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 300,
+                BackColor = ColorContentBg
+            };
+            pnlStockRow.Controls.Add(CreateStockOverviewCard());
+
             pnlContent.Controls.Add(pnlChartRow);
             pnlContent.Controls.Add(lblChartTitle);
             pnlContent.Controls.Add(flowBalances);
             pnlContent.Controls.Add(lblBalancesTitle);
+            pnlContent.Controls.Add(pnlStockRow);
+            pnlContent.Controls.Add(lblStockTitle);
             pnlContent.Controls.Add(flow);
+        }
+
+        // ==========================================================================
+        // جلب أعداد الأصناف حسب حالة المخزون: متوفر / كمية قليلة / نفدت
+        // نفس عتبة "كمية قليلة" المستخدمة في نظام الإشعارات (GetNotificationItems: Quantity <= 3)
+        // عشان الرقم يفضل متسق في كل مكان في البرنامج
+        // ==========================================================================
+        private (int InStock, int LowStock, int OutOfStock, int Total) GetStockOverviewData()
+        {
+            int inStock = 0, lowStock = 0, outOfStock = 0;
+            try
+            {
+                using (SqliteConnection conn = OpenConnection())
+                using (SqliteCommand cmd = new SqliteCommand(@"
+                    SELECT
+                        SUM(CASE WHEN Quantity > 3 THEN 1 ELSE 0 END) AS InStock,
+                        SUM(CASE WHEN Quantity BETWEEN 1 AND 3 THEN 1 ELSE 0 END) AS LowStock,
+                        SUM(CASE WHEN Quantity <= 0 THEN 1 ELSE 0 END) AS OutOfStock
+                    FROM Products", conn))
+                using (SqliteDataReader reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        inStock = reader["InStock"] != DBNull.Value ? Convert.ToInt32(reader["InStock"]) : 0;
+                        lowStock = reader["LowStock"] != DBNull.Value ? Convert.ToInt32(reader["LowStock"]) : 0;
+                        outOfStock = reader["OutOfStock"] != DBNull.Value ? Convert.ToInt32(reader["OutOfStock"]) : 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("حصل خطأ أثناء تحميل بيانات حالة المخزون: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            return (inStock, lowStock, outOfStock, inStock + lowStock + outOfStock);
+        }
+
+        // ==========================================================================
+        // كارت "حالة المخزون": Donut Chart بثلاث حالات + نسبة مئوية لكل حالة + الإجمالي في النص
+        // ==========================================================================
+        private Guna2Panel CreateStockOverviewCard()
+        {
+            var stock = GetStockOverviewData();
+
+            Guna2Panel card = new Guna2Panel
+            {
+                Dock = DockStyle.Right,
+                Width = 320,
+                FillColor = Color.White,
+                BorderRadius = 14,
+                BorderColor = Color.FromArgb(230, 232, 238),
+                BorderThickness = 1,
+                Margin = new Padding(0, 0, 0, 0)
+            };
+
+            Color colorInStock = Color.FromArgb(39, 174, 96);
+            Color colorLowStock = Color.FromArgb(243, 156, 18);
+            Color colorOutOfStock = Color.FromArgb(192, 57, 43);
+
+            if (stock.Total == 0)
+            {
+                Label lblEmpty = new Label
+                {
+                    Text = "لا يوجد أصناف مسجّلة في المخزون بعد.",
+                    Location = new Point(15, 15),
+                    AutoSize = true,
+                    ForeColor = Color.FromArgb(85, 92, 102),
+                    Font = new Font("Segoe UI", 8.5F)
+                };
+                card.Controls.Add(lblEmpty);
+                return card;
+            }
+
+            // ---------- الدونات نفسه ----------
+            Panel pnlChartHolder = new Panel
+            {
+                Location = new Point(70, 15),
+                Size = new Size(180, 180),
+                BackColor = Color.Transparent
+            };
+
+            PieChart pieChart = new PieChart
+            {
+                Dock = DockStyle.Fill,
+                LegendPosition = LegendPosition.Hidden,
+                TooltipPosition = TooltipPosition.Hidden,
+                InitialRotation = -90,
+                Series = new ISeries[]
+                {
+                    new PieSeries<double>
+                    {
+                        Values = new double[] { stock.InStock },
+                        Name = "متوفر",
+                        Fill = new SolidColorPaint(new SKColor(colorInStock.R, colorInStock.G, colorInStock.B)),
+                        InnerRadius = 55
+                    },
+                    new PieSeries<double>
+                    {
+                        Values = new double[] { stock.LowStock },
+                        Name = "كمية قليلة",
+                        Fill = new SolidColorPaint(new SKColor(colorLowStock.R, colorLowStock.G, colorLowStock.B)),
+                        InnerRadius = 55
+                    },
+                    new PieSeries<double>
+                    {
+                        Values = new double[] { stock.OutOfStock },
+                        Name = "نفدت",
+                        Fill = new SolidColorPaint(new SKColor(colorOutOfStock.R, colorOutOfStock.G, colorOutOfStock.B)),
+                        InnerRadius = 55
+                    }
+                }
+            };
+            pnlChartHolder.Controls.Add(pieChart);
+
+            // ---------- إجمالي عدد الأصناف في نص الدونات (فوق الشارت مباشرة) ----------
+            Label lblCenterTotal = new Label
+            {
+                Text = stock.Total.ToString(),
+                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
+                ForeColor = ColorTitleText,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(90, 30),
+                Location = new Point(45, 70),
+                BackColor = Color.Transparent
+            };
+            Label lblCenterCaption = new Label
+            {
+                Text = "إجمالي الأصناف",
+                Font = new Font("Segoe UI", 7.5F),
+                ForeColor = Color.FromArgb(85, 92, 102),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(90, 16),
+                Location = new Point(45, 100),
+                BackColor = Color.Transparent
+            };
+            pnlChartHolder.Controls.Add(lblCenterTotal);
+            pnlChartHolder.Controls.Add(lblCenterCaption);
+            lblCenterTotal.BringToFront();
+            lblCenterCaption.BringToFront();
+
+            card.Controls.Add(pnlChartHolder);
+
+            // ---------- Legend مع العدد والنسبة المئوية ----------
+            var legendRows = new (string Label, int Count, Color LegendColor)[]
+            {
+                ("متوفر", stock.InStock, colorInStock),
+                ("كمية قليلة", stock.LowStock, colorLowStock),
+                ("نفدت", stock.OutOfStock, colorOutOfStock)
+            };
+
+            int legendY = 205;
+            foreach (var row in legendRows)
+            {
+                double pct = stock.Total > 0 ? (row.Count * 100.0 / stock.Total) : 0;
+
+                Guna2Panel dot = new Guna2Panel
+                {
+                    FillColor = row.LegendColor,
+                    BorderRadius = 5,
+                    Location = new Point(20, legendY + 3),
+                    Size = new Size(10, 10)
+                };
+                Label lblName = new Label
+                {
+                    Text = row.Label,
+                    Font = new Font("Segoe UI", 9F),
+                    ForeColor = ColorTitleText,
+                    AutoSize = true,
+                    Location = new Point(38, legendY)
+                };
+                Label lblCountPct = new Label
+                {
+                    Text = $"{row.Count} صنف ({pct:N0}%)",
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(85, 92, 102),
+                    AutoSize = true,
+                    Location = new Point(180, legendY)
+                };
+                card.Controls.Add(dot);
+                card.Controls.Add(lblName);
+                card.Controls.Add(lblCountPct);
+                legendY += 26;
+            }
+
+            return card;
         }
 
         // ==========================================================================
