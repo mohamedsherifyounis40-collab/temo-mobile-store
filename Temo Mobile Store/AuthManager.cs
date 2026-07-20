@@ -44,7 +44,7 @@ namespace Temo_Mobile_Store
                             cmdInsert.Parameters.AddWithValue("@P", HashPassword("admin123"));
                             cmdInsert.Parameters.AddWithValue("@R", "Admin");
                             cmdInsert.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                            cmdInsert.ExecuteNonQuery();
+                            cmdInsert.ExecuteNonQuery();    
                         }
                     }
                 }
