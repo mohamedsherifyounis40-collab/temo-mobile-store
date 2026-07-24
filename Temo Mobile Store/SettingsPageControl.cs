@@ -27,6 +27,7 @@ namespace Temo_Mobile_Store
         private string CurrentStorePhone = "";
         private string CurrentStoreAddress = "";
         private byte[] CurrentStoreLogo = null;
+        private string CurrentStoreWhatsApp = "";
 
         private string BackupFolderPath => BackupManager.BackupFolderPath;
 
@@ -35,7 +36,7 @@ namespace Temo_Mobile_Store
 
         // ---------- إعدادات المحل ----------
         private PictureBox picStoreLogo;
-        private Guna2TextBox txtSettingsStoreName, txtSettingsPhone, txtSettingsAddress;
+        private Guna2TextBox txtSettingsStoreName, txtSettingsPhone, txtSettingsWhatsApp, txtSettingsAddress;
         private Guna2TextBox txtCatalogSyncUrl, txtCatalogSyncSecret;
         private CheckBox chkCatalogSyncEnabled;
         private Label lblCatalogSyncStatus;
@@ -70,7 +71,7 @@ namespace Temo_Mobile_Store
             cmbSettingsViewType.Items.AddRange(new string[] { "إعدادات المحل ⚙️", "النسخ الاحتياطي 💾", "إدارة المستخدمين 👤" });
             cmbSettingsViewType.SelectedIndexChanged += CmbSettingsViewType_SelectedIndexChanged;
 
-            pnlStoreSettings = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 650) };
+            pnlStoreSettings = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 700), AutoScroll = true };
             pnlBackup = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 650) };
             pnlUsers = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 650) };
 
@@ -110,7 +111,7 @@ namespace Temo_Mobile_Store
             btnRemoveLogo.Click += BtnRemoveLogo_Click;
             gbLogo.Controls.AddRange(new Control[] { lblLogoTitle, picStoreLogo, btnUploadLogo, btnRemoveLogo });
 
-            Guna2Panel gbInfo = new Guna2Panel() { Location = new Point(280, 0), Size = new Size(440, 280), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbInfo = new Guna2Panel() { Location = new Point(280, 0), Size = new Size(440, 360), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblInfoTitle = new Label() { Text = "⚙️ بيانات المحل", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblStoreName = new Label() { Text = "اسم المحل:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -119,23 +120,26 @@ namespace Temo_Mobile_Store
             Label lblPhone = new Label() { Text = "رقم التليفون:", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtSettingsPhone = new Guna2TextBox() { Location = new Point(20, 128), Width = 400, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Label lblAddress = new Label() { Text = "العنوان:", Location = new Point(20, 166), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtSettingsAddress = new Guna2TextBox() { Location = new Point(20, 186), Width = 400, Height = 55, Multiline = true, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            Label lblWhatsApp = new Label() { Text = "رقم الواتساب:", Location = new Point(20, 166), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtSettingsWhatsApp = new Guna2TextBox() { Location = new Point(20, 186), Width = 400, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), PlaceholderText = "لو مختلف عن رقم التليفون" };
 
-            Guna2Button btnSaveStoreSettings = new Guna2Button() { Text = "حفظ الإعدادات 💾", Location = new Point(20, 232), Width = 400, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
+            Label lblAddress = new Label() { Text = "العنوان:", Location = new Point(20, 224), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtSettingsAddress = new Guna2TextBox() { Location = new Point(20, 244), Width = 400, Height = 55, Multiline = true, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+
+            Guna2Button btnSaveStoreSettings = new Guna2Button() { Text = "حفظ الإعدادات 💾", Location = new Point(20, 306), Width = 400, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
             btnSaveStoreSettings.Click += BtnSaveStoreSettings_Click;
 
-            gbInfo.Controls.AddRange(new Control[] { lblInfoTitle, lblStoreName, txtSettingsStoreName, lblPhone, txtSettingsPhone, lblAddress, txtSettingsAddress, btnSaveStoreSettings });
+            gbInfo.Controls.AddRange(new Control[] { lblInfoTitle, lblStoreName, txtSettingsStoreName, lblPhone, txtSettingsPhone, lblWhatsApp, txtSettingsWhatsApp, lblAddress, txtSettingsAddress, btnSaveStoreSettings });
 
             Label lblNote = new Label()
             {
-                Text = "ℹ️ البيانات دي هتظهر تلقائيًا في رأس فاتورة البيع المطبوعة (اسم المحل، التليفون، العنوان).",
-                Location = new Point(0, 295),
+                Text = "ℹ️ البيانات دي هتظهر تلقائيًا في رأس وذيل فاتورة البيع المطبوعة (اسم المحل، التليفون، الواتساب، العنوان، الشعار).",
+                Location = new Point(0, 375),
                 Size = new Size(720, 40),
                 ForeColor = Color.FromArgb(85, 92, 102)
             };
 
-            Guna2Panel gbCatalogSync = new Guna2Panel() { Location = new Point(0, 345), Size = new Size(1080, 235), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbCatalogSync = new Guna2Panel() { Location = new Point(0, 425), Size = new Size(1080, 235), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblSyncTitle = new Label() { Text = "🌐 مزامنة موقع الكتالوج", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             Label lblSyncNote = new Label()
             {
@@ -166,6 +170,7 @@ namespace Temo_Mobile_Store
             LoadStoreSettingsIntoMemory();
             txtSettingsStoreName.Text = CurrentStoreName;
             txtSettingsPhone.Text = CurrentStorePhone;
+            txtSettingsWhatsApp.Text = CurrentStoreWhatsApp;
             txtSettingsAddress.Text = CurrentStoreAddress;
             RefreshLogoPreview();
             LoadCatalogSyncSettingsIntoUI();
@@ -216,7 +221,7 @@ namespace Temo_Mobile_Store
 
         private void LoadStoreSettingsIntoMemory()
         {
-            UIHelpers.LoadStoreSettings(out CurrentStoreName, out CurrentStorePhone, out CurrentStoreAddress, out CurrentStoreLogo);
+            UIHelpers.LoadStoreSettings(out CurrentStoreName, out CurrentStorePhone, out CurrentStoreAddress, out CurrentStoreLogo, out CurrentStoreWhatsApp);
         }
 
         private void RefreshLogoPreview()
@@ -282,7 +287,7 @@ namespace Temo_Mobile_Store
 
             try
             {
-                SettingsRepository.SaveStoreSettings(txtSettingsStoreName.Text.Trim(), txtSettingsPhone.Text.Trim(), txtSettingsAddress.Text.Trim(), CurrentStoreLogo);
+                SettingsRepository.SaveStoreSettings(txtSettingsStoreName.Text.Trim(), txtSettingsPhone.Text.Trim(), txtSettingsAddress.Text.Trim(), CurrentStoreLogo, txtSettingsWhatsApp.Text.Trim());
 
                 LoadStoreSettingsIntoMemory();
                 MessageBox.Show("تم حفظ إعدادات المحل بنجاح ✅", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);

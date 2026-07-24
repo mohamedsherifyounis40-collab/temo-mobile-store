@@ -19,17 +19,18 @@ namespace Temo_Mobile_Store
     // ==========================================================================
     public static class SettingsRepository
     {
-        public static void SaveStoreSettings(string name, string phone, string address, byte[] logo)
+        public static void SaveStoreSettings(string name, string phone, string address, byte[] logo, string whatsApp)
         {
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("UPDATE StoreSettings SET StoreName = @Name, Phone = @Phone, Address = @Address, LogoImage = @Logo WHERE Id = 1;", conn))
+                using (SqliteCommand cmd = new SqliteCommand("UPDATE StoreSettings SET StoreName = @Name, Phone = @Phone, Address = @Address, LogoImage = @Logo, WhatsAppNumber = @WhatsApp WHERE Id = 1;", conn))
                 {
                     cmd.Parameters.AddWithValue("@Name", name);
                     cmd.Parameters.AddWithValue("@Phone", phone);
                     cmd.Parameters.AddWithValue("@Address", address);
                     cmd.Parameters.AddWithValue("@Logo", (object)logo ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@WhatsApp", (object)whatsApp ?? DBNull.Value);
                     cmd.ExecuteNonQuery();
                 }
             }

@@ -68,8 +68,8 @@ namespace TemoStore.Core.Abstractions
 
     public interface IEmployeeRepository
     {
-        void Add(string fullName, string? phone, decimal monthlySalary, DateTime hireDate);
-        void Update(int employeeId, string fullName, string? phone, decimal monthlySalary, DateTime hireDate);
+        void Add(string fullName, string? phone, decimal monthlySalary, decimal standardHoursPerDay, DateTime hireDate);
+        void Update(int employeeId, string fullName, string? phone, decimal monthlySalary, decimal standardHoursPerDay, DateTime hireDate);
         void Delete(int employeeId);
         IReadOnlyList<EmployeeRecord> GetAll();
     }
@@ -77,12 +77,14 @@ namespace TemoStore.Core.Abstractions
     // حضور الموظفين وقفل/فتح كشف الرواتب الشهري - نفس معادلة الراتب الموجودة في
     // AttendancePageControl/AttendanceRepository القديمة: قيمة اليوم = المرتب ÷ عدد
     // أيام الشهر، والراتب الصافي = قيمة اليوم × (أيام الحضور + أيام الإجازة المدفوعة)
+    // + قيمة الساعات الإضافية (قيمة الساعة × 1.5 لكل ساعة إضافية، قيمة الساعة = قيمة اليوم
+    // ÷ ساعات العمل القياسية في اليوم بتاعة الموظف)
     public interface IAttendanceRepository
     {
-        void UpsertStatus(int employeeId, DateTime date, string status);
+        void UpsertStatus(int employeeId, DateTime date, string status, decimal overtimeHours);
         bool IsMonthClosed(int employeeId, int year, int month);
-        (int Present, int Absent, int Leave) GetAttendanceCounts(int employeeId, int year, int month);
-        void InsertClosure(int employeeId, int year, int month, decimal monthlySalary, decimal dayValue, int presentDays, int absentDays, int leaveDays, decimal netSalary);
+        (int Present, int Absent, int Leave, decimal OvertimeHours) GetAttendanceCounts(int employeeId, int year, int month);
+        void InsertClosure(int employeeId, int year, int month, decimal monthlySalary, decimal dayValue, int presentDays, int absentDays, int leaveDays, decimal overtimeHours, decimal overtimeAmount, decimal netSalary);
         int DeleteClosuresForMonth(int year, int month);
         void DeleteAttendanceForEmployee(int employeeId);
         decimal GetEmployeeBalance(int employeeId);

@@ -41,7 +41,7 @@ namespace Temo_Mobile_Store
         private DataGridView dgvEmployeeStatement;
 
         // ---------- إدارة الموظفين ----------
-        private Guna2TextBox txtEmployeeName, txtEmployeePhone, txtEmployeeSalary;
+        private Guna2TextBox txtEmployeeName, txtEmployeePhone, txtEmployeeSalary, txtEmployeeHours;
         private DateTimePicker dtpEmployeeHireDate;
         private Guna2Button btnSaveEmployeeEdit;
         private DataGridView dgvEmployees;
@@ -164,8 +164,11 @@ namespace Temo_Mobile_Store
                     string status = dr["الحالة"]?.ToString();
                     if (string.IsNullOrEmpty(status)) continue;
 
+                    if (!decimal.TryParse(dr["ساعات إضافية"]?.ToString(), out decimal overtimeHours) || overtimeHours < 0)
+                        overtimeHours = 0;
+
                     int employeeId = Convert.ToInt32(dr["EmployeeId"]);
-                    AppServices.CoreEngine.Execute(new SetAttendanceStatusCommand { EmployeeId = employeeId, Date = dtpAttendanceDate.Value.Date, Status = status, PerformedBy = AuthManager.CurrentUsername });
+                    AppServices.CoreEngine.Execute(new SetAttendanceStatusCommand { EmployeeId = employeeId, Date = dtpAttendanceDate.Value.Date, Status = status, OvertimeHours = overtimeHours, PerformedBy = AuthManager.CurrentUsername });
                     savedCount++;
                 }
             }
@@ -227,19 +230,23 @@ namespace Temo_Mobile_Store
                 var rows = AttendanceRepository.GetPayrollForMonth(dtpPayrollMonth.Value.Year, dtpPayrollMonth.Value.Month);
 
                 DataTable dt = new DataTable();
-                dt.Columns.AddRange(new DataColumn[] { new DataColumn("الاسم"), new DataColumn("المرتب الشهري"), new DataColumn("قيمة اليوم"),
-                    new DataColumn("أيام الحضور"), new DataColumn("أيام الغياب"), new DataColumn("أيام الإجازة"), new DataColumn("الراتب الصافي"), new DataColumn("الحالة") });
+                dt.Columns.AddRange(new DataColumn[] { new DataColumn("الاسم"), new DataColumn("المرتب الشهري"), new DataColumn("قيمة اليوم"), new DataColumn("قيمة الساعة"),
+                    new DataColumn("أيام الحضور"), new DataColumn("أيام الغياب"), new DataColumn("أيام الإجازة"),
+                    new DataColumn("ساعات إضافية"), new DataColumn("قيمة الإضافي"), new DataColumn("الراتب الصافي"), new DataColumn("الحالة") });
 
-                decimal totalNet = 0;
+                decimal totalNet = 0, totalOvertime = 0;
                 foreach (var r in rows)
                 {
-                    dt.Rows.Add(r.FullName, r.MonthlySalary.ToString("N2"), r.DayValue.ToString("N2"), r.PresentDays, r.AbsentDays, r.LeaveDays,
+                    dt.Rows.Add(r.FullName, r.MonthlySalary.ToString("N2"), r.DayValue.ToString("N2"), r.HourValue.ToString("N2"),
+                        r.PresentDays, r.AbsentDays, r.LeaveDays,
+                        r.OvertimeHours.ToString("N2"), r.OvertimeAmount.ToString("N2"),
                         r.NetSalary.ToString("N2"), r.IsClosed ? "مقفول 🔒" : "مفتوح");
                     totalNet += r.NetSalary;
+                    totalOvertime += r.OvertimeAmount;
                 }
 
                 dgvPayroll.DataSource = dt;
-                lblPayrollTotals.Text = $"💰 إجمالي صافي الرواتب لشهر {dtpPayrollMonth.Value:MMMM yyyy}: {totalNet:N2} ج.م";
+                lblPayrollTotals.Text = $"💰 إجمالي صافي الرواتب لشهر {dtpPayrollMonth.Value:MMMM yyyy}: {totalNet:N2} ج.م  (منها {totalOvertime:N2} ج.م ساعات إضافية)";
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
@@ -458,7 +465,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildEmployeesPanel()
         {
-            Guna2Panel gbEmployee = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 340), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbEmployee = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 398), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblTitle = new Label() { Text = "🧑‍💼 إضافة / تعديل موظف", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblName = new Label() { Text = "الاسم:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -470,15 +477,18 @@ namespace Temo_Mobile_Store
             Label lblSalary = new Label() { Text = "المرتب الشهري:", Location = new Point(20, 166), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtEmployeeSalary = new Guna2TextBox() { Location = new Point(20, 186), Width = 240, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Label lblHireDate = new Label() { Text = "تاريخ التعيين:", Location = new Point(20, 224), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            dtpEmployeeHireDate = new DateTimePicker() { Location = new Point(20, 244), Width = 240, Format = DateTimePickerFormat.Short, Value = DateTime.Now };
+            Label lblHours = new Label() { Text = "ساعات العمل باليوم:", Location = new Point(20, 224), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtEmployeeHours = new Guna2TextBox() { Location = new Point(20, 244), Width = 240, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), Text = "8" };
 
-            Guna2Button btnAddEmployee = new Guna2Button() { Text = "إضافة موظف جديد ✅", Location = new Point(20, 278), Width = 240, Height = 34, FillColor = ColorSuccess, BorderRadius = 9 };
+            Label lblHireDate = new Label() { Text = "تاريخ التعيين:", Location = new Point(20, 282), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            dtpEmployeeHireDate = new DateTimePicker() { Location = new Point(20, 302), Width = 240, Format = DateTimePickerFormat.Short, Value = DateTime.Now };
+
+            Guna2Button btnAddEmployee = new Guna2Button() { Text = "إضافة موظف جديد ✅", Location = new Point(20, 350), Width = 240, Height = 34, FillColor = ColorSuccess, BorderRadius = 9 };
             btnAddEmployee.Click += BtnAddEmployee_Click;
 
-            gbEmployee.Controls.AddRange(new Control[] { lblTitle, lblName, txtEmployeeName, lblPhone, txtEmployeePhone, lblSalary, txtEmployeeSalary, lblHireDate, dtpEmployeeHireDate, btnAddEmployee });
+            gbEmployee.Controls.AddRange(new Control[] { lblTitle, lblName, txtEmployeeName, lblPhone, txtEmployeePhone, lblSalary, txtEmployeeSalary, lblHours, txtEmployeeHours, lblHireDate, dtpEmployeeHireDate, btnAddEmployee });
 
-            Guna2Panel gbEmployeeActions = new Guna2Panel() { Location = new Point(0, 355), Size = new Size(280, 110), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbEmployeeActions = new Guna2Panel() { Location = new Point(0, 413), Size = new Size(280, 110), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             btnSaveEmployeeEdit = new Guna2Button() { Text = "حفظ التعديل 💾", Location = new Point(20, 18), Width = 240, Height = 32, FillColor = ColorWarning, Enabled = false, BorderRadius = 9 };
             btnSaveEmployeeEdit.Click += BtnSaveEmployeeEdit_Click;
 
@@ -517,14 +527,16 @@ namespace Temo_Mobile_Store
             txtEmployeeName.Text = row.Cells["الاسم"].Value?.ToString();
             txtEmployeePhone.Text = row.Cells["الهاتف"].Value?.ToString();
             txtEmployeeSalary.Text = row.Cells["المرتب الشهري"].Value?.ToString();
+            txtEmployeeHours.Text = row.Cells["ساعات العمل باليوم"].Value?.ToString();
             if (DateTime.TryParse(row.Cells["تاريخ التعيين"].Value?.ToString(), out DateTime hireDate))
                 dtpEmployeeHireDate.Value = hireDate;
             btnSaveEmployeeEdit.Enabled = true;
         }
 
-        private bool ValidateEmployeeInputs(out decimal salary)
+        private bool ValidateEmployeeInputs(out decimal salary, out decimal standardHours)
         {
             salary = 0;
+            standardHours = 0;
             if (string.IsNullOrWhiteSpace(txtEmployeeName.Text))
             {
                 MessageBox.Show("من فضلك أدخل اسم الموظف.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -535,16 +547,21 @@ namespace Temo_Mobile_Store
                 MessageBox.Show("من فضلك أدخل مرتب شهري صحيح.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
+            if (!decimal.TryParse(txtEmployeeHours.Text, out standardHours) || standardHours <= 0)
+            {
+                MessageBox.Show("من فضلك أدخل عدد ساعات عمل قياسية في اليوم أكبر من صفر.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
             return true;
         }
 
         private void BtnAddEmployee_Click(object sender, EventArgs e)
         {
-            if (!ValidateEmployeeInputs(out decimal salary)) return;
+            if (!ValidateEmployeeInputs(out decimal salary, out decimal standardHours)) return;
 
             try
             {
-                AppServices.CoreEngine.Execute(new AddEmployeeCommand { FullName = txtEmployeeName.Text.Trim(), Phone = string.IsNullOrWhiteSpace(txtEmployeePhone.Text) ? null : txtEmployeePhone.Text.Trim(), MonthlySalary = salary, HireDate = dtpEmployeeHireDate.Value.Date, PerformedBy = AuthManager.CurrentUsername });
+                AppServices.CoreEngine.Execute(new AddEmployeeCommand { FullName = txtEmployeeName.Text.Trim(), Phone = string.IsNullOrWhiteSpace(txtEmployeePhone.Text) ? null : txtEmployeePhone.Text.Trim(), MonthlySalary = salary, StandardHoursPerDay = standardHours, HireDate = dtpEmployeeHireDate.Value.Date, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
@@ -558,11 +575,11 @@ namespace Temo_Mobile_Store
         private void BtnSaveEmployeeEdit_Click(object sender, EventArgs e)
         {
             if (selectedEmployeeId == -1) return;
-            if (!ValidateEmployeeInputs(out decimal salary)) return;
+            if (!ValidateEmployeeInputs(out decimal salary, out decimal standardHours)) return;
 
             try
             {
-                AppServices.CoreEngine.Execute(new UpdateEmployeeCommand { EmployeeId = selectedEmployeeId, FullName = txtEmployeeName.Text.Trim(), Phone = string.IsNullOrWhiteSpace(txtEmployeePhone.Text) ? null : txtEmployeePhone.Text.Trim(), MonthlySalary = salary, HireDate = dtpEmployeeHireDate.Value.Date, PerformedBy = AuthManager.CurrentUsername });
+                AppServices.CoreEngine.Execute(new UpdateEmployeeCommand { EmployeeId = selectedEmployeeId, FullName = txtEmployeeName.Text.Trim(), Phone = string.IsNullOrWhiteSpace(txtEmployeePhone.Text) ? null : txtEmployeePhone.Text.Trim(), MonthlySalary = salary, StandardHoursPerDay = standardHours, HireDate = dtpEmployeeHireDate.Value.Date, PerformedBy = AuthManager.CurrentUsername });
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); return; }
 
@@ -609,6 +626,7 @@ namespace Temo_Mobile_Store
             txtEmployeeName.Clear();
             txtEmployeePhone.Clear();
             txtEmployeeSalary.Clear();
+            txtEmployeeHours.Text = "8";
             dtpEmployeeHireDate.Value = DateTime.Now;
             btnSaveEmployeeEdit.Enabled = false;
         }

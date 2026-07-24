@@ -13,6 +13,25 @@ namespace Temo_Mobile_Store
         public bool IsSerialized;
     }
 
+    // بيانات كاملة لآخر عملية بيع - مستخدمة في طباعة إيصال العميل (كل حقل مربوط ببيانات حقيقية)
+    public class ReceiptData
+    {
+        public int SaleId;
+        public int DailyInvoiceNumber;
+        public string Barcode;
+        public string ProductName;
+        public decimal UnitPrice;
+        public int Quantity;
+        public decimal Total;
+        public string PaymentType;   // Cash / Credit
+        public string PaymentMethod; // نقدي/فوري/... (لو كاش)
+        public string SaleDate;
+        public string IMEI;
+        public string CustomerName;
+        public string CustomerPhone;
+        public string CashierName;
+    }
+
     public class SaleRecord
     {
         public int SaleId;
@@ -175,6 +194,48 @@ namespace Temo_Mobile_Store
                         reader["Phone"] != DBNull.Value ? reader["Phone"].ToString() : null,
                         reader["CustomerName"] != DBNull.Value ? reader["CustomerName"].ToString() : null
                     );
+                }
+            }
+        }
+
+        // آخر عملية بيع بكل تفاصيلها (منتج/IMEI/دفع/عميل/كاشير) - مستخدمة في تصميم إيصال الطباعة الجديد.
+        // اسم الكاشير مش متخزن على صف Sales نفسه، بيتجاب من قيد اليومية اللي اترحل وقت البيع
+        // (JournalEntries.SourceType='Sale' AND SourceId=SaleId) - نفس القيد اللي بيسجله الـAccountingEngine.
+        public static ReceiptData GetLastSaleForReceipt()
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand(@"
+                    SELECT S.SaleID, S.Barcode, S.ProductName, S.Price, S.QuantitySold, S.Total,
+                           S.PaymentType, S.PaymentMethod, S.SaleDate, S.IMEI, C.CustomerName, C.Phone,
+                           (SELECT CreatedBy FROM JournalEntries WHERE SourceType = 'Sale' AND SourceId = S.SaleID ORDER BY JournalEntryId LIMIT 1) AS CashierName
+                    FROM Sales S
+                    LEFT JOIN Customers C ON S.CustomerId = C.CustomerId
+                    ORDER BY S.SaleID DESC LIMIT 1;", conn))
+                using (SqliteDataReader reader = cmd.ExecuteReader())
+                {
+                    if (!reader.Read()) return null;
+
+                    var receipt = new ReceiptData
+                    {
+                        SaleId = Convert.ToInt32(reader["SaleID"]),
+                        Barcode = reader["Barcode"] == DBNull.Value ? null : reader["Barcode"].ToString(),
+                        ProductName = reader["ProductName"].ToString(),
+                        UnitPrice = Convert.ToDecimal(reader["Price"]),
+                        Quantity = Convert.ToInt32(reader["QuantitySold"]),
+                        Total = Convert.ToDecimal(reader["Total"]),
+                        PaymentType = reader["PaymentType"] == DBNull.Value ? null : reader["PaymentType"].ToString(),
+                        PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
+                        SaleDate = reader["SaleDate"].ToString(),
+                        IMEI = reader["IMEI"] == DBNull.Value ? null : reader["IMEI"].ToString(),
+                        CustomerName = reader["CustomerName"] == DBNull.Value ? null : reader["CustomerName"].ToString(),
+                        CustomerPhone = reader["Phone"] == DBNull.Value ? null : reader["Phone"].ToString(),
+                        CashierName = reader["CashierName"] == DBNull.Value ? null : reader["CashierName"].ToString(),
+                    };
+
+                    receipt.DailyInvoiceNumber = GetDailyInvoiceNumber(receipt.SaleId, receipt.SaleDate);
+                    return receipt;
                 }
             }
         }

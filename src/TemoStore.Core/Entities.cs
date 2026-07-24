@@ -78,6 +78,7 @@ namespace TemoStore.Core.Entities
         public int EmployeeId { get; set; }
         public string FullName { get; set; } = "";
         public decimal MonthlySalary { get; set; }
+        public decimal StandardHoursPerDay { get; set; }
     }
 
     public class JournalLineRequest

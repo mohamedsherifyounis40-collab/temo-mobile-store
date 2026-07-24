@@ -22,18 +22,18 @@ namespace Temo_Mobile_Store
         {
             DataTable dt = new DataTable();
             dt.Columns.AddRange(new DataColumn[] { new DataColumn("EmployeeId"), new DataColumn("الاسم"), new DataColumn("الهاتف"),
-                new DataColumn("المرتب الشهري"), new DataColumn("تاريخ التعيين") });
+                new DataColumn("المرتب الشهري"), new DataColumn("ساعات العمل باليوم"), new DataColumn("تاريخ التعيين") });
 
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT EmployeeId, FullName, Phone, MonthlySalary, HireDate FROM Employees ORDER BY FullName", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT EmployeeId, FullName, Phone, MonthlySalary, StandardHoursPerDay, HireDate FROM Employees ORDER BY FullName", conn))
                 using (SqliteDataReader reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
                         dt.Rows.Add(reader["EmployeeId"], reader["FullName"], reader["Phone"] == DBNull.Value ? "" : reader["Phone"],
-                            Convert.ToDecimal(reader["MonthlySalary"]).ToString("N2"), reader["HireDate"]);
+                            Convert.ToDecimal(reader["MonthlySalary"]).ToString("N2"), Convert.ToDecimal(reader["StandardHoursPerDay"]).ToString("N2"), reader["HireDate"]);
                     }
                 }
             }
@@ -86,14 +86,14 @@ namespace Temo_Mobile_Store
         public static DataTable GetAttendanceForDate(DateTime date)
         {
             DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("EmployeeId"), new DataColumn("الاسم"), new DataColumn("الحالة") });
+            dt.Columns.AddRange(new DataColumn[] { new DataColumn("EmployeeId"), new DataColumn("الاسم"), new DataColumn("الحالة"), new DataColumn("ساعات إضافية") });
 
             string dateStr = date.ToString("yyyy-MM-dd");
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
                 using (SqliteCommand cmd = new SqliteCommand(
-                    @"SELECT E.EmployeeId, E.FullName, A.Status
+                    @"SELECT E.EmployeeId, E.FullName, A.Status, A.OvertimeHours
                       FROM Employees E
                       LEFT JOIN AttendanceRecords A ON A.EmployeeId = E.EmployeeId AND A.AttendanceDate = @Date
                       ORDER BY E.FullName", conn))
@@ -102,7 +102,8 @@ namespace Temo_Mobile_Store
                     using (SqliteDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
-                            dt.Rows.Add(reader["EmployeeId"], reader["FullName"], reader["Status"] == DBNull.Value ? "" : reader["Status"]);
+                            dt.Rows.Add(reader["EmployeeId"], reader["FullName"], reader["Status"] == DBNull.Value ? "" : reader["Status"],
+                                reader["OvertimeHours"] == DBNull.Value ? "0" : Convert.ToDecimal(reader["OvertimeHours"]).ToString("N2"));
                     }
                 }
             }
@@ -116,10 +117,14 @@ namespace Temo_Mobile_Store
             public int EmployeeId;
             public string FullName;
             public decimal MonthlySalary;
+            public decimal StandardHoursPerDay;
             public decimal DayValue;
+            public decimal HourValue;
             public int PresentDays;
             public int AbsentDays;
             public int LeaveDays;
+            public decimal OvertimeHours;
+            public decimal OvertimeAmount;
             public decimal NetSalary;
             public bool IsClosed;
         }
@@ -133,7 +138,7 @@ namespace Temo_Mobile_Store
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT EmployeeId, FullName, MonthlySalary FROM Employees ORDER BY FullName", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT EmployeeId, FullName, MonthlySalary, StandardHoursPerDay FROM Employees ORDER BY FullName", conn))
                 using (SqliteDataReader reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
@@ -142,7 +147,8 @@ namespace Temo_Mobile_Store
                         {
                             EmployeeId = Convert.ToInt32(reader["EmployeeId"]),
                             FullName = reader["FullName"].ToString(),
-                            MonthlySalary = Convert.ToDecimal(reader["MonthlySalary"])
+                            MonthlySalary = Convert.ToDecimal(reader["MonthlySalary"]),
+                            StandardHoursPerDay = Convert.ToDecimal(reader["StandardHoursPerDay"])
                         });
                     }
                 }
@@ -157,7 +163,7 @@ namespace Temo_Mobile_Store
         private static void FillPayrollRow(SqliteConnection conn, SqliteTransaction transaction, PayrollRow row, int year, int month)
         {
             using (SqliteCommand cmdClosure = new SqliteCommand(
-                "SELECT MonthlySalary, DayValue, PresentDays, AbsentDays, LeaveDays, NetSalary FROM PayrollClosures WHERE EmployeeId = @Id AND Year = @Y AND Month = @M", conn, transaction))
+                "SELECT MonthlySalary, DayValue, PresentDays, AbsentDays, LeaveDays, OvertimeHours, OvertimeAmount, NetSalary FROM PayrollClosures WHERE EmployeeId = @Id AND Year = @Y AND Month = @M", conn, transaction))
             {
                 cmdClosure.Parameters.AddWithValue("@Id", row.EmployeeId);
                 cmdClosure.Parameters.AddWithValue("@Y", year);
@@ -168,9 +174,12 @@ namespace Temo_Mobile_Store
                     {
                         row.MonthlySalary = Convert.ToDecimal(reader["MonthlySalary"]);
                         row.DayValue = Convert.ToDecimal(reader["DayValue"]);
+                        row.HourValue = row.StandardHoursPerDay > 0 ? row.DayValue / row.StandardHoursPerDay : 0;
                         row.PresentDays = Convert.ToInt32(reader["PresentDays"]);
                         row.AbsentDays = Convert.ToInt32(reader["AbsentDays"]);
                         row.LeaveDays = Convert.ToInt32(reader["LeaveDays"]);
+                        row.OvertimeHours = Convert.ToDecimal(reader["OvertimeHours"]);
+                        row.OvertimeAmount = Convert.ToDecimal(reader["OvertimeAmount"]);
                         row.NetSalary = Convert.ToDecimal(reader["NetSalary"]);
                         row.IsClosed = true;
                         return;
@@ -181,6 +190,7 @@ namespace Temo_Mobile_Store
             int daysInMonth = DateTime.DaysInMonth(year, month);
             string monthPrefix = $"{year:0000}-{month:00}";
             row.DayValue = daysInMonth > 0 ? row.MonthlySalary / daysInMonth : 0;
+            row.HourValue = row.StandardHoursPerDay > 0 ? row.DayValue / row.StandardHoursPerDay : 0;
             row.PresentDays = 0; row.AbsentDays = 0; row.LeaveDays = 0;
 
             using (SqliteCommand cmd = new SqliteCommand(
@@ -201,10 +211,21 @@ namespace Temo_Mobile_Store
                 }
             }
 
+            using (SqliteCommand cmd = new SqliteCommand(
+                "SELECT SUM(OvertimeHours) FROM AttendanceRecords WHERE EmployeeId = @Id AND AttendanceDate LIKE @Prefix", conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@Id", row.EmployeeId);
+                cmd.Parameters.AddWithValue("@Prefix", monthPrefix + "%");
+                var res = cmd.ExecuteScalar();
+                row.OvertimeHours = res != null && res != DBNull.Value ? Convert.ToDecimal(res) : 0;
+            }
+
             // الراتب بيتبني تراكميًا من الأيام المسجّلة فعليًا (حضور + إجازة مدفوعة)، مش بيبدأ
             // من المرتب الكامل وينقص منه. يعني يوم مايتسجلش له حضور أصلًا (لسه ماجاش، أو الأدمن
-            // نسي يسجّله) مايتحسبش للموظف تلقائيًا زي ما كان بيحصل قبل كده.
-            row.NetSalary = row.DayValue * (row.PresentDays + row.LeaveDays);
+            // نسي يسجّله) مايتحسبش للموظف تلقائيًا زي ما كان بيحصل قبل كده. الساعات الإضافية
+            // بتتحسب فوق كده بـ1.5× قيمة الساعة العادية.
+            row.OvertimeAmount = row.OvertimeHours * row.HourValue * 1.5m;
+            row.NetSalary = row.DayValue * (row.PresentDays + row.LeaveDays) + row.OvertimeAmount;
             row.IsClosed = false;
         }
 

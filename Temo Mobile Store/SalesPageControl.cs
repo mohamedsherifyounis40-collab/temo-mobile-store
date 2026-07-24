@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
@@ -36,6 +37,7 @@ namespace Temo_Mobile_Store
         private string CurrentStorePhone = "";
         private string CurrentStoreAddress = "";
         private byte[] CurrentStoreLogo = null;
+        private string CurrentStoreWhatsApp = "";
 
         // ---------- عناصر الشاشة ----------
         private Guna2TextBox txtSaleBarcode, txtSaleName, txtCustomerPrice, txtSaleQty, txtSaleTotal;
@@ -233,7 +235,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void LoadStoreSettingsIntoMemory()
         {
-            UIHelpers.LoadStoreSettings(out CurrentStoreName, out CurrentStorePhone, out CurrentStoreAddress, out CurrentStoreLogo);
+            UIHelpers.LoadStoreSettings(out CurrentStoreName, out CurrentStorePhone, out CurrentStoreAddress, out CurrentStoreLogo, out CurrentStoreWhatsApp);
         }
 
         // ==========================================================================
@@ -682,6 +684,9 @@ namespace Temo_Mobile_Store
                 return;
             }
 
+            ReceiptData receipt = LoadReceiptForPrinting();
+            if (receipt == null) return;
+
             try
             {
                 string folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "TemoStore_Invoices");
@@ -691,8 +696,8 @@ namespace Temo_Mobile_Store
                 string filePath = System.IO.Path.Combine(folder, fileName);
 
                 PrintDocument pd = new PrintDocument();
-                pd.PrintPage += PrintInvoicePage;
-                pd.DefaultPageSettings.PaperSize = GetSelectedInvoicePaperSize();
+                pd.PrintPage += (s, ev) => RenderReceiptPage(ev, receipt);
+                pd.DefaultPageSettings.PaperSize = BuildReceiptPaperSize(receipt);
                 pd.PrinterSettings.PrinterName = "Microsoft Print to PDF";
                 pd.PrinterSettings.PrintToFile = true;
                 pd.PrinterSettings.PrintFileName = filePath;
@@ -711,154 +716,333 @@ namespace Temo_Mobile_Store
 
         private void BtnPrintInvoice_Click(object sender, EventArgs e)
         {
+            ReceiptData receipt = LoadReceiptForPrinting();
+            if (receipt == null) return;
+
             PrintDocument pd = new PrintDocument();
-            pd.PrintPage += new PrintPageEventHandler(PrintInvoicePage);
-            pd.DefaultPageSettings.PaperSize = GetSelectedInvoicePaperSize();
+            pd.PrintPage += (s, ev) => RenderReceiptPage(ev, receipt);
+            pd.DefaultPageSettings.PaperSize = BuildReceiptPaperSize(receipt);
             PrintPreviewDialog pdd = new PrintPreviewDialog() { Document = pd };
             pdd.ShowDialog();
         }
 
-        private void PrintInvoicePage(object sender, PrintPageEventArgs e)
+        // بيجيب بيانات آخر عملية بيع كاملة (مرة واحدة) عشان نفس البيانات المستخدمة في حساب
+        // ارتفاع الصفحة الديناميكي هي بالظبط اللي هتترسم - من غير خطر إن بيع جديد يتسجل
+        // في نفس اللحظة بين حساب الارتفاع والطباعة الفعلية
+        private ReceiptData LoadReceiptForPrinting()
+        {
+            ReceiptData receipt;
+            try { receipt = SalesRepository.GetLastSaleForReceipt(); }
+            catch (Exception ex)
+            {
+                MessageBox.Show("حدث خطأ أثناء تجهيز الفاتورة: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return null;
+            }
+
+            if (receipt == null)
+            {
+                MessageBox.Show("لا توجد عمليات بيع مسجلة بعد.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return null;
+            }
+
+            return receipt;
+        }
+
+        // بيبني مقاس الورقة، وللطابعات الحرارية (80/58مم) بيحسب الارتفاع المطلوب فعليًا حسب
+        // محتوى الفاتورة (مفيش IMEI؟ عميل نقدي؟ فمفيش أسطر فاضية) بدل ارتفاع ثابت ضخم بيسيب
+        // مسافة بيضا في آخر كل إيصال
+        private PaperSize BuildReceiptPaperSize(ReceiptData receipt)
+        {
+            PaperSize paperSize = GetSelectedInvoicePaperSize();
+            if (paperSize.Width < 500)
+            {
+                using (var tempBmp = new Bitmap(1, 1))
+                using (var measureG = Graphics.FromImage(tempBmp))
+                {
+                    float contentHeight = RenderReceipt(measureG, paperSize.Width, true, receipt);
+                    paperSize.Height = (int)Math.Ceiling(contentHeight) + 20;
+                }
+            }
+            return paperSize;
+        }
+
+        private void RenderReceiptPage(PrintPageEventArgs e, ReceiptData receipt)
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            RenderReceipt(g, e.PageBounds.Width, false, receipt);
+        }
 
-            float pageWidth = e.PageBounds.Width;
-            float pageHeight = e.PageBounds.Height;
+        // ==========================================================================
+        // رسم/قياس الإيصال - نفس الدالة تستخدم مرتين: مرة "قياس بس" (measureOnly=true،
+        // بترجع الارتفاع المطلوب من غير ما ترسم حاجة فعليًا) قبل الطباعة عشان نظبط مقاس
+        // الورقة، ومرة تانية "رسم فعلي" وقت الطباعة الحقيقية - بنفس المنطق بالظبط، فمفيش
+        // احتمال إن القياس يختلف عن الرسم الفعلي.
+        // ==========================================================================
+        private float RenderReceipt(Graphics g, float pageWidth, bool measureOnly, ReceiptData receipt)
+        {
             bool isThermal = pageWidth < 500;
+            float margin = isThermal ? 14 : 24;
+            float contentWidth = pageWidth - margin * 2;
 
-            float margin = isThermal ? 10 : 20;
-            float fontHeaderSize = isThermal ? 12 : 16;
-            float fontStoreSize = isThermal ? 13 : 18;
-            float fontBodySize = isThermal ? 9 : 11.5f;
-            float fontSmallSize = isThermal ? 7.5f : 9;
+            Color colorPrimary = UIHelpers.ColorPrimary;
+            Color colorAccent = UIHelpers.ColorSuccess;
+            Color colorWarning = UIHelpers.ColorWarning;
+            Color colorMuted = Color.FromArgb(120, 126, 138);
+            Color colorLightBg = Color.FromArgb(238, 242, 248);
 
-            Color colorPrimary = Color.FromArgb(26, 43, 76);
-            Color colorAccent = Color.FromArgb(39, 174, 96);
-            Font fontStore = new Font("Arial", fontStoreSize, FontStyle.Bold);
-            Font fontHeader = new Font("Arial", fontHeaderSize, FontStyle.Bold);
-            Font fontBody = new Font("Arial", fontBodySize, FontStyle.Regular);
-            Font fontBodyBold = new Font("Arial", fontBodySize, FontStyle.Bold);
-            Font fontSmall = new Font("Arial", fontSmallSize, FontStyle.Regular);
-            Font fontWatermark = new Font("Arial", isThermal ? 22 : 46, FontStyle.Bold);
-            StringFormat centerFormat = new StringFormat() { Alignment = StringAlignment.Center };
+            using var fontBrand = new Font("Arial", isThermal ? 15 : 20, FontStyle.Bold);
+            using var fontTagline = new Font("Arial", isThermal ? 8 : 10, FontStyle.Regular);
+            using var fontLabelBold = new Font("Arial", isThermal ? 10 : 12, FontStyle.Bold);
+            using var fontBody = new Font("Arial", isThermal ? 9 : 11, FontStyle.Regular);
+            using var fontBodyBold = new Font("Arial", isThermal ? 9 : 11, FontStyle.Bold);
+            using var fontSmall = new Font("Arial", isThermal ? 7.5f : 9, FontStyle.Regular);
+            using var fontItemName = new Font("Arial", isThermal ? 10.5f : 13, FontStyle.Bold);
+            using var fontTotalValue = new Font("Arial", isThermal ? 15 : 19, FontStyle.Bold);
+            using var fontSectionHeader = new Font("Arial", isThermal ? 9.5f : 11.5f, FontStyle.Bold);
 
-            // ---------- 1) الواتر مارك (اسم المحل خفيف بالخلف، مايلة) ----------
-            string watermarkText = string.IsNullOrWhiteSpace(CurrentStoreName) ? "TEMO MOBILE STORE" : CurrentStoreName.ToUpper();
-            using (Brush watermarkBrush = new SolidBrush(Color.FromArgb(18, colorPrimary.R, colorPrimary.G, colorPrimary.B)))
-            {
-                var state = g.Save();
-                g.TranslateTransform(pageWidth / 2, pageHeight / 2);
-                g.RotateTransform(-35);
-                SizeF wmSize = g.MeasureString(watermarkText, fontWatermark);
-                g.DrawString(watermarkText, fontWatermark, watermarkBrush, -wmSize.Width / 2, -wmSize.Height / 2);
-                g.Restore(state);
-            }
+            var center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+            var farAlign = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center };
+            var nearAlign = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
 
-            // ---------- 2) إطار خارجي للفاتورة كلها ----------
-            float frameMargin = margin - 5 > 2 ? margin - 5 : 2;
-            using (Pen framePen = new Pen(Color.FromArgb(210, 214, 224), 1.2f))
-            {
-                g.DrawRectangle(framePen, frameMargin, frameMargin, pageWidth - frameMargin * 2, pageHeight - frameMargin * 2);
-            }
+            float yPos = 0;
 
-            float yPos = margin + 6;
+            void FillRect(RectangleF rect, Color color) { if (!measureOnly) using (Brush b = new SolidBrush(color)) g.FillRectangle(b, rect); }
+            void FillRounded(RectangleF rect, Color color, float radius) { if (!measureOnly) using (Brush b = new SolidBrush(color)) using (var path = RoundedRect(rect, radius)) g.FillPath(b, path); }
+            void BorderRounded(RectangleF rect, Color color, float radius, float width) { if (!measureOnly) using (Pen p = new Pen(color, width)) using (var path = RoundedRect(rect, radius)) g.DrawPath(p, path); }
+            void Text(string s, Font f, Color color, RectangleF rect, StringFormat fmt) { if (!measureOnly) using (Brush b = new SolidBrush(color)) g.DrawString(s ?? "", f, b, rect, fmt); }
+            void Dashed(float y) { if (!measureOnly) DrawDashedLine(g, margin, pageWidth - margin, y); }
 
-            // ---------- 3) الشعار واسم المحل ----------
+            // 1) شريط علوي (لمسة براند)
+            FillRect(new RectangleF(0, yPos, pageWidth, isThermal ? 4 : 6), colorPrimary);
+            yPos += (isThermal ? 4 : 6) + (isThermal ? 10 : 14);
+
+            // 2) الشعار (من إعدادات المحل - نفس الشعار المستخدم في باقي البرنامج)
             if (CurrentStoreLogo != null && CurrentStoreLogo.Length > 0)
             {
-                float logoSize = isThermal ? 42 : 58;
-                using (var ms = new System.IO.MemoryStream(CurrentStoreLogo))
-                using (var logoImg = Image.FromStream(ms))
+                float logoSize = isThermal ? 48 : 64;
+                if (!measureOnly)
                 {
-                    g.DrawImage(logoImg, (pageWidth - logoSize) / 2, yPos, logoSize, logoSize);
+                    using (var ms = new System.IO.MemoryStream(CurrentStoreLogo))
+                    using (var logoImg = Image.FromStream(ms))
+                        g.DrawImage(logoImg, (pageWidth - logoSize) / 2, yPos, logoSize, logoSize);
                 }
-                yPos += logoSize + 6;
+                yPos += logoSize + (isThermal ? 8 : 12);
             }
 
-            g.DrawString(string.IsNullOrWhiteSpace(CurrentStoreName) ? "Temo Mobile Store" : CurrentStoreName, fontStore, new SolidBrush(colorPrimary), new RectangleF(0, yPos, pageWidth, 26), centerFormat);
-            yPos += isThermal ? 22 : 30;
+            // 3) اسم المحل
+            string brandName = string.IsNullOrWhiteSpace(CurrentStoreName) ? "Temo Mobile Store" : CurrentStoreName;
+            Text(brandName, fontBrand, colorPrimary, new RectangleF(0, yPos, pageWidth, isThermal ? 24 : 30), center);
+            yPos += isThermal ? 24 : 30;
 
-            // خط مزدوج تحت اسم المحل (لمسة شياكة بسيطة)
-            using (Pen accentPen = new Pen(colorAccent, 1.6f))
-                g.DrawLine(accentPen, pageWidth / 2 - 35, yPos, pageWidth / 2 + 35, yPos);
-            using (Pen thinPen = new Pen(Color.FromArgb(200, 205, 215), 0.8f))
-                g.DrawLine(thinPen, pageWidth / 2 - 55, yPos + 3, pageWidth / 2 + 55, yPos + 3);
-            yPos += isThermal ? 14 : 18;
+            Text("هواتف وإكسسوارات موبايل", fontTagline, colorMuted, new RectangleF(0, yPos, pageWidth, isThermal ? 16 : 20), center);
+            yPos += isThermal ? 18 : 22;
 
-            g.DrawString("فاتورة مبيعات", fontHeader, new SolidBrush(Color.Black), new RectangleF(0, yPos, pageWidth, 24), centerFormat);
-            yPos += isThermal ? 20 : 26;
-
-            if (!string.IsNullOrWhiteSpace(CurrentStorePhone))
-            { g.DrawString($"تليفون: {CurrentStorePhone}", fontSmall, Brushes.DimGray, new RectangleF(0, yPos, pageWidth, 16), centerFormat); yPos += 15; }
+            // 4) العنوان
             if (!string.IsNullOrWhiteSpace(CurrentStoreAddress))
-            { g.DrawString($"العنوان: {CurrentStoreAddress}", fontSmall, Brushes.DimGray, new RectangleF(0, yPos, pageWidth, 16), centerFormat); yPos += 15; }
+            {
+                Text(CurrentStoreAddress, fontSmall, colorMuted, new RectangleF(margin, yPos, contentWidth, isThermal ? 14 : 18), center);
+                yPos += isThermal ? 15 : 19;
+            }
 
-            yPos += 8;
-            DrawDashedLine(g, margin, pageWidth - margin, yPos);
+            // 5) تليفون / واتساب (سطر واحد لو الاتنين موجودين)
+            string phoneLine = "";
+            if (!string.IsNullOrWhiteSpace(CurrentStorePhone)) phoneLine += $"تليفون: {CurrentStorePhone}";
+            if (!string.IsNullOrWhiteSpace(CurrentStoreWhatsApp))
+                phoneLine += (phoneLine.Length > 0 ? "   |   " : "") + $"واتساب: {CurrentStoreWhatsApp}";
+            if (phoneLine.Length > 0)
+            {
+                Text(phoneLine, fontSmall, colorMuted, new RectangleF(margin, yPos, contentWidth, isThermal ? 14 : 18), center);
+                yPos += isThermal ? 16 : 20;
+            }
+
+            yPos += isThermal ? 6 : 8;
+            Dashed(yPos);
             yPos += isThermal ? 12 : 16;
 
-            string productName = null; int quantitySold = 0; decimal total = 0; string saleDate = null; int dailyInvoiceNumber = 0;
+            // 6) بيانات الفاتورة
+            string invoiceCode = $"INV-{receipt.SaleId:D6}";
+            Text($"رقم الفاتورة:  #{receipt.DailyInvoiceNumber}", fontBodyBold, colorPrimary, new RectangleF(margin, yPos, contentWidth, isThermal ? 16 : 20), nearAlign);
+            yPos += isThermal ? 18 : 22;
 
-            try
+            string dateDisplay = DateTime.TryParse(receipt.SaleDate, out DateTime saleDt) ? saleDt.ToString("yyyy-MM-dd  hh:mm tt") : receipt.SaleDate;
+
+            void InfoLine(string label, string value)
             {
-                var lastSale = SalesRepository.GetLastSale();
-                productName = lastSale.ProductName;
-                quantitySold = lastSale.QuantitySold;
-                total = lastSale.Total;
-                saleDate = lastSale.SaleDate;
-
-                if (lastSale.SaleId > 0)
-                    dailyInvoiceNumber = SalesRepository.GetDailyInvoiceNumber(lastSale.SaleId, saleDate);
-            }
-            catch (Exception ex) { MessageBox.Show("حدث خطأ أثناء تجهيز الفاتورة: " + ex.Message); }
-
-            g.DrawString($"رقم الفاتورة: {dailyInvoiceNumber}", fontSmall, Brushes.DimGray, margin, yPos);
-            yPos += isThermal ? 16 : 20;
-            g.DrawString($"التاريخ: {saleDate ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")}", fontSmall, Brushes.DimGray, margin, yPos);
-            yPos += isThermal ? 20 : 24;
-
-            if (productName != null)
-            {
-                // ---------- سطر المنتج بأسلوب "اسم ...... سعر" (خط منقط رابط) ----------
-                g.DrawString(productName, fontBodyBold, Brushes.Black, margin, yPos);
-                string qtyText = $"× {quantitySold}";
-                SizeF qtySizeMeasure = g.MeasureString(qtyText, fontBody);
-                g.DrawString(qtyText, fontBody, Brushes.DimGray, pageWidth - margin - qtySizeMeasure.Width, yPos + 2);
-                yPos += isThermal ? 24 : 30;
-
-                DrawDashedLine(g, margin, pageWidth - margin, yPos);
-                yPos += isThermal ? 14 : 18;
-
-                // ---------- صندوق الإجمالي البارز ----------
-                float boxHeight = isThermal ? 34 : 42;
-                RectangleF totalBox = new RectangleF(margin, yPos, pageWidth - margin * 2, boxHeight);
-                using (Brush totalBg = new SolidBrush(Color.FromArgb(236, 247, 240)))
-                    g.FillRectangle(totalBg, totalBox);
-                using (Pen totalBorder = new Pen(colorAccent, 1.2f))
-                    g.DrawRectangle(totalBorder, totalBox.X, totalBox.Y, totalBox.Width, totalBox.Height);
-
-                g.DrawString("الإجمالي المستحق", fontSmall, Brushes.DimGray, margin + 10, yPos + (isThermal ? 5 : 7));
-                string totalText = $"{total:N2} ج.م";
-                Font fontTotal = new Font("Arial", isThermal ? 14 : 18, FontStyle.Bold);
-                SizeF totalSize = g.MeasureString(totalText, fontTotal);
-                g.DrawString(totalText, fontTotal, new SolidBrush(colorAccent), pageWidth - margin - 10 - totalSize.Width, yPos + (isThermal ? 3 : 5));
-
-                yPos += boxHeight + (isThermal ? 14 : 18);
-            }
-            else
-            {
-                g.DrawString("لا توجد عمليات بيع مسجلة بعد.", fontBody, Brushes.Red, margin, yPos);
-                yPos += isThermal ? 20 : 26;
+                if (string.IsNullOrWhiteSpace(value)) return;
+                Text($"{label}:  {value}", fontBody, Color.Black, new RectangleF(margin, yPos, contentWidth, isThermal ? 16 : 20), nearAlign);
+                yPos += isThermal ? 18 : 22;
             }
 
-            DrawDashedLine(g, margin, pageWidth - margin, yPos);
+            InfoLine("التاريخ والوقت", dateDisplay);
+            InfoLine("الكاشير", receipt.CashierName);
+            InfoLine("العميل", receipt.PaymentType == "Credit" ? receipt.CustomerName : "عميل نقدي");
+            InfoLine("هاتف العميل", receipt.PaymentType == "Credit" ? receipt.CustomerPhone : null);
+
+            yPos += isThermal ? 4 : 6;
+            Dashed(yPos);
+            yPos += isThermal ? 12 : 16;
+
+            // 7) عنوان قسم الأصناف
+            float sectionBarH = isThermal ? 22 : 28;
+            FillRect(new RectangleF(margin, yPos, contentWidth, sectionBarH), colorPrimary);
+            Text("تفاصيل الصنف", fontSectionHeader, Color.White, new RectangleF(margin, yPos, contentWidth, sectionBarH), center);
+            yPos += sectionBarH + (isThermal ? 10 : 14);
+
+            // 8) كارت الصنف - بيتكرر لكل صنف في الفاتورة (النظام الحالي بيسجل صنف واحد بالظبط
+            // لكل عملية بيع، فالحلقة دي هتلف مرة واحدة بس - جاهزة تلقائيًا لو تعدد الأصناف
+            // اتضاف مستقبلًا من غير ما يتغير شكل الطباعة)
+            var items = new List<ReceiptData> { receipt };
+            foreach (var item in items)
+            {
+                float iconSize = isThermal ? 34 : 44;
+                if (!measureOnly) DrawDeviceIcon(g, new RectangleF(margin, yPos, iconSize, iconSize), colorPrimary);
+
+                float textX = margin + iconSize + (isThermal ? 8 : 12);
+                float textW = contentWidth - iconSize - (isThermal ? 8 : 12);
+                float itemTop = yPos;
+
+                Text(item.ProductName, fontItemName, Color.Black, new RectangleF(textX, yPos, textW, isThermal ? 16 : 20), nearAlign);
+                yPos += isThermal ? 17 : 21;
+
+                if (!string.IsNullOrWhiteSpace(item.Barcode))
+                {
+                    Text($"باركود: {item.Barcode}", fontSmall, colorMuted, new RectangleF(textX, yPos, textW, isThermal ? 13 : 16), nearAlign);
+                    yPos += isThermal ? 14 : 17;
+                }
+                if (!string.IsNullOrWhiteSpace(item.IMEI))
+                {
+                    Text($"IMEI/سيريال: {item.IMEI}", fontSmall, colorMuted, new RectangleF(textX, yPos, textW, isThermal ? 13 : 16), nearAlign);
+                    yPos += isThermal ? 14 : 17;
+                }
+
+                Text($"{item.Quantity} × {item.UnitPrice:N2}  =  {item.Total:N2} ج.م", fontBodyBold, colorPrimary, new RectangleF(textX, yPos, textW, isThermal ? 16 : 20), nearAlign);
+                yPos += isThermal ? 18 : 22;
+
+                yPos = Math.Max(yPos, itemTop + iconSize + (isThermal ? 6 : 8));
+                yPos += isThermal ? 8 : 10;
+            }
+
+            yPos -= 4; // تعويض هامش آخر عنصر زيادة
+            Dashed(yPos);
+            yPos += isThermal ? 12 : 16;
+
+            // 9) الإجماليات (خصم=0 دايمًا حاليًا - النظام مفيهوش خاصية خصم على مستوى البيع)
+            decimal subtotal = receipt.Total;
+            decimal discount = 0m;
+            decimal grandTotal = subtotal - discount;
+
+            void TotalLine(string label, decimal amount)
+            {
+                Text(label, fontBody, Color.Black, new RectangleF(margin, yPos, contentWidth / 2, isThermal ? 16 : 20), nearAlign);
+                Text($"{amount:N2} ج.م", fontBody, Color.Black, new RectangleF(margin + contentWidth / 2, yPos, contentWidth / 2, isThermal ? 16 : 20), farAlign);
+                yPos += isThermal ? 17 : 21;
+            }
+            TotalLine("الإجمالي الفرعي", subtotal);
+            TotalLine("الخصم", discount);
+
+            yPos += isThermal ? 2 : 4;
+            if (!measureOnly) using (Pen p = new Pen(colorPrimary, 1.2f)) g.DrawLine(p, margin, yPos, pageWidth - margin, yPos);
+            yPos += isThermal ? 8 : 10;
+
+            float totalBoxH = isThermal ? 34 : 42;
+            FillRounded(new RectangleF(margin, yPos, contentWidth, totalBoxH), Color.FromArgb(236, 247, 240), isThermal ? 8 : 10);
+            Text("الإجمالي النهائي", fontBodyBold, colorAccent, new RectangleF(margin + 12, yPos, contentWidth / 2, totalBoxH), nearAlign);
+            Text($"{grandTotal:N2} ج.م", fontTotalValue, colorAccent, new RectangleF(margin, yPos, contentWidth - 12, totalBoxH), farAlign);
+            yPos += totalBoxH + (isThermal ? 12 : 16);
+
+            // 10) صندوق وسيلة الدفع / المدفوع
+            bool isCredit = receipt.PaymentType == "Credit";
+            decimal paid = isCredit ? 0m : grandTotal;
+            decimal remaining = isCredit ? grandTotal : 0m;
+            string methodDisplay = isCredit ? "آجل" : (string.IsNullOrWhiteSpace(receipt.PaymentMethod) ? "نقدي" : receipt.PaymentMethod);
+
+            float payBoxH = isThermal ? 46 : 58;
+            RectangleF payBox = new RectangleF(margin, yPos, contentWidth, payBoxH);
+            FillRounded(payBox, colorLightBg, isThermal ? 8 : 10);
+            BorderRounded(payBox, Color.FromArgb(220, 226, 236), isThermal ? 8 : 10, 1f);
+            if (!measureOnly) using (Pen p = new Pen(Color.FromArgb(220, 226, 236), 1f)) g.DrawLine(p, margin + contentWidth / 2, yPos + 8, margin + contentWidth / 2, yPos + payBoxH - 8);
+
+            RectangleF methodCol = new RectangleF(margin, yPos, contentWidth / 2, payBoxH);
+            RectangleF paidCol = new RectangleF(margin + contentWidth / 2, yPos, contentWidth / 2, payBoxH);
+            Text("طريقة الدفع", fontSmall, colorMuted, new RectangleF(methodCol.X, methodCol.Y + 6, methodCol.Width, isThermal ? 13 : 16), center);
+            Text(methodDisplay, fontBodyBold, Color.Black, new RectangleF(methodCol.X, methodCol.Y + payBoxH - (isThermal ? 22 : 26), methodCol.Width, isThermal ? 18 : 22), center);
+            Text("المدفوع", fontSmall, colorMuted, new RectangleF(paidCol.X, paidCol.Y + 6, paidCol.Width, isThermal ? 13 : 16), center);
+            Text($"{paid:N2} ج.م", fontBodyBold, Color.Black, new RectangleF(paidCol.X, paidCol.Y + payBoxH - (isThermal ? 22 : 26), paidCol.Width, isThermal ? 18 : 22), center);
+            yPos += payBoxH + (isThermal ? 8 : 10);
+
+            if (remaining > 0)
+            {
+                Text($"المتبقي: {remaining:N2} ج.م", fontBodyBold, colorWarning, new RectangleF(0, yPos, pageWidth, isThermal ? 18 : 22), center);
+                yPos += isThermal ? 20 : 24;
+            }
+
+            yPos += isThermal ? 4 : 6;
+            Dashed(yPos);
             yPos += isThermal ? 14 : 18;
 
-            g.DrawString("★ شكراً لتعاملكم معنا ★", fontSmall, new SolidBrush(colorPrimary), new RectangleF(0, yPos, pageWidth, 20), centerFormat);
-            yPos += 16;
-            g.DrawString("نتمنى لكم يومًا سعيدًا 🌟", fontSmall, Brushes.DimGray, new RectangleF(0, yPos, pageWidth, 20), centerFormat);
+            // 11) QR + باركود جنبًا لجنب
+            float halfW = contentWidth / 2;
+            float codeSize = isThermal ? 64 : 80;
+
+            Text("امسح لعرض الفاتورة", fontSmall, colorMuted, new RectangleF(margin, yPos, halfW, isThermal ? 13 : 16), center);
+            if (!measureOnly)
+            {
+                string qrPayload = $"{brandName}\n{invoiceCode}\n{dateDisplay}\n{receipt.ProductName}\nEGP {grandTotal:N2}";
+                RectangleF qrRect = new RectangleF(margin + halfW / 2 - codeSize / 2, yPos + 16, codeSize, codeSize);
+                QrCodeHelper.DrawQrCode(g, qrPayload, Rectangle.Round(qrRect));
+            }
+
+            Text("باركود الفاتورة", fontSmall, colorMuted, new RectangleF(margin + halfW, yPos, halfW, isThermal ? 13 : 16), center);
+            float barcodeH = isThermal ? 38 : 48;
+            if (!measureOnly)
+            {
+                RectangleF barcodeRect = new RectangleF(margin + halfW + 12, yPos + 20, halfW - 24, barcodeH);
+                BarcodeHelper.DrawCode39(g, invoiceCode, Rectangle.Round(barcodeRect));
+            }
+            Text(invoiceCode, fontSmall, Color.Black, new RectangleF(margin + halfW, yPos + 20 + barcodeH + 2, halfW, isThermal ? 13 : 16), center);
+
+            yPos += 16 + codeSize + (isThermal ? 6 : 8);
+            Dashed(yPos);
+            yPos += isThermal ? 14 : 18;
+
+            // 12) خاتمة الشكر
+            Text("♥ شكرًا لتعاملكم معنا ♥", fontLabelBold, colorPrimary, new RectangleF(0, yPos, pageWidth, isThermal ? 18 : 22), center);
+            yPos += isThermal ? 20 : 24;
+            Text($"نتمنى لكم يومًا سعيدًا مع {brandName}", fontSmall, colorMuted, new RectangleF(0, yPos, pageWidth, isThermal ? 16 : 20), center);
+            yPos += isThermal ? 18 : 22;
+
+            yPos += isThermal ? 6 : 8;
+            FillRect(new RectangleF(0, yPos, pageWidth, isThermal ? 4 : 6), colorPrimary);
+            yPos += isThermal ? 4 : 6;
+
+            return yPos;
+        }
+
+        // بيرسم أيقونة جهاز عامة (زخرفية بس - مفيش عمود صور منتجات في قاعدة البيانات
+        // فمينفعش نعرض صورة المنتج الحقيقية، وأولى من عرض صورة وهمية)
+        private static void DrawDeviceIcon(Graphics g, RectangleF bounds, Color color)
+        {
+            using (Pen pen = new Pen(color, 1.8f))
+            using (var path = RoundedRect(bounds, bounds.Width * 0.22f))
+                g.DrawPath(pen, path);
+
+            float dotR = bounds.Width * 0.1f;
+            using (Brush b = new SolidBrush(color))
+                g.FillEllipse(b, bounds.X + bounds.Width / 2 - dotR / 2, bounds.Bottom - bounds.Height * 0.2f - dotR / 2, dotR, dotR);
+        }
+
+        private static System.Drawing.Drawing2D.GraphicsPath RoundedRect(RectangleF rect, float radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            float d = radius * 2;
+            path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
         }
 
         // بيرسم خط منقط أفقي - مستخدم كفواصل شيك بدل الخط العادي

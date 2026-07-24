@@ -315,6 +315,9 @@ namespace Temo_Mobile_Store.Database
                 EnsureSalesPaymentMethodColumn(conn);
                 EnsureStoreSettingsCatalogSyncColumns(conn);
                 EnsureDailyClosuresAdjustmentMovementIdColumn(conn);
+                EnsureEmployeesStandardHoursPerDayColumn(conn);
+                EnsureAttendanceRecordsOvertimeHoursColumn(conn);
+                EnsurePayrollClosuresOvertimeColumns(conn);
 
                 BackfillHistoricalJournalEntries(conn);
             }
@@ -636,6 +639,8 @@ namespace Temo_Mobile_Store.Database
                 ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN CatalogSyncSecret TEXT;");
             if (!existingColumns.Contains("CatalogSyncEnabled"))
                 ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN CatalogSyncEnabled INTEGER NOT NULL DEFAULT 0;");
+            if (!existingColumns.Contains("WhatsAppNumber"))
+                ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN WhatsAppNumber TEXT;");
         }
 
         // ==========================================================================
@@ -810,6 +815,76 @@ namespace Temo_Mobile_Store.Database
 
             if (!columnExists)
                 ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN PaymentMethod TEXT;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود StandardHoursPerDay لجدول Employees (كان ناقص من الأول) - ساعات
+        // العمل القياسية في اليوم لكل موظف، بتتسجل يدويًا لكل موظف عشان تختلف من واحد
+        // للتاني، ومنها بيتحسب "قيمة الساعة" = قيمة اليوم ÷ الرقم ده.
+        // ==========================================================================
+        private static void EnsureEmployeesStandardHoursPerDayColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(Employees);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "StandardHoursPerDay", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE Employees ADD COLUMN StandardHoursPerDay REAL NOT NULL DEFAULT 8;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود OvertimeHours لجدول AttendanceRecords (كان ناقص من الأول) - عدد
+        // ساعات العمل الإضافي في يوم معين، بيتسجل مع الحالة (حاضر/غايب/إجازة) وقت
+        // تسجيل الحضور اليومي.
+        // ==========================================================================
+        private static void EnsureAttendanceRecordsOvertimeHoursColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(AttendanceRecords);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "OvertimeHours", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE AttendanceRecords ADD COLUMN OvertimeHours REAL NOT NULL DEFAULT 0;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمودي OvertimeHours و OvertimeAmount لجدول PayrollClosures - عشان لما
+        // شهر يتقفل، قيمة الإضافي المحسوبة تتجمد مع باقي أرقام الشهر نهائيًا زي كل حاجة تانية.
+        // ==========================================================================
+        private static void EnsurePayrollClosuresOvertimeColumns(SqliteConnection conn)
+        {
+            var existingColumns = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(PayrollClosures);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                    existingColumns.Add(reader["name"].ToString());
+            }
+
+            if (!existingColumns.Contains("OvertimeHours"))
+                ExecuteNonQuery(conn, "ALTER TABLE PayrollClosures ADD COLUMN OvertimeHours REAL NOT NULL DEFAULT 0;");
+            if (!existingColumns.Contains("OvertimeAmount"))
+                ExecuteNonQuery(conn, "ALTER TABLE PayrollClosures ADD COLUMN OvertimeAmount REAL NOT NULL DEFAULT 0;");
         }
 
         // ==========================================================================

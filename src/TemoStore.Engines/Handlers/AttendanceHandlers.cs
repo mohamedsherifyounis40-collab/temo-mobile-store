@@ -22,7 +22,7 @@ namespace TemoStore.Engines.Handlers
             if (uow.Attendance.IsMonthClosed(command.EmployeeId, command.Date.Year, command.Date.Month))
                 throw new PayrollMonthClosedException($"شهر {command.Date.Month}/{command.Date.Year} مقفول بالفعل لهذا الموظف، لا يمكن تعديل الحضور فيه.");
 
-            uow.Attendance.UpsertStatus(command.EmployeeId, command.Date, command.Status);
+            uow.Attendance.UpsertStatus(command.EmployeeId, command.Date, command.Status, command.OvertimeHours);
             uow.Commit();
             return true;
         }
@@ -51,11 +51,13 @@ namespace TemoStore.Engines.Handlers
             {
                 if (uow.Attendance.IsMonthClosed(emp.EmployeeId, command.Year, command.Month)) continue;
 
-                var (present, absent, leave) = uow.Attendance.GetAttendanceCounts(emp.EmployeeId, command.Year, command.Month);
+                var (present, absent, leave, overtimeHours) = uow.Attendance.GetAttendanceCounts(emp.EmployeeId, command.Year, command.Month);
                 decimal dayValue = daysInMonth > 0 ? emp.MonthlySalary / daysInMonth : 0;
-                decimal netSalary = dayValue * (present + leave);
+                decimal hourValue = emp.StandardHoursPerDay > 0 ? dayValue / emp.StandardHoursPerDay : 0;
+                decimal overtimeAmount = overtimeHours * hourValue * 1.5m; // الساعة الإضافية بـ1.5× قيمة الساعة العادية
+                decimal netSalary = dayValue * (present + leave) + overtimeAmount;
 
-                uow.Attendance.InsertClosure(emp.EmployeeId, command.Year, command.Month, emp.MonthlySalary, dayValue, present, absent, leave, netSalary);
+                uow.Attendance.InsertClosure(emp.EmployeeId, command.Year, command.Month, emp.MonthlySalary, dayValue, present, absent, leave, overtimeHours, overtimeAmount, netSalary);
                 closedCount++;
             }
 
@@ -148,7 +150,7 @@ namespace TemoStore.Engines.Handlers
         public bool Handle(AddEmployeeCommand command)
         {
             using var uow = _uowFactory.Create();
-            uow.Employees.Add(command.FullName, command.Phone, command.MonthlySalary, command.HireDate);
+            uow.Employees.Add(command.FullName, command.Phone, command.MonthlySalary, command.StandardHoursPerDay, command.HireDate);
             uow.Commit();
             return true;
         }
@@ -166,7 +168,7 @@ namespace TemoStore.Engines.Handlers
         public bool Handle(UpdateEmployeeCommand command)
         {
             using var uow = _uowFactory.Create();
-            uow.Employees.Update(command.EmployeeId, command.FullName, command.Phone, command.MonthlySalary, command.HireDate);
+            uow.Employees.Update(command.EmployeeId, command.FullName, command.Phone, command.MonthlySalary, command.StandardHoursPerDay, command.HireDate);
             uow.Commit();
             return true;
         }

@@ -148,12 +148,13 @@ namespace Temo_Mobile_Store
             btnEditMode = new Guna2Button() { Text = "تعديل البند المحدّد", Location = new Point(20, 433), Width = 260, Height = 36, FillColor = ColorPrimary, BorderRadius = 10 };
             btnEditMode.Click += BtnEditMode_Click;
 
-            Guna2Button btnPrintBarcode = new Guna2Button() { Text = "طباعة باركود 🏷️", Location = new Point(20, 473), Width = 260, Height = 34, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
-            btnPrintBarcode.Click += (s, e) => BarcodeHelper.PrintBarcodeLabel(txtBarcode.Text, txtProductName.Text, this.FindForm());
+            Guna2Button btnPrintBarcode = new Guna2Button() { Text = "طباعة باركود 🏷️", Location = new Point(20, 473), Width = 195, Height = 34, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
+            NumericUpDown numPrintCopies = new NumericUpDown() { Location = new Point(222, 473), Width = 58, Height = 34, Minimum = 1, Maximum = 200, Value = 1, TextAlign = HorizontalAlignment.Center, Font = new Font("Segoe UI", 9F) };
+            btnPrintBarcode.Click += (s, e) => BarcodeHelper.PrintBarcodeLabel(txtBarcode.Text, txtProductName.Text, this.FindForm(), (int)numPrintCopies.Value);
 
             pnlCard.Controls.AddRange(new Control[] {
                 lblCardTitle, lblBarcode, txtBarcode, lblProductName, txtProductName, lblCostPrice, txtCostPrice,
-                lblSalePrice, txtSalePrice, lblQuantity, txtQuantity, lblNote, btnAddProduct, btnEditMode, btnPrintBarcode
+                lblSalePrice, txtSalePrice, lblQuantity, txtQuantity, lblNote, btnAddProduct, btnEditMode, btnPrintBarcode, numPrintCopies
             });
 
             // ---------- كارت ثاني (حفظ / حذف / تفريغ) ----------

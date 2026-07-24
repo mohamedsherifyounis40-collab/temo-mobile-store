@@ -18,14 +18,15 @@ namespace TemoStore.Data.Repositories
             _tx = tx;
         }
 
-        public void UpsertStatus(int employeeId, DateTime date, string status)
+        public void UpsertStatus(int employeeId, DateTime date, string status, decimal overtimeHours)
         {
             using var cmd = new SqliteCommand(
-                @"INSERT INTO AttendanceRecords (EmployeeId, AttendanceDate, Status) VALUES (@Id, @Date, @Status)
-                  ON CONFLICT(EmployeeId, AttendanceDate) DO UPDATE SET Status = excluded.Status", _conn, _tx);
+                @"INSERT INTO AttendanceRecords (EmployeeId, AttendanceDate, Status, OvertimeHours) VALUES (@Id, @Date, @Status, @Overtime)
+                  ON CONFLICT(EmployeeId, AttendanceDate) DO UPDATE SET Status = excluded.Status, OvertimeHours = excluded.OvertimeHours", _conn, _tx);
             cmd.Parameters.AddWithValue("@Id", employeeId);
             cmd.Parameters.AddWithValue("@Date", date.ToString("yyyy-MM-dd"));
             cmd.Parameters.AddWithValue("@Status", status);
+            cmd.Parameters.AddWithValue("@Overtime", overtimeHours);
             cmd.ExecuteNonQuery();
         }
 
@@ -38,30 +39,42 @@ namespace TemoStore.Data.Repositories
             return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
         }
 
-        public (int Present, int Absent, int Leave) GetAttendanceCounts(int employeeId, int year, int month)
+        public (int Present, int Absent, int Leave, decimal OvertimeHours) GetAttendanceCounts(int employeeId, int year, int month)
         {
             int present = 0, absent = 0, leave = 0;
             string monthPrefix = $"{year:0000}-{month:00}";
-            using var cmd = new SqliteCommand("SELECT Status, COUNT(*) FROM AttendanceRecords WHERE EmployeeId = @Id AND AttendanceDate LIKE @Prefix GROUP BY Status", _conn, _tx);
-            cmd.Parameters.AddWithValue("@Id", employeeId);
-            cmd.Parameters.AddWithValue("@Prefix", monthPrefix + "%");
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            using (var cmd = new SqliteCommand("SELECT Status, COUNT(*) FROM AttendanceRecords WHERE EmployeeId = @Id AND AttendanceDate LIKE @Prefix GROUP BY Status", _conn, _tx))
             {
-                string status = reader.GetString(0);
-                int count = reader.GetInt32(1);
-                if (status == StatusPresent) present = count;
-                else if (status == StatusAbsent) absent = count;
-                else if (status == StatusLeave) leave = count;
+                cmd.Parameters.AddWithValue("@Id", employeeId);
+                cmd.Parameters.AddWithValue("@Prefix", monthPrefix + "%");
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    string status = reader.GetString(0);
+                    int count = reader.GetInt32(1);
+                    if (status == StatusPresent) present = count;
+                    else if (status == StatusAbsent) absent = count;
+                    else if (status == StatusLeave) leave = count;
+                }
             }
-            return (present, absent, leave);
+
+            decimal overtimeHours = 0;
+            using (var cmd = new SqliteCommand("SELECT SUM(OvertimeHours) FROM AttendanceRecords WHERE EmployeeId = @Id AND AttendanceDate LIKE @Prefix", _conn, _tx))
+            {
+                cmd.Parameters.AddWithValue("@Id", employeeId);
+                cmd.Parameters.AddWithValue("@Prefix", monthPrefix + "%");
+                var res = cmd.ExecuteScalar();
+                if (res != null && res != DBNull.Value) overtimeHours = Convert.ToDecimal(res);
+            }
+
+            return (present, absent, leave, overtimeHours);
         }
 
-        public void InsertClosure(int employeeId, int year, int month, decimal monthlySalary, decimal dayValue, int presentDays, int absentDays, int leaveDays, decimal netSalary)
+        public void InsertClosure(int employeeId, int year, int month, decimal monthlySalary, decimal dayValue, int presentDays, int absentDays, int leaveDays, decimal overtimeHours, decimal overtimeAmount, decimal netSalary)
         {
             using var cmd = new SqliteCommand(
-                @"INSERT INTO PayrollClosures (EmployeeId, Year, Month, MonthlySalary, DayValue, PresentDays, AbsentDays, LeaveDays, NetSalary)
-                  VALUES (@Id, @Y, @M, @Salary, @DayValue, @Present, @Absent, @Leave, @Net)", _conn, _tx);
+                @"INSERT INTO PayrollClosures (EmployeeId, Year, Month, MonthlySalary, DayValue, PresentDays, AbsentDays, LeaveDays, OvertimeHours, OvertimeAmount, NetSalary)
+                  VALUES (@Id, @Y, @M, @Salary, @DayValue, @Present, @Absent, @Leave, @OvertimeHours, @OvertimeAmount, @Net)", _conn, _tx);
             cmd.Parameters.AddWithValue("@Id", employeeId);
             cmd.Parameters.AddWithValue("@Y", year);
             cmd.Parameters.AddWithValue("@M", month);
@@ -70,6 +83,8 @@ namespace TemoStore.Data.Repositories
             cmd.Parameters.AddWithValue("@Present", presentDays);
             cmd.Parameters.AddWithValue("@Absent", absentDays);
             cmd.Parameters.AddWithValue("@Leave", leaveDays);
+            cmd.Parameters.AddWithValue("@OvertimeHours", overtimeHours);
+            cmd.Parameters.AddWithValue("@OvertimeAmount", overtimeAmount);
             cmd.Parameters.AddWithValue("@Net", netSalary);
             cmd.ExecuteNonQuery();
         }

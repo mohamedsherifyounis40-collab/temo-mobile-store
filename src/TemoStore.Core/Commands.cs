@@ -268,6 +268,7 @@ namespace TemoStore.Core.Commands
         public required int EmployeeId { get; set; }
         public required DateTime Date { get; set; }
         public required string Status { get; set; }
+        public decimal OvertimeHours { get; set; } = 0m;
         public required string PerformedBy { get; set; }
     }
 
@@ -301,6 +302,7 @@ namespace TemoStore.Core.Commands
         public required string FullName { get; set; }
         public string? Phone { get; set; }
         public required decimal MonthlySalary { get; set; }
+        public decimal StandardHoursPerDay { get; set; } = 8m;
         public required DateTime HireDate { get; set; }
         public required string PerformedBy { get; set; }
     }
@@ -311,6 +313,7 @@ namespace TemoStore.Core.Commands
         public required string FullName { get; set; }
         public string? Phone { get; set; }
         public required decimal MonthlySalary { get; set; }
+        public decimal StandardHoursPerDay { get; set; } = 8m;
         public required DateTime HireDate { get; set; }
         public required string PerformedBy { get; set; }
     }

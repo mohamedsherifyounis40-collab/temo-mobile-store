@@ -128,19 +128,20 @@ namespace Temo_Mobile_Store
 
         public static bool IsTodayClosed(string paymentMethod = "نقدي") => IsDateClosed(DateTime.Now, paymentMethod);
 
-        // بيانات المتجر (اسم/تليفون/عنوان/شعار) - مستخدمة في طباعة الفاتورة وشاشة الإعدادات
-        public static void LoadStoreSettings(out string storeName, out string phone, out string address, out byte[] logo)
+        // بيانات المتجر (اسم/تليفون/عنوان/شعار/واتساب) - مستخدمة في طباعة الفاتورة وشاشة الإعدادات
+        public static void LoadStoreSettings(out string storeName, out string phone, out string address, out byte[] logo, out string whatsApp)
         {
             storeName = "Temo Mobile Store";
             phone = "";
             address = "";
             logo = null;
+            whatsApp = "";
             try
             {
                 using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
                 {
                     conn.Open();
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT StoreName, Phone, Address, LogoImage FROM StoreSettings WHERE Id = 1;", conn))
+                    using (SqliteCommand cmd = new SqliteCommand("SELECT StoreName, Phone, Address, LogoImage, WhatsAppNumber FROM StoreSettings WHERE Id = 1;", conn))
                     using (SqliteDataReader reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
@@ -149,6 +150,7 @@ namespace Temo_Mobile_Store
                             phone = reader["Phone"] == DBNull.Value ? "" : reader["Phone"].ToString();
                             address = reader["Address"] == DBNull.Value ? "" : reader["Address"].ToString();
                             logo = reader["LogoImage"] == DBNull.Value ? null : (byte[])reader["LogoImage"];
+                            whatsApp = reader["WhatsAppNumber"] == DBNull.Value ? "" : reader["WhatsAppNumber"].ToString();
                         }
                     }
                 }
