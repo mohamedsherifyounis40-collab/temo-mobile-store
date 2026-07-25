@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Linq;
 using System.Drawing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
@@ -161,7 +162,7 @@ namespace Temo_Mobile_Store
             Guna2Panel pnlActions = new Guna2Panel()
             {
                 Location = new Point(0, 535),
-                Size = new Size(300, 175),
+                Size = new Size(300, 255),
                 FillColor = Color.White,
                 BorderRadius = 14,
                 BorderColor = Color.FromArgb(230, 232, 238),
@@ -177,7 +178,13 @@ namespace Temo_Mobile_Store
             btnClear = new Guna2Button() { Text = "تفريغ الخانات", Location = new Point(20, 112), Width = 260, Height = 34, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 10 };
             btnClear.Click += (s, e) => ClearInputs();
 
-            pnlActions.Controls.AddRange(new Control[] { btnSaveUpdate, btnDeleteProduct, btnClear });
+            Guna2Button btnDownloadTemplate = new Guna2Button() { Text = "تحميل قالب إكسل ⬇️", Location = new Point(20, 156), Width = 260, Height = 34, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 10 };
+            btnDownloadTemplate.Click += BtnDownloadTemplate_Click;
+
+            Guna2Button btnImportExcel = new Guna2Button() { Text = "استيراد من إكسل 📥", Location = new Point(20, 200), Width = 260, Height = 34, FillColor = ColorPrimary, BorderRadius = 10 };
+            btnImportExcel.Click += BtnImportExcel_Click;
+
+            pnlActions.Controls.AddRange(new Control[] { btnSaveUpdate, btnDeleteProduct, btnClear, btnDownloadTemplate, btnImportExcel });
 
             // ---------- كارت الجدول ----------
             Guna2Panel pnlGridCard = new Guna2Panel()
@@ -245,6 +252,48 @@ namespace Temo_Mobile_Store
                 txtBarcode.ReadOnly = true;
                 btnSaveUpdate.Enabled = false;
             }
+        }
+
+        private void BtnDownloadTemplate_Click(object sender, EventArgs e)
+        {
+            using SaveFileDialog dlg = new SaveFileDialog
+            {
+                Filter = "ملف إكسل (*.xlsx)|*.xlsx",
+                FileName = "قالب_استيراد_منتجات.xlsx"
+            };
+            if (dlg.ShowDialog(this.FindForm()) != DialogResult.OK) return;
+
+            try
+            {
+                ExcelImportHelper.GenerateProductTemplate(dlg.FileName);
+                MessageBox.Show("تم إنشاء القالب بنجاح. املا الأعمدة (باركود، اسم المنتج، سعر الشراء، سعر البيع، الكمية) وارجع استورد الملف.", "تم", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        private void BtnImportExcel_Click(object sender, EventArgs e)
+        {
+            using OpenFileDialog dlg = new OpenFileDialog
+            {
+                Filter = "ملف إكسل (*.xlsx)|*.xlsx"
+            };
+            if (dlg.ShowDialog(this.FindForm()) != DialogResult.OK) return;
+
+            try
+            {
+                var result = ExcelImportHelper.ImportProducts(dlg.FileName, AuthManager.CurrentUsername);
+                LoadProductsData();
+
+                string summary = $"تم استيراد {result.SuccessCount} منتج بنجاح.";
+                if (result.SkippedDuplicateBarcodes.Count > 0)
+                    summary += $"\nاتخطّى {result.SkippedDuplicateBarcodes.Count} صف باركود موجود بالفعل: {string.Join(", ", result.SkippedDuplicateBarcodes.Take(10))}{(result.SkippedDuplicateBarcodes.Count > 10 ? " ..." : "")}";
+                if (result.RowErrors.Count > 0)
+                    summary += $"\n\nأخطاء ({result.RowErrors.Count}):\n{string.Join("\n", result.RowErrors.Take(15))}{(result.RowErrors.Count > 15 ? "\n..." : "")}";
+
+                MessageBox.Show(summary, "نتيجة الاستيراد", MessageBoxButtons.OK,
+                    result.RowErrors.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
 
         private void BtnAddProduct_Click(object sender, EventArgs e)
