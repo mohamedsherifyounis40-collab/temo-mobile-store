@@ -39,6 +39,7 @@ namespace Temo_Mobile_Store
         public AccountsPageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -55,9 +56,10 @@ namespace Temo_Mobile_Store
             cmbAccountsViewType.Items.AddRange(new string[] { "شجرة الحسابات 🌳", "قائمة الدخل 📈", "ميزان المراجعة ⚖️" });
             cmbAccountsViewType.SelectedIndexChanged += CmbAccountsViewType_SelectedIndexChanged;
 
-            pnlAccountsTree = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 680) };
-            pnlIncomeStatement = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 680) };
-            pnlTrialBalance = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 680) };
+            AnchorStyles fillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            pnlAccountsTree = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 680), Anchor = fillAnchor };
+            pnlIncomeStatement = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 680), Anchor = fillAnchor };
+            pnlTrialBalance = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 680), Anchor = fillAnchor };
 
             BuildAccountsTreePanel();
             BuildIncomeStatementPanel();
@@ -121,10 +123,11 @@ namespace Temo_Mobile_Store
             };
             pnlNote.Controls.Add(lblNote);
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📒 كل الحسابات المسجّلة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvAccountsTree = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 615), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvAccountsTree = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 615), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvAccountsTree.CellClick += DgvAccountsTree_CellClick;
             StyleDataGridView(dgvAccountsTree);
             pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvAccountsTree });
@@ -168,10 +171,11 @@ namespace Temo_Mobile_Store
             };
             pnlNote.Controls.Add(lblNote);
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor2 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), Anchor = gridFillAnchor2, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📈 قائمة الدخل التفصيلية", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvIncomeStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 615), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvIncomeStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 615), Anchor = gridFillAnchor2, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvIncomeStatement.DefaultCellStyle.Font = new Font("Segoe UI", 10F);
             StyleDataGridView(dgvIncomeStatement);
             pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvIncomeStatement });
@@ -204,10 +208,11 @@ namespace Temo_Mobile_Store
             };
             pnlNote.Controls.Add(lblNote);
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor3 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), Anchor = gridFillAnchor3, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "⚖️ ميزان المراجعة - كل الحسابات", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvTrialBalance = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 615), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvTrialBalance = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 615), Anchor = gridFillAnchor3, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvTrialBalance.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F);
             StyleDataGridView(dgvTrialBalance);
             pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvTrialBalance });

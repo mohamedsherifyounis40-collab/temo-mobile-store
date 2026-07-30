@@ -18,7 +18,7 @@ namespace TemoStore.Data.Repositories
         public int Insert(SaleRecord sale)
         {
             using (var cmd = new SqliteCommand(
-                "INSERT INTO Sales (Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, IMEI, PaymentMethod) VALUES (@Barcode, @ProductName, @CostPrice, @Price, @QuantitySold, @Total, @CustomerId, @PaymentType, @IMEI, @PaymentMethod)", _conn, _tx))
+                "INSERT INTO Sales (Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, IMEI, PaymentMethod, SalesInvoiceId) VALUES (@Barcode, @ProductName, @CostPrice, @Price, @QuantitySold, @Total, @CustomerId, @PaymentType, @IMEI, @PaymentMethod, @SalesInvoiceId)", _conn, _tx))
             {
                 cmd.Parameters.AddWithValue("@Barcode", sale.Barcode);
                 cmd.Parameters.AddWithValue("@ProductName", sale.ProductName);
@@ -30,15 +30,52 @@ namespace TemoStore.Data.Repositories
                 cmd.Parameters.AddWithValue("@PaymentType", sale.PaymentType);
                 cmd.Parameters.AddWithValue("@IMEI", (object?)sale.Imei ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@PaymentMethod", (object?)sale.PaymentMethod ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@SalesInvoiceId", sale.SalesInvoiceId == 0 ? (object)DBNull.Value : sale.SalesInvoiceId);
                 cmd.ExecuteNonQuery();
             }
             using var cmdId = new SqliteCommand("SELECT last_insert_rowid();", _conn, _tx);
             return Convert.ToInt32(cmdId.ExecuteScalar());
         }
 
+        public void SetInvoiceId(int saleId, int invoiceId)
+        {
+            using var cmd = new SqliteCommand("UPDATE Sales SET SalesInvoiceId = @InvoiceId WHERE SaleID = @Id", _conn, _tx);
+            cmd.Parameters.AddWithValue("@InvoiceId", invoiceId);
+            cmd.Parameters.AddWithValue("@Id", saleId);
+            cmd.ExecuteNonQuery();
+        }
+
+        public IReadOnlyList<SaleRecord> GetByInvoiceId(int invoiceId)
+        {
+            var results = new List<SaleRecord>();
+            using var cmd = new SqliteCommand("SELECT SaleID, Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId FROM Sales WHERE SalesInvoiceId = @InvoiceId ORDER BY SaleID ASC", _conn, _tx);
+            cmd.Parameters.AddWithValue("@InvoiceId", invoiceId);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                results.Add(new SaleRecord
+                {
+                    SaleId = Convert.ToInt32(reader["SaleID"]),
+                    Barcode = reader["Barcode"].ToString()!,
+                    ProductName = reader["ProductName"].ToString()!,
+                    CostPrice = Convert.ToDecimal(reader["CostPrice"]),
+                    Price = Convert.ToDecimal(reader["Price"]),
+                    QuantitySold = Convert.ToInt32(reader["QuantitySold"]),
+                    Total = Convert.ToDecimal(reader["Total"]),
+                    CustomerId = reader["CustomerId"] == DBNull.Value ? null : Convert.ToInt32(reader["CustomerId"]),
+                    PaymentType = reader["PaymentType"] == DBNull.Value ? "" : reader["PaymentType"].ToString()!,
+                    PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
+                    SaleDate = reader["SaleDate"].ToString()!,
+                    Imei = reader["IMEI"] == DBNull.Value ? null : reader["IMEI"].ToString(),
+                    SalesInvoiceId = reader["SalesInvoiceId"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SalesInvoiceId"])
+                });
+            }
+            return results;
+        }
+
         public SaleRecord? GetById(int saleId)
         {
-            using var cmd = new SqliteCommand("SELECT Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI FROM Sales WHERE SaleID = @Id", _conn, _tx);
+            using var cmd = new SqliteCommand("SELECT Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId FROM Sales WHERE SaleID = @Id", _conn, _tx);
             cmd.Parameters.AddWithValue("@Id", saleId);
             using var reader = cmd.ExecuteReader();
             if (!reader.Read()) return null;
@@ -55,7 +92,8 @@ namespace TemoStore.Data.Repositories
                 PaymentType = reader["PaymentType"] == DBNull.Value ? "" : reader["PaymentType"].ToString()!,
                 PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
                 SaleDate = reader["SaleDate"].ToString()!,
-                Imei = reader["IMEI"] == DBNull.Value ? null : reader["IMEI"].ToString()
+                Imei = reader["IMEI"] == DBNull.Value ? null : reader["IMEI"].ToString(),
+                SalesInvoiceId = reader["SalesInvoiceId"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SalesInvoiceId"])
             };
         }
 
@@ -75,11 +113,11 @@ namespace TemoStore.Data.Repositories
             cmd.ExecuteNonQuery();
         }
 
-        public int GetDailyInvoiceNumber(int saleId, string saleDate)
+        public int GetDailyInvoiceNumber(int invoiceId, string saleDate)
         {
-            using var cmd = new SqliteCommand("SELECT COUNT(*) FROM Sales WHERE date(SaleDate) = date(@SaleDate) AND SaleID <= @SaleId", _conn, _tx);
+            using var cmd = new SqliteCommand("SELECT COUNT(DISTINCT SalesInvoiceId) FROM Sales WHERE date(SaleDate) = date(@SaleDate) AND SalesInvoiceId <= @InvoiceId", _conn, _tx);
             cmd.Parameters.AddWithValue("@SaleDate", saleDate);
-            cmd.Parameters.AddWithValue("@SaleId", saleId);
+            cmd.Parameters.AddWithValue("@InvoiceId", invoiceId);
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
     }

@@ -22,6 +22,7 @@ namespace Temo_Mobile_Store
             public string Type;
             public string Title;
             public string Subtitle;
+            public string ItemKey; // المفتاح اللي بيحدد الصف في الشاشة المستهدفة (باركود/رقم عميل/رقم مورد/رقم تذكرة/رقم بيع)
         }
 
         private static readonly Color ColorPrimary = Color.FromArgb(26, 43, 76);
@@ -30,6 +31,7 @@ namespace Temo_Mobile_Store
         private List<SearchResultItem> currentResults = new List<SearchResultItem>();
 
         public string SelectedPageKey { get; private set; } = null;
+        public string SelectedItemKey { get; private set; } = null;
 
         public UniversalSearchForm()
         {
@@ -105,47 +107,47 @@ namespace Temo_Mobile_Store
                         using (SqliteDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
-                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Product, Type = "منتج 📦", Title = reader["ProductName"].ToString(), Subtitle = $"باركود: {reader["Barcode"]} | الكمية: {reader["Quantity"]}" });
+                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Product, Type = "منتج 📦", Title = reader["ProductName"].ToString(), Subtitle = $"باركود: {reader["Barcode"]} | الكمية: {reader["Quantity"]}", ItemKey = reader["Barcode"].ToString() });
                         }
                     }
 
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT CustomerName, Phone FROM Customers WHERE CustomerName LIKE @q OR Phone LIKE @q LIMIT 15", conn))
+                    using (SqliteCommand cmd = new SqliteCommand("SELECT CustomerId, CustomerName, Phone FROM Customers WHERE CustomerName LIKE @q OR Phone LIKE @q LIMIT 15", conn))
                     {
                         cmd.Parameters.AddWithValue("@q", like);
                         using (SqliteDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
-                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Customer, Type = "عميل 👤", Title = reader["CustomerName"].ToString(), Subtitle = $"تليفون: {reader["Phone"]}" });
+                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Customer, Type = "عميل 👤", Title = reader["CustomerName"].ToString(), Subtitle = $"تليفون: {reader["Phone"]}", ItemKey = reader["CustomerId"].ToString() });
                         }
                     }
 
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT SupplierName, Phone FROM Suppliers WHERE SupplierName LIKE @q OR Phone LIKE @q LIMIT 15", conn))
+                    using (SqliteCommand cmd = new SqliteCommand("SELECT SupplierId, SupplierName, Phone FROM Suppliers WHERE SupplierName LIKE @q OR Phone LIKE @q LIMIT 15", conn))
                     {
                         cmd.Parameters.AddWithValue("@q", like);
                         using (SqliteDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
-                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Supplier, Type = "مورد 🚚", Title = reader["SupplierName"].ToString(), Subtitle = $"تليفون: {reader["Phone"]}" });
+                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Supplier, Type = "مورد 🚚", Title = reader["SupplierName"].ToString(), Subtitle = $"تليفون: {reader["Phone"]}", ItemKey = reader["SupplierId"].ToString() });
                         }
                     }
 
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT CustomerName, CustomerPhone, DeviceInfo, Status FROM MaintenanceTickets WHERE CustomerName LIKE @q OR CustomerPhone LIKE @q OR DeviceInfo LIKE @q LIMIT 15", conn))
+                    using (SqliteCommand cmd = new SqliteCommand("SELECT TicketId, CustomerName, CustomerPhone, DeviceInfo, Status FROM MaintenanceTickets WHERE CustomerName LIKE @q OR CustomerPhone LIKE @q OR DeviceInfo LIKE @q LIMIT 15", conn))
                     {
                         cmd.Parameters.AddWithValue("@q", like);
                         using (SqliteDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
-                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Maintenance, Type = "صيانة 🔧", Title = $"{reader["CustomerName"]} - {reader["DeviceInfo"]}", Subtitle = $"الحالة: {reader["Status"]} | {reader["CustomerPhone"]}" });
+                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Maintenance, Type = "صيانة 🔧", Title = $"{reader["CustomerName"]} - {reader["DeviceInfo"]}", Subtitle = $"الحالة: {reader["Status"]} | {reader["CustomerPhone"]}", ItemKey = reader["TicketId"].ToString() });
                         }
                     }
 
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT ProductName, Total, SaleDate, Barcode FROM Sales WHERE ProductName LIKE @q OR Barcode LIKE @q ORDER BY SaleID DESC LIMIT 15", conn))
+                    using (SqliteCommand cmd = new SqliteCommand("SELECT SaleID, ProductName, Total, SaleDate, Barcode FROM Sales WHERE ProductName LIKE @q OR Barcode LIKE @q ORDER BY SaleID DESC LIMIT 15", conn))
                     {
                         cmd.Parameters.AddWithValue("@q", like);
                         using (SqliteDataReader reader = cmd.ExecuteReader())
                         {
                             while (reader.Read())
-                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Sale, Type = "عملية بيع 🧾", Title = reader["ProductName"].ToString(), Subtitle = $"الإجمالي: {reader["Total"]} ج.م | {reader["SaleDate"]}" });
+                                currentResults.Add(new SearchResultItem { Kind = SearchResultKind.Sale, Type = "عملية بيع 🧾", Title = reader["ProductName"].ToString(), Subtitle = $"الإجمالي: {reader["Total"]} ج.م | {reader["SaleDate"]}", ItemKey = reader["SaleID"].ToString() });
                         }
                     }
                 }
@@ -177,6 +179,7 @@ namespace Temo_Mobile_Store
                 case SearchResultKind.Sale: SelectedPageKey = "Sales"; break;
                 default: SelectedPageKey = null; break;
             }
+            SelectedItemKey = result.ItemKey;
 
             this.DialogResult = DialogResult.OK;
             this.Close();

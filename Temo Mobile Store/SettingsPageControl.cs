@@ -55,6 +55,7 @@ namespace Temo_Mobile_Store
         public SettingsPageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -71,9 +72,10 @@ namespace Temo_Mobile_Store
             cmbSettingsViewType.Items.AddRange(new string[] { "إعدادات المحل ⚙️", "النسخ الاحتياطي 💾", "إدارة المستخدمين 👤" });
             cmbSettingsViewType.SelectedIndexChanged += CmbSettingsViewType_SelectedIndexChanged;
 
-            pnlStoreSettings = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 700), AutoScroll = true };
-            pnlBackup = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 650) };
-            pnlUsers = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 650) };
+            AnchorStyles fillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            pnlStoreSettings = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 700), AutoScroll = true, Anchor = fillAnchor };
+            pnlBackup = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 710), Anchor = fillAnchor };
+            pnlUsers = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 650), Anchor = fillAnchor };
 
             BuildStoreSettingsPanel();
             BuildBackupPanel();
@@ -330,8 +332,9 @@ namespace Temo_Mobile_Store
                 ForeColor = Color.FromArgb(85, 92, 102)
             };
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 230), Size = new Size(1080, 470), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            dgvBackups = new DataGridView() { Location = new Point(20, 20), Size = new Size(1040, 430), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
+            AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 230), Size = new Size(1080, 470), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            dgvBackups = new DataGridView() { Location = new Point(20, 20), Size = new Size(1040, 430), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
             StyleDataGridView(dgvBackups);
             pnlGridCard.Controls.Add(dgvBackups);
 
@@ -514,10 +517,11 @@ namespace Temo_Mobile_Store
             };
             pnlNote.Controls.Add(lblNote);
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 620), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 620), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "👥 المستخدمين المسجّلين", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvUsers = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 555), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvUsers = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 555), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvUsers.CellClick += DgvUsers_CellClick;
             StyleDataGridView(dgvUsers);
             pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvUsers });

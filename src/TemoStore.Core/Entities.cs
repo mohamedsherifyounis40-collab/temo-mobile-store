@@ -31,6 +31,18 @@ namespace TemoStore.Core.Entities
         public string? PaymentMethod { get; set; }        // نقدي/فوري/... - لو PaymentType == "Cash"
         public string? Imei { get; set; }
         public string SaleDate { get; set; } = "";
+        public int SalesInvoiceId { get; set; }           // بيربط عدة أصناف تحت نفس رقم الفاتورة
+    }
+
+    // صنف واحد جوه فاتورة بيع ممكن تحتوي على أكتر من صنف - نفس مبدأ PurchaseLine بالظبط
+    public class SaleLine
+    {
+        public required string Barcode { get; set; }
+        public required string ProductName { get; set; }
+        public required decimal UnitPrice { get; set; }
+        public required int Quantity { get; set; }
+        public required decimal Total { get; set; }
+        public string? Imei { get; set; }
     }
 
     public class PurchaseLine

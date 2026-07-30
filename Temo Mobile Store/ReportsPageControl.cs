@@ -49,6 +49,7 @@ namespace Temo_Mobile_Store
         public ReportsPageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -67,9 +68,10 @@ namespace Temo_Mobile_Store
             cmbReportsViewType.Items.AddRange(new string[] { "الملخص المالي وإقفال اليوم 📊", "سجل إقفال الأيام 🔒", "كشف حساب الوسائل 📋" });
             cmbReportsViewType.SelectedIndexChanged += CmbReportsViewType_SelectedIndexChanged;
 
-            pnlSummary = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 1050), AutoScroll = true };
-            pnlClosuresLog = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 680) };
-            pnlStatements = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 680) };
+            AnchorStyles fillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            pnlSummary = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 1050), AutoScroll = true, Anchor = fillAnchor };
+            pnlClosuresLog = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 680), Anchor = fillAnchor };
+            pnlStatements = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 710), Anchor = fillAnchor };
 
             BuildSummaryPanel();
             BuildClosuresLogPanel();
@@ -160,13 +162,14 @@ namespace Temo_Mobile_Store
 
             pnlActions.Controls.AddRange(new Control[] { btnRefreshReports, btnCloseDay, btnReopenDay });
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 1000), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 1000), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblTableTitle = new Label() { Text = "📈 سجل الأرباح التفصيلي", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Guna2Button btnPrintReport = new Guna2Button() { Text = "طباعة / PDF 🖨️", Location = new Point(640, 12), Width = 140, Height = 30, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 8 };
             btnPrintReport.Click += (s, e) => GridPrintHelper.Print(dgvReports, "سجل الأرباح التفصيلي", this.FindForm());
 
-            dgvReports = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 935), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvReports = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 935), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             StyleDataGridView(dgvReports);
             pnlGridCard.Controls.AddRange(new Control[] { lblTableTitle, btnPrintReport, dgvReports });
 
@@ -178,10 +181,12 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildClosuresLogPanel()
         {
-            Guna2Panel pnlLogCard = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 385), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            // الكارتين دول واقفين فوق بعض عموديًا، فبنمدّهم عرضًا بس (Top|Left|Right) من غير Bottom عشان محدش يغطي التاني
+            AnchorStyles widenAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlLogCard = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 385), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblLogTitle = new Label() { Text = "🔒 سجل الأيام المُقفلة بالتفصيل", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvClosuresLog = new DataGridView() { Location = new Point(20, 50), Size = new Size(1060, 320), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, ReadOnly = true, AllowUserToAddRows = false };
+            dgvClosuresLog = new DataGridView() { Location = new Point(20, 50), Size = new Size(1060, 320), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, ReadOnly = true, AllowUserToAddRows = false };
             dgvClosuresLog.CellClick += DgvClosuresLog_CellClick;
             dgvClosuresLog.DefaultCellStyle.Font = new Font("Segoe UI", 10.5F);
             dgvClosuresLog.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
@@ -190,10 +195,10 @@ namespace Temo_Mobile_Store
             StyleDataGridView(dgvClosuresLog);
             pnlLogCard.Controls.AddRange(new Control[] { lblLogTitle, dgvClosuresLog });
 
-            Guna2Panel pnlDetailsCard = new Guna2Panel() { Location = new Point(0, 400), Size = new Size(1100, 260), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlDetailsCard = new Guna2Panel() { Location = new Point(0, 400), Size = new Size(1100, 260), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblClosureDetailsTitle = new Label() { Text = "🧾 تفاصيل فئات الكاش الفعلي لليوم المحدد (دوس على أي صف فوق)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvClosureDetails = new DataGridView() { Location = new Point(20, 50), Size = new Size(1060, 195), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, ReadOnly = true, AllowUserToAddRows = false };
+            dgvClosureDetails = new DataGridView() { Location = new Point(20, 50), Size = new Size(1060, 195), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, ReadOnly = true, AllowUserToAddRows = false };
             dgvClosureDetails.DefaultCellStyle.Font = new Font("Segoe UI", 10.5F);
             dgvClosureDetails.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
             dgvClosureDetails.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
@@ -311,10 +316,11 @@ namespace Temo_Mobile_Store
             Guna2Button btnShowAllStatement = new Guna2Button() { Text = "عرض كل الفترات 🔄", Location = new Point(0, 530), Width = 280, Height = 34, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
             btnShowAllStatement.Click += (s, e) => ShowStatement(false);
 
-            Guna2Panel pnlStatementGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 700), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor2 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlStatementGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 700), Anchor = gridFillAnchor2, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle2 = new Label() { Text = "📄 كشف الحساب بالتفصيل", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 635), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, ReadOnly = true, AllowUserToAddRows = false };
+            dgvStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 635), Anchor = gridFillAnchor2, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, ReadOnly = true, AllowUserToAddRows = false };
             dgvStatement.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F);
             dgvStatement.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             dgvStatement.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;

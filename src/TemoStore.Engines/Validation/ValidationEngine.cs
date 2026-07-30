@@ -22,38 +22,67 @@ namespace TemoStore.Engines.Validation
         {
             var errors = new List<string>();
 
-            if (string.IsNullOrWhiteSpace(command.Barcode)) errors.Add("لازم باركود للمنتج.");
-            if (command.Quantity <= 0) errors.Add("الكمية لازم تكون أكبر من صفر.");
+            if (command.Lines == null || command.Lines.Count == 0)
+                errors.Add("لازم صنف واحد على الأقل في الفاتورة.");
 
             if (_dateClosure.IsClosed(DateTime.Now))
                 errors.Add("تم إقفال اليوم بالفعل، لا يمكن تسجيل مبيعات جديدة.");
 
-            using (var uow = _uowFactory.Create())
+            if (command.Lines != null && command.Lines.Count > 0)
             {
-                var product = uow.Products.GetByBarcode(command.Barcode);
-                if (product == null)
-                    errors.Add("المنتج غير موجود بالمخزون.");
-                else
+                using (var uow = _uowFactory.Create())
                 {
-                    if (product.Quantity < command.Quantity)
-                        errors.Add($"الكمية المطلوبة أكبر من المتاح! المتاح حاليًا هو: {product.Quantity}");
-                    if (product.IsSerialized && string.IsNullOrWhiteSpace(command.Imei))
-                        errors.Add("لازم تحدد رقم IMEI لمنتج بسيريال.");
-                }
+                    // بنجمع الكمية المطلوبة لكل باركود على حدة، عشان لو نفس الصنف اتكرر
+                    // في أكتر من سطر في نفس الفاتورة، نتأكد إن الإجمالي مش أكبر من المتاح
+                    var requestedQtyByBarcode = new Dictionary<string, int>();
+                    var seenImeis = new HashSet<string>();
 
-                if (command.PaymentType == "Credit")
-                {
-                    if (command.CustomerId == null)
-                        errors.Add("البيع بالآجل لازم يكون له عميل محدد.");
-                    else if (!uow.Customers.Exists(command.CustomerId.Value))
-                        errors.Add("العميل المحدد غير موجود.");
-                }
-                else if (command.PaymentType == "Cash" && string.IsNullOrWhiteSpace(command.PaymentMethod))
-                {
-                    errors.Add("لازم تحدد وسيلة الدفع للبيع الكاش.");
-                }
+                    foreach (var line in command.Lines)
+                    {
+                        if (string.IsNullOrWhiteSpace(line.Barcode))
+                        {
+                            errors.Add("لازم باركود لكل صنف في الفاتورة.");
+                            continue;
+                        }
+                        if (line.Quantity <= 0)
+                        {
+                            errors.Add($"كمية الصنف \"{line.ProductName}\" لازم تكون أكبر من صفر.");
+                            continue;
+                        }
 
-                uow.Rollback();
+                        var product = uow.Products.GetByBarcode(line.Barcode);
+                        if (product == null)
+                        {
+                            errors.Add($"المنتج \"{line.ProductName}\" غير موجود بالمخزون.");
+                            continue;
+                        }
+
+                        if (product.IsSerialized && string.IsNullOrWhiteSpace(line.Imei))
+                            errors.Add($"لازم تحدد رقم IMEI لمنتج \"{line.ProductName}\" (بسيريال).");
+
+                        if (!string.IsNullOrWhiteSpace(line.Imei) && !seenImeis.Add(line.Imei))
+                            errors.Add($"رقم IMEI \"{line.Imei}\" مكرر أكتر من مرة في نفس الفاتورة.");
+
+                        requestedQtyByBarcode.TryGetValue(line.Barcode, out int soFar);
+                        requestedQtyByBarcode[line.Barcode] = soFar + line.Quantity;
+                        if (requestedQtyByBarcode[line.Barcode] > product.Quantity)
+                            errors.Add($"الكمية المطلوبة من \"{line.ProductName}\" أكبر من المتاح! المتاح حاليًا هو: {product.Quantity}");
+                    }
+
+                    if (command.PaymentType == "Credit")
+                    {
+                        if (command.CustomerId == null)
+                            errors.Add("البيع بالآجل لازم يكون له عميل محدد.");
+                        else if (!uow.Customers.Exists(command.CustomerId.Value))
+                            errors.Add("العميل المحدد غير موجود.");
+                    }
+                    else if (command.PaymentType == "Cash" && string.IsNullOrWhiteSpace(command.PaymentMethod))
+                    {
+                        errors.Add("لازم تحدد وسيلة الدفع للبيع الكاش.");
+                    }
+
+                    uow.Rollback();
+                }
             }
 
             return errors.Count == 0 ? ValidationResult.Ok() : new ValidationResult { IsValid = false, Errors = errors };

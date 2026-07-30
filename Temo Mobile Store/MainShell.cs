@@ -66,6 +66,10 @@ namespace Temo_Mobile_Store
         private Guna2Button activeSidebarButton;
         private string currentPageKey = null;
 
+        // نافذة مستقلة لكل صفحة (غير الرئيسية) بتتفتح لما تُضغط من السايدبار.
+        // مفتاح الصفحة → الفورم المفتوح ليها حاليًا، عشان لو اتضغطت تاني وهي مفتوحة نجيبها لقدام بدل ما نفتح نسخة جديدة.
+        private readonly Dictionary<string, Form> openPageWindows = new Dictionary<string, Form>();
+
         // تايمر التحديث التلقائي: بيحدّث جرس الإشعارات، وكمان يعيد بناء صفحة الداشبورد
         // لو هي المفتوحة دلوقتي، عشان الأرقام تفضل حديثة من غير ما المستخدم يغيّر الصفحة يدويًا
         private System.Windows.Forms.Timer autoRefreshTimer;
@@ -148,8 +152,8 @@ namespace Temo_Mobile_Store
             autoRefreshTimer.Tick += (s, e) =>
             {
                 RefreshNotificationBadge();
-                if (currentPageKey == PageKeys.Home)
-                    BuildHomeDashboardPage();
+                // الداشبورد بقى دايمًا هو محتوى الشاشة الرئيسية تحت النوافذ التانية، فبيتحدّث كل تيك بغض النظر عن آخر تاب اتضغط
+                BuildHomeDashboardPage();
             };
             autoRefreshTimer.Start();
 
@@ -549,7 +553,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         // الملاحة الموحّدة - بتُستخدم من ضغطة السايدبار وكمان من الاختصارات السريعة (F2/F4/F5/F6)
         // ==========================================================================
-        private void NavigateToPageKey(string pageKey, string presetMovementType = null)
+        private void NavigateToPageKey(string pageKey, string presetMovementType = null, string highlightKey = null)
         {
             Guna2Button targetButton = sidebarButtons.FirstOrDefault(b => (b.Tag?.ToString() ?? "") == pageKey);
             if (targetButton == null) return; // الصفحة مش متاحة (مخفية عن الموظف مثلاً)
@@ -570,19 +574,19 @@ namespace Temo_Mobile_Store
             if (pageKey == PageKeys.Home)
                 BuildHomeDashboardPage();
             else if (pageKey == PageKeys.Sales)
-                BuildSalesPage();
+                BuildSalesPage(highlightKey);
             else if (pageKey == PageKeys.Inventory)
-                BuildInventoryPage();
+                BuildInventoryPage(highlightKey);
             else if (pageKey == PageKeys.InventoryCount)
                 BuildInventoryCountPage();
             else if (pageKey == PageKeys.Customers)
-                BuildCustomersPage();
+                BuildCustomersPage(highlightKey);
             else if (pageKey == PageKeys.Maintenance)
-                BuildMaintenancePage();
+                BuildMaintenancePage(highlightKey);
             else if (pageKey == PageKeys.Treasury)
                 BuildTreasuryPage(presetMovementType);
             else if (pageKey == PageKeys.Suppliers)
-                BuildSuppliersPage();
+                BuildSuppliersPage(highlightKey);
             else if (pageKey == PageKeys.Reports)
                 BuildReportsPage();
             else if (pageKey == PageKeys.Accounts)
@@ -596,13 +600,54 @@ namespace Temo_Mobile_Store
         }
 
         // ==========================================================================
+        // بيفتح صفحة تاب السايدبار (غير الرئيسية) في نافذة مستقلة بدل ما تستبدل محتوى الشاشة الرئيسية.
+        // لو الصفحة دي مفتوحة بالفعل في نافذة، بيجيبها لقدام (Activate/BringToFront) بدل ما يفتح نسخة جديدة.
+        // ==========================================================================
+        private Form OpenPageWindow(string pageKey, string title, Func<Control> createControl)
+        {
+            if (openPageWindows.TryGetValue(pageKey, out Form existing) && !existing.IsDisposed)
+            {
+                if (existing.WindowState == FormWindowState.Minimized)
+                    existing.WindowState = FormWindowState.Normal;
+                existing.Activate();
+                existing.BringToFront();
+                return existing;
+            }
+
+            Form pageForm = new Form
+            {
+                Text = title,
+                StartPosition = FormStartPosition.Manual,
+                RightToLeft = RightToLeft.Yes,
+                RightToLeftLayout = true,
+                Font = this.Font, // لازم نفس فونت MainShell بالظبط، وإلا الـ AutoScale بتاع الفورم بيلخبط كل الإحداثيات الثابتة جوه الصفحة (تراكب اللابلز، وأعمدة الجدول بتختفي)
+                Owner = this, // عشان تتقفل تلقائيًا لو البرنامج الرئيسي اتقفل
+                KeyPreview = true, // عشان اختصارات F2/F4/F5/F6 وCtrl+F (البحث الشامل) تشتغل من جوه النافذة دي كمان، مش بس من MainShell نفسه
+            };
+            pageForm.KeyDown += MainShell_KeyDown;
+            try { pageForm.Icon = this.Icon; } catch { }
+
+            // بنحط الأبعاد يدويًا على مساحة الشاشة الفعلية (WorkingArea، يعني من غير الـ Taskbar)
+            // بدل الاعتماد على WindowState.Maximized قبل ما الفورم يتعرض، عشان ده بيسبب أحيانًا
+            // مقاسات غلط (خصوصًا مع الفورم المالكة Owner) بدل ما ياخد المساحة كاملة فعلًا
+            pageForm.Bounds = Screen.FromControl(this).WorkingArea;
+
+            Control pageControl = createControl();
+            pageControl.Dock = DockStyle.Fill;
+            pageForm.Controls.Add(pageControl);
+
+            pageForm.FormClosed += (s, e) => openPageWindows.Remove(pageKey);
+            openPageWindows[pageKey] = pageForm;
+            pageForm.Show();
+            return pageForm;
+        }
+
+        // ==========================================================================
         // بناء صفحة "الإعدادات" - بتستخدم إعدادات المحل + النسخ الاحتياطي + المستخدمين (SettingsPageControl)
         // ==========================================================================
         private void BuildSettingsPage()
         {
-            pnlContent.Controls.Clear();
-            SettingsPageControl settingsPage = new SettingsPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(settingsPage);
+            OpenPageWindow(PageKeys.Settings, "الإعدادات", () => new SettingsPageControl());
         }
 
         // ==========================================================================
@@ -610,9 +655,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildAccountsPage()
         {
-            pnlContent.Controls.Clear();
-            AccountsPageControl accountsPage = new AccountsPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(accountsPage);
+            OpenPageWindow(PageKeys.Accounts, "الحسابات", () => new AccountsPageControl());
         }
 
         // ==========================================================================
@@ -620,9 +663,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildAttendancePage()
         {
-            pnlContent.Controls.Clear();
-            AttendancePageControl attendancePage = new AttendancePageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(attendancePage);
+            OpenPageWindow(PageKeys.Attendance, "الحضور والمرتبات", () => new AttendancePageControl());
         }
 
         // ==========================================================================
@@ -630,19 +671,17 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildReportsPage()
         {
-            pnlContent.Controls.Clear();
-            ReportsPageControl reportsPage = new ReportsPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(reportsPage);
+            OpenPageWindow(PageKeys.Reports, "التقارير", () => new ReportsPageControl());
         }
 
         // ==========================================================================
         // بناء صفحة "الموردين" - بتستخدم شاشة الموردين والمشتريات الحقيقية (SuppliersPageControl)
         // ==========================================================================
-        private void BuildSuppliersPage()
+        private void BuildSuppliersPage(string highlightKey = null)
         {
-            pnlContent.Controls.Clear();
-            SuppliersPageControl suppliersPage = new SuppliersPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(suppliersPage);
+            Form form = OpenPageWindow(PageKeys.Suppliers, "الموردين", () => new SuppliersPageControl());
+            if (highlightKey != null)
+                form.Controls.OfType<SuppliersPageControl>().FirstOrDefault()?.HighlightSupplier(highlightKey);
         }
 
         // ==========================================================================
@@ -650,41 +689,42 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildTreasuryPage(string presetMovementType = null)
         {
-            pnlContent.Controls.Clear();
-            TreasuryPageControl treasuryPage = new TreasuryPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(treasuryPage);
+            Form form = OpenPageWindow(PageKeys.Treasury, "الخزينة", () => new TreasuryPageControl());
             if (presetMovementType != null)
-                treasuryPage.ShowMovementEntry(presetMovementType);
+            {
+                TreasuryPageControl treasuryPage = form.Controls.OfType<TreasuryPageControl>().FirstOrDefault();
+                treasuryPage?.ShowMovementEntry(presetMovementType);
+            }
         }
 
         // ==========================================================================
         // بناء صفحة "الصيانة" - بتستخدم شاشة الصيانة الحقيقية (MaintenancePageControl)
         // ==========================================================================
-        private void BuildMaintenancePage()
+        private void BuildMaintenancePage(string highlightKey = null)
         {
-            pnlContent.Controls.Clear();
-            MaintenancePageControl maintenancePage = new MaintenancePageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(maintenancePage);
+            Form form = OpenPageWindow(PageKeys.Maintenance, "الصيانة", () => new MaintenancePageControl());
+            if (highlightKey != null)
+                form.Controls.OfType<MaintenancePageControl>().FirstOrDefault()?.HighlightTicket(highlightKey);
         }
 
         // ==========================================================================
         // بناء صفحة "العملاء" - بتستخدم شاشة العملاء الحقيقية (CustomersPageControl)
         // ==========================================================================
-        private void BuildCustomersPage()
+        private void BuildCustomersPage(string highlightKey = null)
         {
-            pnlContent.Controls.Clear();
-            CustomersPageControl customersPage = new CustomersPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(customersPage);
+            Form form = OpenPageWindow(PageKeys.Customers, "العملاء", () => new CustomersPageControl());
+            if (highlightKey != null)
+                form.Controls.OfType<CustomersPageControl>().FirstOrDefault()?.HighlightCustomer(highlightKey);
         }
 
         // ==========================================================================
         // بناء صفحة "المخزون" - بتستخدم شاشة إدارة المخزن الحقيقية (InventoryPageControl)
         // ==========================================================================
-        private void BuildInventoryPage()
+        private void BuildInventoryPage(string highlightKey = null)
         {
-            pnlContent.Controls.Clear();
-            InventoryPageControl inventoryPage = new InventoryPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(inventoryPage);
+            Form form = OpenPageWindow(PageKeys.Inventory, "المخزون", () => new InventoryPageControl());
+            if (highlightKey != null)
+                form.Controls.OfType<InventoryPageControl>().FirstOrDefault()?.HighlightProduct(highlightKey);
         }
 
         // ==========================================================================
@@ -692,19 +732,17 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildInventoryCountPage()
         {
-            pnlContent.Controls.Clear();
-            InventoryCountPageControl countPage = new InventoryCountPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(countPage);
+            OpenPageWindow(PageKeys.InventoryCount, "جرد المخزن", () => new InventoryCountPageControl());
         }
 
         // ==========================================================================
         // بناء صفحة "المبيعات" - بتستخدم شاشة نقطة البيع الحقيقية (SalesPageControl)
         // ==========================================================================
-        private void BuildSalesPage()
+        private void BuildSalesPage(string highlightKey = null)
         {
-            pnlContent.Controls.Clear();
-            SalesPageControl salesPage = new SalesPageControl { Dock = DockStyle.Fill };
-            pnlContent.Controls.Add(salesPage);
+            Form form = OpenPageWindow(PageKeys.Sales, "المبيعات", () => new SalesPageControl());
+            if (highlightKey != null)
+                form.Controls.OfType<SalesPageControl>().FirstOrDefault()?.HighlightSale(highlightKey);
         }
 
         // ==========================================================================
@@ -1453,7 +1491,7 @@ namespace Temo_Mobile_Store
             {
                 if (searchForm.ShowDialog(this) == DialogResult.OK && searchForm.SelectedPageKey != null)
                 {
-                    NavigateToPageKey(searchForm.SelectedPageKey);
+                    NavigateToPageKey(searchForm.SelectedPageKey, highlightKey: searchForm.SelectedItemKey);
                 }
             }
         }

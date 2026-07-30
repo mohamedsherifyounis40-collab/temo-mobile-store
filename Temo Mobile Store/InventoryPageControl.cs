@@ -46,6 +46,7 @@ namespace Temo_Mobile_Store
         public InventoryPageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -83,8 +84,9 @@ namespace Temo_Mobile_Store
             cmbInventoryOperationType.Items.AddRange(new string[] { "المخزون (إكسسوارات) 📦", "الأجهزة والسريالات (موبايلات) 📱" });
             cmbInventoryOperationType.SelectedIndexChanged += CmbInventoryOperationType_SelectedIndexChanged;
 
-            pnlAccessoriesOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 740) };
-            pnlDevicesOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 740) };
+            AnchorStyles fillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            pnlAccessoriesOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 800), Anchor = fillAnchor };
+            pnlDevicesOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 800), Anchor = fillAnchor };
 
             BuildAccessoriesPanel();
             BuildDevicesPanel();
@@ -191,6 +193,7 @@ namespace Temo_Mobile_Store
             {
                 Location = new Point(320, 0),
                 Size = new Size(780, 690),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 FillColor = Color.White,
                 BorderRadius = 14,
                 BorderColor = Color.FromArgb(230, 232, 238),
@@ -198,7 +201,7 @@ namespace Temo_Mobile_Store
             };
             Label lblGridTitle = new Label() { Text = "📦 المنتجات المسجّلة (إكسسوارات وغيرها)", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvProducts = new DataGridView() { Location = new Point(20, 55), Size = new Size(740, 615), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvProducts = new DataGridView() { Location = new Point(20, 55), Size = new Size(740, 615), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvProducts.CellClick += DgvProducts_CellClick;
             StyleDataGridView(dgvProducts);
 
@@ -235,6 +238,40 @@ namespace Temo_Mobile_Store
                 {
                     row.DefaultCellStyle.ForeColor = ColorDanger;
                     row.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+                }
+            }
+        }
+
+        // بيدوّر على منتج بالباركود ده - في جدول الإكسسوارات الأول، ولو مش لاقيه يبدّل
+        // لتاب الأجهزة ويدور في جدول الـIMEI - وبيحدده ويجيب تفاصيله في الخانات
+        // (مستخدمة من نتيجة البحث الشامل Ctrl+F)
+        public void HighlightProduct(string barcode)
+        {
+            foreach (DataGridViewRow row in dgvProducts.Rows)
+            {
+                if (row.Cells["الباركود"].Value?.ToString() == barcode)
+                {
+                    cmbInventoryOperationType.SelectedIndex = 0;
+                    dgvProducts.ClearSelection();
+                    row.Selected = true;
+                    dgvProducts.CurrentCell = row.Cells[0];
+                    dgvProducts.FirstDisplayedScrollingRowIndex = row.Index;
+                    DgvProducts_CellClick(dgvProducts, new DataGridViewCellEventArgs(0, row.Index));
+                    return;
+                }
+            }
+
+            foreach (DataGridViewRow row in dgvImeiUnits.Rows)
+            {
+                if (row.Cells["الباركود"].Value?.ToString() == barcode)
+                {
+                    cmbInventoryOperationType.SelectedIndex = 1;
+                    dgvImeiUnits.ClearSelection();
+                    row.Selected = true;
+                    dgvImeiUnits.CurrentCell = row.Cells[0];
+                    dgvImeiUnits.FirstDisplayedScrollingRowIndex = row.Index;
+                    DgvImeiUnits_CellClick(dgvImeiUnits, new DataGridViewCellEventArgs(0, row.Index));
+                    return;
                 }
             }
         }
@@ -447,10 +484,11 @@ namespace Temo_Mobile_Store
             gbQuickAdd.Controls.AddRange(new Control[] { lblQaTitle, lblQaBarcode, txtQaBarcode, lblQaName, txtQaProductName, lblQaImei, txtQaImei, lblQaCost, txtQaCostPrice, lblQaSale, txtQaSalePrice, lblQaNote, btnQuickAddDevice, btnSaveModelPriceEdit });
 
             // ---------- كارت الجدول ----------
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(320, 0), Size = new Size(780, 780), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(320, 0), Size = new Size(780, 780), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📱 كل الأجهزة المسجّلة بأرقام الـIMEI", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvImeiUnits = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 715), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvImeiUnits = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 715), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvImeiUnits.CellClick += DgvImeiUnits_CellClick;
             StyleDataGridView(dgvImeiUnits);
 

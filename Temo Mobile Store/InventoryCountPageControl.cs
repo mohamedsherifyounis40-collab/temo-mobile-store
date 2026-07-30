@@ -29,6 +29,7 @@ namespace Temo_Mobile_Store
         public InventoryCountPageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -38,7 +39,8 @@ namespace Temo_Mobile_Store
 
         private void BuildUI()
         {
-            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(1100, 90), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles widenAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(1100, 90), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
 
             Label lblSearch = new Label() { Text = "بحث بالاسم أو الباركود:", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtInventorySearch = new Guna2TextBox() { Location = new Point(20, 38), Width = 280, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
@@ -55,7 +57,7 @@ namespace Temo_Mobile_Store
 
             pnlToolbar.Controls.AddRange(new Control[] { lblSearch, txtInventorySearch, btnRefreshInventoryCount, btnViewAdjustmentsLog, btnSaveInventoryCount });
 
-            Guna2Panel pnlNote = new Guna2Panel() { Location = new Point(20, 120), Size = new Size(1100, 45), FillColor = Color.FromArgb(255, 249, 230), BorderRadius = 10 };
+            Guna2Panel pnlNote = new Guna2Panel() { Location = new Point(20, 120), Size = new Size(1100, 45), Anchor = widenAnchor, FillColor = Color.FromArgb(255, 249, 230), BorderRadius = 10 };
             Label lblNote = new Label()
             {
                 Text = "اكتب الكمية الفعلية اللي عددتها بإيدك في عمود \"الكمية الفعلية\" لأي صنف جردته، والباقي سيبه فاضي. عمود \"الفرق\" هيتحسب لوحده. لما تخلص، دوس \"حفظ نتيجة الجرد\".",
@@ -66,10 +68,11 @@ namespace Temo_Mobile_Store
             };
             pnlNote.Controls.Add(lblNote);
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(20, 180), Size = new Size(1100, 545), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(20, 180), Size = new Size(1100, 545), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📋 جدول الجرد", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvInventoryCount = new DataGridView() { Location = new Point(20, 50), Size = new Size(1060, 480), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AllowUserToAddRows = false, RowHeadersVisible = false };
+            dgvInventoryCount = new DataGridView() { Location = new Point(20, 50), Size = new Size(1060, 480), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AllowUserToAddRows = false, RowHeadersVisible = false };
             StyleDataGridView(dgvInventoryCount);
             dgvInventoryCount.CellValueChanged += DgvInventoryCount_CellValueChanged;
             dgvInventoryCount.CellFormatting += DgvInventoryCount_CellFormatting;

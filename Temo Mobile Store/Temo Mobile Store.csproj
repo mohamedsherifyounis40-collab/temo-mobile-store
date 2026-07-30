@@ -7,6 +7,10 @@
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- الشاشات في البرنامج كلها مبنية بإحداثيات بكسل ثابتة مفترض إنها تشتغل على 100% Scaling.
+         DpiUnawareGdiScaled بيخلي ويندوز يكبّر البرنامج كله (خط وخانات مع بعض) بدل ما البرنامج
+         ياخد الـ DPI الحقيقي ويحصل تعارض بين حجم الخط الفعلي والمسافات الثابتة (تراكب لابلز/أعمدة). -->
+    <ApplicationHighDpiMode>DpiUnawareGdiScaled</ApplicationHighDpiMode>
     <ApplicationIcon>temo_logo.ico</ApplicationIcon>
   </PropertyGroup>
 

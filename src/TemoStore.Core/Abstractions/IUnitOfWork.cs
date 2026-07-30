@@ -96,7 +96,9 @@ namespace TemoStore.Core.Abstractions
         SaleRecord? GetById(int saleId);
         void UpdateQuantityAndTotal(int saleId, int qty, decimal total);
         void Delete(int saleId);
-        int GetDailyInvoiceNumber(int saleId, string saleDate);
+        int GetDailyInvoiceNumber(int invoiceId, string saleDate);
+        void SetInvoiceId(int saleId, int invoiceId);
+        IReadOnlyList<SaleRecord> GetByInvoiceId(int invoiceId);
     }
 
     public interface IPurchaseRepository

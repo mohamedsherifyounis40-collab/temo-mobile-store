@@ -55,6 +55,7 @@ namespace Temo_Mobile_Store
         public SuppliersPageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -104,17 +105,20 @@ namespace Temo_Mobile_Store
             pnlOperationCard.Controls.AddRange(new Control[] { lblOpType, cmbSupplierOperationType, pnlNewPurchase, pnlSupplierPayment });
 
             // ---------- كارت جدول الموردين ----------
-            Guna2Panel pnlSuppliersGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 335), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            // ملحوظة: الكارتين دول واقفين فوق بعض عموديًا في نفس العمود، فبنمدّهم عرضًا بس (Top|Left|Right)
+            // من غير Bottom عشان محدش يكبر لتحت ويغطي التاني
+            AnchorStyles widenAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlSuppliersGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 335), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblSuppliersGridTitle = new Label() { Text = "🚚 الموردون وأرصدتهم", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
-            dgvSuppliers = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 270), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvSuppliers = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 270), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvSuppliers.CellClick += DgvSuppliers_CellClick;
             StyleDataGridView(dgvSuppliers);
             pnlSuppliersGridCard.Controls.AddRange(new Control[] { lblSuppliersGridTitle, dgvSuppliers });
 
             // ---------- كارت كشف حساب المورد ----------
-            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 370), Size = new Size(780, 375), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 370), Size = new Size(780, 375), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblStatementTitle = new Label() { Text = "📋 كشف حساب المورد المحدد (دوس على فاتورة شراء عشان تعدلها أو تلغيها)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
-            dgvSupplierStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 230), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
+            dgvSupplierStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 230), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
             dgvSupplierStatement.CellClick += DgvSupplierStatement_CellClick;
             StyleDataGridView(dgvSupplierStatement);
 
@@ -264,6 +268,24 @@ namespace Temo_Mobile_Store
                 if (dgvSuppliers.Columns["SupplierId"] != null) dgvSuppliers.Columns["SupplierId"].Visible = false;
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        // بيدوّر على مورد برقمه، يحدده في الجدول، ويجيب بياناته وكشف حسابه (مستخدمة من نتيجة البحث الشامل Ctrl+F)
+        public void HighlightSupplier(string supplierIdText)
+        {
+            if (!int.TryParse(supplierIdText, out int supplierId)) return;
+            foreach (DataGridViewRow row in dgvSuppliers.Rows)
+            {
+                if (row.Cells["SupplierId"].Value != null && Convert.ToInt32(row.Cells["SupplierId"].Value) == supplierId)
+                {
+                    dgvSuppliers.ClearSelection();
+                    row.Selected = true;
+                    dgvSuppliers.CurrentCell = row.Cells[0];
+                    dgvSuppliers.FirstDisplayedScrollingRowIndex = row.Index;
+                    DgvSuppliers_CellClick(dgvSuppliers, new DataGridViewCellEventArgs(0, row.Index));
+                    return;
+                }
+            }
         }
 
         private void DgvSuppliers_CellClick(object sender, DataGridViewCellEventArgs e)

@@ -31,6 +31,7 @@ namespace Temo_Mobile_Store
         public MaintenancePageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -101,7 +102,8 @@ namespace Temo_Mobile_Store
             btnDeliverDevice.Click += BtnDeliverMaintenanceDevice_Click;
             gbDeliver.Controls.AddRange(new Control[] { lblDeliverTitle, lblActualCost, txtMaintActualCost, lblMaintMethod, cmbMaintPaymentMethod, btnDeliverDevice });
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 785), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 785), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📋 تذاكر الصيانة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblFilterTitle = new Label() { Text = "فلترة حسب الحالة:", Location = new Point(300, 20), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -111,7 +113,7 @@ namespace Temo_Mobile_Store
             cmbMaintStatusFilter.SelectedIndex = 0;
             cmbMaintStatusFilter.SelectedIndexChanged += (s, e) => LoadMaintenanceGrid();
 
-            dgvMaintenanceTickets = new DataGridView() { Location = new Point(20, 55), Size = new Size(740, 710), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvMaintenanceTickets = new DataGridView() { Location = new Point(20, 55), Size = new Size(740, 710), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvMaintenanceTickets.CellClick += DgvMaintenanceTickets_CellClick;
             StyleDataGridView(dgvMaintenanceTickets);
 
@@ -133,6 +135,24 @@ namespace Temo_Mobile_Store
                 if (dgvMaintenanceTickets.Columns["TicketId"] != null) dgvMaintenanceTickets.Columns["TicketId"].Visible = false;
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        // بيدوّر على تذكرة صيانة برقمها، يحددها في الجدول، ويجيب بياناتها (مستخدمة من نتيجة البحث الشامل Ctrl+F)
+        public void HighlightTicket(string ticketIdText)
+        {
+            if (!int.TryParse(ticketIdText, out int ticketId)) return;
+            foreach (DataGridViewRow row in dgvMaintenanceTickets.Rows)
+            {
+                if (row.Cells["TicketId"].Value != null && Convert.ToInt32(row.Cells["TicketId"].Value) == ticketId)
+                {
+                    dgvMaintenanceTickets.ClearSelection();
+                    row.Selected = true;
+                    dgvMaintenanceTickets.CurrentCell = row.Cells[0];
+                    dgvMaintenanceTickets.FirstDisplayedScrollingRowIndex = row.Index;
+                    DgvMaintenanceTickets_CellClick(dgvMaintenanceTickets, new DataGridViewCellEventArgs(0, row.Index));
+                    return;
+                }
+            }
         }
 
         private void DgvMaintenanceTickets_CellClick(object sender, DataGridViewCellEventArgs e)

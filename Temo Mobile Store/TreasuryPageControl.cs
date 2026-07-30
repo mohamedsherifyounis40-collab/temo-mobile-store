@@ -55,6 +55,7 @@ namespace Temo_Mobile_Store
         public TreasuryPageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -101,9 +102,10 @@ namespace Temo_Mobile_Store
             cmbTreasuryOperationType.Items.AddRange(new string[] { "مصروف عمومي 💸", "قبض 💰", "صرف 💸", "تحويل بين وسائل 🔄" });
             cmbTreasuryOperationType.SelectedIndexChanged += CmbTreasuryOperationType_SelectedIndexChanged;
 
-            pnlExpenseOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
-            pnlMovementOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
-            pnlTransferOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
+            AnchorStyles fillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            pnlExpenseOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660), Anchor = fillAnchor };
+            pnlMovementOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660), Anchor = fillAnchor };
+            pnlTransferOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660), Anchor = fillAnchor };
 
             BuildExpensesPanel();
             BuildMovementsPanel();
@@ -160,9 +162,9 @@ namespace Temo_Mobile_Store
 
             gbAddExpense.Controls.AddRange(new Control[] { lblExpTitleCard, lblExpAcc, cmbExpenseAccounts, lblExpAmount, txtExpenseAmount, lblExpPaymentMethod, cmbExpensePaymentMethod, btnAddExpense, btnEditExpenseMode, btnSaveExpenseUpdate, btnDeleteExpense });
 
-            Guna2Panel pnlExpGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 645), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlExpGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 645), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblExpTitle = new Label() { Text = "📖 دفتر حركات المصروفات العمومية", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
-            dgvExpenses = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 580), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvExpenses = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 580), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvExpenses.CellClick += DgvExpenses_CellClick;
             StyleDataGridView(dgvExpenses);
             pnlExpGridCard.Controls.AddRange(new Control[] { lblExpTitle, dgvExpenses });
@@ -215,9 +217,9 @@ namespace Temo_Mobile_Store
 
             gbMovement.Controls.AddRange(new Control[] { lblMovementTitle, lblType, cmbMovementType, lblMethod, cmbPaymentMethod, lblMethodBalance, lblAmount, txtMovementAmount, lblRef, txtMovementReference, lblDesc, txtMovementDescription, lblMovementAccount, cmbMovementAccount, btnAddMovement, btnEditMovement, btnSaveMovementEdit, btnCancelMovement });
 
-            Guna2Panel pnlMovGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 645), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlMovGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 645), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblMovGridTitle = new Label() { Text = "📖 سجل حركات القبض والصرف", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
-            dgvCashMovements = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 580), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvCashMovements = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 580), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvCashMovements.CellClick += DgvCashMovements_CellClick;
             StyleDataGridView(dgvCashMovements);
             pnlMovGridCard.Controls.AddRange(new Control[] { lblMovGridTitle, dgvCashMovements });

@@ -68,69 +68,97 @@ namespace TemoStore.Engines.Handlers
 
             using var uow = _uowFactory.Create();
 
-            var product = uow.Products.GetByBarcode(command.Barcode)!;
-            decimal cost = product.Price * command.Quantity;
+            var saleIds = new List<int>();
+            var lineCosts = new List<decimal>();
+            var affectedBarcodes = new List<string>();
+            decimal grandTotal = 0;
+            decimal totalCost = 0;
+            int invoiceId = 0;
 
-            int saleId = uow.Sales.Insert(new SaleRecord
+            foreach (var line in command.Lines)
             {
-                Barcode = command.Barcode,
-                ProductName = command.ProductName,
-                CostPrice = product.Price,
-                Price = command.UnitPrice,
-                QuantitySold = command.Quantity,
-                Total = command.Total,
-                CustomerId = command.CustomerId,
-                PaymentType = command.PaymentType,
-                PaymentMethod = command.PaymentType == "Cash" ? command.PaymentMethod : null,
-                Imei = command.Imei
-            });
+                var product = uow.Products.GetByBarcode(line.Barcode)!;
+                decimal lineCost = product.Price * line.Quantity;
 
-            _inventory.DeductStock(command.Barcode, command.Quantity, uow);
-            if (command.Imei != null)
-                _inventory.MarkImeiSold(command.Imei, saleId, uow);
+                int saleId = uow.Sales.Insert(new SaleRecord
+                {
+                    Barcode = line.Barcode,
+                    ProductName = line.ProductName,
+                    CostPrice = product.Price,
+                    Price = line.UnitPrice,
+                    QuantitySold = line.Quantity,
+                    Total = line.Total,
+                    CustomerId = command.CustomerId,
+                    PaymentType = command.PaymentType,
+                    PaymentMethod = command.PaymentType == "Cash" ? command.PaymentMethod : null,
+                    Imei = line.Imei,
+                    SalesInvoiceId = invoiceId // أول صنف بيتسجل بـ 0 مؤقتًا، وبنرجع نظبطه تحت
+                });
+
+                if (invoiceId == 0)
+                {
+                    invoiceId = saleId;
+                    uow.Sales.SetInvoiceId(saleId, invoiceId);
+                }
+
+                _inventory.DeductStock(line.Barcode, line.Quantity, uow);
+                if (line.Imei != null)
+                    _inventory.MarkImeiSold(line.Imei, saleId, uow);
+
+                saleIds.Add(saleId);
+                lineCosts.Add(lineCost);
+                affectedBarcodes.Add(line.Barcode);
+                grandTotal += line.Total;
+                totalCost += lineCost;
+            }
 
             if (command.PaymentType == "Cash")
-                _cashDrawer.Credit(command.PaymentMethod!, command.Total, $"قبض كاش من عملية بيع رقم {saleId}", uow, saleId: saleId, accountCode: AccountCodes.SalesRevenue);
+                _cashDrawer.Credit(command.PaymentMethod!, grandTotal, $"قبض كاش من عملية بيع رقم {invoiceId}", uow, saleId: invoiceId, accountCode: AccountCodes.SalesRevenue);
 
-            decimal profit = _profit.CalculateProfit(command.Total, cost);
+            decimal profit = _profit.CalculateProfit(grandTotal, totalCost);
 
-            var lines = new List<JournalLineRequest>
+            var journalLines = new List<JournalLineRequest>
             {
-                new() { AccountCode = command.PaymentType == "Cash" ? AccountCodes.ForPaymentMethod(command.PaymentMethod!) : AccountCodes.Customers, Debit = command.Total, Credit = 0 },
-                new() { AccountCode = AccountCodes.SalesRevenue, Debit = 0, Credit = command.Total }
+                new() { AccountCode = command.PaymentType == "Cash" ? AccountCodes.ForPaymentMethod(command.PaymentMethod!) : AccountCodes.Customers, Debit = grandTotal, Credit = 0 },
+                new() { AccountCode = AccountCodes.SalesRevenue, Debit = 0, Credit = grandTotal }
             };
-            if (cost > 0)
+            if (totalCost > 0)
             {
-                lines.Add(new JournalLineRequest { AccountCode = AccountCodes.Cogs, Debit = cost, Credit = 0 });
-                lines.Add(new JournalLineRequest { AccountCode = AccountCodes.Inventory, Debit = 0, Credit = cost });
+                journalLines.Add(new JournalLineRequest { AccountCode = AccountCodes.Cogs, Debit = totalCost, Credit = 0 });
+                journalLines.Add(new JournalLineRequest { AccountCode = AccountCodes.Inventory, Debit = 0, Credit = totalCost });
             }
-            _accounting.Post(new JournalEntryRequest { SourceType = "Sale", SourceId = saleId, Description = $"بيع {command.ProductName}", Lines = lines }, command.PerformedBy, uow);
+            string invoiceDescription = command.Lines.Count == 1 ? $"بيع {command.Lines[0].ProductName}" : $"فاتورة بيع رقم {invoiceId} ({command.Lines.Count} أصناف)";
+            _accounting.Post(new JournalEntryRequest { SourceType = "Sale", SourceId = invoiceId, Description = invoiceDescription, Lines = journalLines }, command.PerformedBy, uow);
 
             var affectedMethods = command.PaymentType == "Cash" ? new[] { command.PaymentMethod! } : null;
-            var integrity = _integrity.CheckBeforeCommit(uow, new[] { command.Barcode }, affectedMethods);
+            var integrity = _integrity.CheckBeforeCommit(uow, affectedBarcodes, affectedMethods);
             if (!integrity.Passed)
                 throw new InvalidOperationException(string.Join("؛ ", integrity.Violations));
 
-            var saleRecord = uow.Sales.GetById(saleId)!;
-            int dailyInvoiceNumber = uow.Sales.GetDailyInvoiceNumber(saleId, saleRecord.SaleDate);
+            var firstSaleRecord = uow.Sales.GetById(invoiceId)!;
+            int dailyInvoiceNumber = uow.Sales.GetDailyInvoiceNumber(invoiceId, firstSaleRecord.SaleDate);
 
             uow.Commit();
 
-            _eventBus.Publish(new SaleCompleted
+            for (int i = 0; i < command.Lines.Count; i++)
             {
-                SaleId = saleId,
-                Barcode = command.Barcode,
-                ProductName = command.ProductName,
-                QuantitySold = command.Quantity,
-                Total = command.Total,
-                Cost = cost,
-                PaymentType = command.PaymentType,
-                PaymentMethod = command.PaymentMethod,
-                CustomerId = command.CustomerId,
-                PerformedBy = command.PerformedBy
-            });
+                var line = command.Lines[i];
+                _eventBus.Publish(new SaleCompleted
+                {
+                    SaleId = saleIds[i],
+                    Barcode = line.Barcode,
+                    ProductName = line.ProductName,
+                    QuantitySold = line.Quantity,
+                    Total = line.Total,
+                    Cost = lineCosts[i],
+                    PaymentType = command.PaymentType,
+                    PaymentMethod = command.PaymentMethod,
+                    CustomerId = command.CustomerId,
+                    PerformedBy = command.PerformedBy
+                });
+            }
 
-            return new SaleResult { SaleId = saleId, DailyInvoiceNumber = dailyInvoiceNumber };
+            return new SaleResult { SaleId = saleIds[0], SalesInvoiceId = invoiceId, SaleIds = saleIds, DailyInvoiceNumber = dailyInvoiceNumber };
         }
     }
 

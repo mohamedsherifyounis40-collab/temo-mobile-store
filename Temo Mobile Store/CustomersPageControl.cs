@@ -30,6 +30,7 @@ namespace Temo_Mobile_Store
         public CustomersPageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -78,16 +79,18 @@ namespace Temo_Mobile_Store
 
             gbCollect.Controls.AddRange(new Control[] { lblCollectTitle, lblCollectCustomer, cmbCollectCustomer, lblCollectMethod, cmbCollectPaymentMethod, lblCollectAmount, txtCollectAmount, btnCollect });
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 320), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            // الكارتين دول واقفين فوق بعض عموديًا، فبنمدّهم عرضًا بس (Top|Left|Right) من غير Bottom عشان محدش يغطي التاني
+            AnchorStyles widenAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 320), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblCustomersGridTitle = new Label() { Text = "👥 العملاء وأرصدتهم", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
-            dgvCustomers = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 255), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvCustomers = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 255), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvCustomers.CellClick += DgvCustomers_CellClick;
             StyleDataGridView(dgvCustomers);
             pnlGridCard.Controls.AddRange(new Control[] { lblCustomersGridTitle, dgvCustomers });
 
-            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 355), Size = new Size(780, 310), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 355), Size = new Size(780, 310), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblCustomerStatementTitle = new Label() { Text = "📋 كشف حساب العميل المحدد (دوس على أي صف فوق)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
-            dgvCustomerStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 245), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvCustomerStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 245), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             StyleDataGridView(dgvCustomerStatement);
             pnlStatementCard.Controls.AddRange(new Control[] { lblCustomerStatementTitle, dgvCustomerStatement });
 
@@ -119,6 +122,24 @@ namespace Temo_Mobile_Store
                 if (dgvCustomers.Columns["CustomerId"] != null) dgvCustomers.Columns["CustomerId"].Visible = false;
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        // بيدوّر على عميل برقمه، يحدده في الجدول، ويجيب بياناته وكشف حسابه (مستخدمة من نتيجة البحث الشامل Ctrl+F)
+        public void HighlightCustomer(string customerIdText)
+        {
+            if (!int.TryParse(customerIdText, out int customerId)) return;
+            foreach (DataGridViewRow row in dgvCustomers.Rows)
+            {
+                if (row.Cells["CustomerId"].Value != null && Convert.ToInt32(row.Cells["CustomerId"].Value) == customerId)
+                {
+                    dgvCustomers.ClearSelection();
+                    row.Selected = true;
+                    dgvCustomers.CurrentCell = row.Cells[0];
+                    dgvCustomers.FirstDisplayedScrollingRowIndex = row.Index;
+                    DgvCustomers_CellClick(dgvCustomers, new DataGridViewCellEventArgs(0, row.Index));
+                    return;
+                }
+            }
         }
 
         private void DgvCustomers_CellClick(object sender, DataGridViewCellEventArgs e)

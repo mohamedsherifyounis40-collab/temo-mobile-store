@@ -10,21 +10,18 @@ namespace TemoStore.Core.Commands
 
     public class CreateSaleCommand : ICommand<SaleResult>
     {
-        public required string Barcode { get; set; }
-        public required string ProductName { get; set; }
-        public required decimal UnitPrice { get; set; }
-        public required int Quantity { get; set; }
-        public required decimal Total { get; set; }
+        public required List<SaleLine> Lines { get; set; }
         public int? CustomerId { get; set; }
         public required string PaymentType { get; set; }     // "Cash" | "Credit"
         public string? PaymentMethod { get; set; }
-        public string? Imei { get; set; }
         public required string PerformedBy { get; set; }
     }
 
     public class SaleResult
     {
         public int SaleId { get; set; }
+        public int SalesInvoiceId { get; set; }
+        public List<int> SaleIds { get; set; } = new();
         public int DailyInvoiceNumber { get; set; }
     }
 

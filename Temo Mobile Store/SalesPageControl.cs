@@ -7,6 +7,7 @@ using System.Drawing.Printing;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
 using TemoStore.Core.Commands;
+using TemoStore.Core.Entities;
 using TemoStore.Core.Exceptions;
 
 namespace Temo_Mobile_Store
@@ -44,14 +45,23 @@ namespace Temo_Mobile_Store
         private Label lblSaleImei;
         private Guna2ComboBox cmbSaleImei, cmbSalePaymentType, cmbSalePaymentMethod, cmbSaleCustomer, cmbInvoicePaperSize;
         private Guna2TextBox txtInvoiceNumber, txtInvoiceCustomer;
-        private Guna2Button btnAddToBill, btnPrintInvoice, btnEditSaleMode, btnSaveSaleEdit, btnCancelSale;
-        private DataGridView dgvSales;
+        private Guna2Button btnAddItemToCart, btnAddToBill, btnPrintInvoice, btnEditSaleMode, btnSaveSaleEdit, btnCancelSale;
+        private DataGridView dgvSales, dgvSaleCart;
+        private Label lblSaleCartTotal;
 
         private int selectedSaleId = -1;
+
+        // ---------- سلة الفاتورة الحالية - بتتجمع فيها الأصناف قبل ما "إتمام عملية البيع"
+        // يسجّلها كلها مرة واحدة تحت رقم فاتورة واحد مشترك ----------
+        private readonly List<SaleLine> currentSaleItems = new List<SaleLine>();
 
         public SalesPageControl()
         {
             this.Dock = DockStyle.Fill;
+            // مقاس مبدئي واقعي قبل ما نبني الشاشة: عناصر الشاشة بتتبني وهي متربطة بمقاس UserControl الافتراضي
+            // الصغير (150x150) لسه، فلو مفيش مقاس واقعي هنا، أي عنصر معاه Anchor بيحسب هامشه غلط تمامًا
+            // (سالب)، وبمجرد ما الشاشة تتفتح في نافذتها الحقيقية الكبيرة بيطلع أعمدة الجدول تختفي/تكبر جدًا.
+            this.Size = new Size(1150, 1150);
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -83,7 +93,7 @@ namespace Temo_Mobile_Store
             Guna2Panel pnlCard = new Guna2Panel()
             {
                 Location = new Point(20, 20),
-                Size = new Size(300, 900),
+                Size = new Size(300, 1140),
                 FillColor = Color.White,
                 BorderRadius = 14,
                 BorderColor = Color.FromArgb(230, 232, 238),
@@ -123,7 +133,7 @@ namespace Temo_Mobile_Store
             lblSaleImei = new Label() { Text = "اختار الجهاز (IMEI):", Location = new Point(20, 348), AutoSize = true, Visible = false, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             cmbSaleImei = new Guna2ComboBox() { Location = new Point(20, 368), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Visible = false, BorderRadius = 8 };
 
-            // كارت الإجمالي - بارز بلون مميز
+            // كارت إجمالي الصنف الحالي (قبل ما يتضاف للسلة) - بارز بلون مميز
             Guna2Panel pnlTotal = new Guna2Panel()
             {
                 Location = new Point(20, 406),
@@ -131,7 +141,7 @@ namespace Temo_Mobile_Store
                 FillColor = Color.FromArgb(255, 249, 230),
                 BorderRadius = 10
             };
-            Label lblTotal = new Label() { Text = "إجمالي الحساب", Location = new Point(15, 8), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            Label lblTotal = new Label() { Text = "إجمالي الصنف الحالي", Location = new Point(15, 8), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtSaleTotal = new Guna2TextBox()
             {
                 Location = new Point(15, 26),
@@ -144,47 +154,62 @@ namespace Temo_Mobile_Store
             };
             pnlTotal.Controls.AddRange(new Control[] { lblTotal, txtSaleTotal });
 
-            Label lblPaymentType = new Label() { Text = "نوع البيع:", Location = new Point(20, 481), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbSalePaymentType = new Guna2ComboBox() { Location = new Point(20, 501), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            btnAddItemToCart = new Guna2Button() { Text = "➕ إضافة الصنف للسلة", Location = new Point(20, 474), Width = 260, Height = 38, FillColor = ColorPrimary, BorderRadius = 10, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
+            btnAddItemToCart.Click += BtnAddItemToCart_Click;
+
+            // ---------- السلة الحالية: الأصناف اللي هتتسجل مع بعض تحت رقم فاتورة واحد ----------
+            Label lblCartTitle = new Label() { Text = "🧺 السلة الحالية", Location = new Point(20, 522), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = ColorPrimary };
+
+            dgvSaleCart = new DataGridView() { Location = new Point(20, 544), Width = 260, Height = 130, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvSaleCart.CellDoubleClick += DgvSaleCart_CellDoubleClick;
+            StyleDataGridView(dgvSaleCart);
+
+            Label lblCartHint = new Label() { Text = "دبل كليك على صنف عشان تشيله من السلة", Location = new Point(20, 676), Size = new Size(260, 15), Font = new Font("Segoe UI", 7F), ForeColor = Color.FromArgb(150, 155, 165) };
+
+            lblSaleCartTotal = new Label() { Text = "إجمالي السلة: 0.00 ج.م", Location = new Point(20, 694), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorSuccess };
+
+            Label lblPaymentType = new Label() { Text = "نوع البيع:", Location = new Point(20, 722), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbSalePaymentType = new Guna2ComboBox() { Location = new Point(20, 742), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbSalePaymentType.Items.AddRange(new string[] { "كاش", "آجل" });
             cmbSalePaymentType.SelectedIndex = 0;
             cmbSalePaymentType.SelectedIndexChanged += CmbSalePaymentType_SelectedIndexChanged;
 
-            Label lblSalePaymentMethod = new Label() { Text = "وسيلة الدفع (لو كاش):", Location = new Point(20, 539), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbSalePaymentMethod = new Guna2ComboBox() { Location = new Point(20, 559), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            Label lblSalePaymentMethod = new Label() { Text = "وسيلة الدفع (لو كاش):", Location = new Point(20, 780), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbSalePaymentMethod = new Guna2ComboBox() { Location = new Point(20, 800), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbSalePaymentMethod.Items.AddRange(UIHelpers.PaymentMethods);
 
-            Label lblSaleCustomer = new Label() { Text = "العميل (لازم للآجل):", Location = new Point(20, 597), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbSaleCustomer = new Guna2ComboBox() { Location = new Point(20, 617), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false, BorderRadius = 8 };
+            Label lblSaleCustomer = new Label() { Text = "العميل (لازم للآجل):", Location = new Point(20, 838), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbSaleCustomer = new Guna2ComboBox() { Location = new Point(20, 858), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false, BorderRadius = 8 };
 
-            btnAddToBill = new Guna2Button() { Text = "إتمام عملية البيع 🛒", Location = new Point(20, 659), Width = 260, Height = 42, FillColor = ColorWarning, BorderRadius = 10, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+            btnAddToBill = new Guna2Button() { Text = "إتمام عملية البيع 🛒", Location = new Point(20, 900), Width = 260, Height = 42, FillColor = ColorWarning, BorderRadius = 10, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
             btnAddToBill.Click += BtnAddToBill_Click;
 
-            btnPrintInvoice = new Guna2Button() { Text = "طباعة آخر فاتورة 🖨️", Location = new Point(20, 707), Width = 260, Height = 36, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 10 };
+            btnPrintInvoice = new Guna2Button() { Text = "طباعة آخر فاتورة 🖨️", Location = new Point(20, 948), Width = 260, Height = 36, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 10 };
             btnPrintInvoice.Click += BtnPrintInvoice_Click;
 
-            Label lblPaperSize = new Label() { Text = "مقاس الطباعة:", Location = new Point(20, 752), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbInvoicePaperSize = new Guna2ComboBox() { Location = new Point(20, 772), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            Label lblPaperSize = new Label() { Text = "مقاس الطباعة:", Location = new Point(20, 993), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbInvoicePaperSize = new Guna2ComboBox() { Location = new Point(20, 1013), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbInvoicePaperSize.Items.AddRange(new string[] { "80 مم (طابعة حرارية)", "58 مم (طابعة حرارية)", "A4 (طابعة عادية)" });
             cmbInvoicePaperSize.SelectedIndex = 0;
 
-            Guna2Button btnSendWhatsApp = new Guna2Button() { Text = "إرسال آخر فاتورة واتساب 📱", Location = new Point(20, 812), Width = 260, Height = 34, FillColor = Color.FromArgb(37, 211, 102), BorderRadius = 9 };
+            Guna2Button btnSendWhatsApp = new Guna2Button() { Text = "إرسال آخر فاتورة واتساب 📱", Location = new Point(20, 1053), Width = 260, Height = 34, FillColor = Color.FromArgb(37, 211, 102), BorderRadius = 9 };
             btnSendWhatsApp.Click += BtnSendInvoiceWhatsApp_Click;
 
-            Guna2Button btnSavePdf = new Guna2Button() { Text = "حفظ آخر فاتورة PDF 📄", Location = new Point(20, 852), Width = 260, Height = 34, FillColor = Color.FromArgb(192, 57, 43), BorderRadius = 9 };
+            Guna2Button btnSavePdf = new Guna2Button() { Text = "حفظ آخر فاتورة PDF 📄", Location = new Point(20, 1093), Width = 260, Height = 34, FillColor = Color.FromArgb(192, 57, 43), BorderRadius = 9 };
             btnSavePdf.Click += BtnSaveInvoicePdf_Click;
 
             pnlCard.Controls.AddRange(new Control[] {
                 lblCardTitle, lblBadgeInvTitle, txtInvoiceNumber, lblBadgeCustTitle, txtInvoiceCustomer,
                 lblBarcode, txtSaleBarcode, lblName, txtSaleName, lblPrice, txtCustomerPrice,
-                lblQty, txtSaleQty, lblSaleImei, cmbSaleImei, pnlTotal, lblPaymentType, cmbSalePaymentType,
+                lblQty, txtSaleQty, lblSaleImei, cmbSaleImei, pnlTotal, btnAddItemToCart,
+                lblCartTitle, dgvSaleCart, lblCartHint, lblSaleCartTotal, lblPaymentType, cmbSalePaymentType,
                 lblSalePaymentMethod, cmbSalePaymentMethod, lblSaleCustomer, cmbSaleCustomer, btnAddToBill, btnPrintInvoice, lblPaperSize, cmbInvoicePaperSize, btnSendWhatsApp, btnSavePdf
             });
 
             // ---------- كارت إدارة العمليات (تعديل/إلغاء) - تحت كارت البيع مباشرة ----------
             Guna2Panel pnlManage = new Guna2Panel()
             {
-                Location = new Point(20, 940),
+                Location = new Point(20, 1180),
                 Size = new Size(300, 150),
                 FillColor = Color.White,
                 BorderRadius = 14,
@@ -205,10 +230,13 @@ namespace Temo_Mobile_Store
             pnlManage.Controls.AddRange(new Control[] { lblManageTitle, btnEditSaleMode, btnSaveSaleEdit, btnCancelSale });
 
             // ---------- كارت الجدول (يمين) ----------
+            // Anchor بكل الاتجاهات عشان الكارت يتمدد ويملأ المساحة الفاضية لما النافذة تبقى أعرض/أطول
+            // (خصوصًا بعد ما بقت الصفحة بتفتح في نافذة مستقلة بمساحة الشاشة كاملة)
             Guna2Panel pnlGridCard = new Guna2Panel()
             {
                 Location = new Point(340, 20),
                 Size = new Size(780, 850),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 FillColor = Color.White,
                 BorderRadius = 14,
                 BorderColor = Color.FromArgb(230, 232, 238),
@@ -216,7 +244,15 @@ namespace Temo_Mobile_Store
             };
             Label lblGridTitle = new Label() { Text = "📋 سجل المبيعات", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            dgvSales = new DataGridView() { Location = new Point(20, 55), Size = new Size(740, 775), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvSales = new DataGridView()
+            {
+                Location = new Point(20, 55),
+                Size = new Size(740, 775),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ReadOnly = true,
+                AllowUserToAddRows = false
+            };
             dgvSales.CellClick += DgvSales_CellClick;
             StyleDataGridView(dgvSales);
 
@@ -357,9 +393,9 @@ namespace Temo_Mobile_Store
         }
 
         // ==========================================================================
-        // تنفيذ عملية البيع
+        // إضافة الصنف المعروض حاليًا في الخانات للسلة (من غير ما يتسجل في قاعدة البيانات لسه)
         // ==========================================================================
-        private void BtnAddToBill_Click(object sender, EventArgs e)
+        private void BtnAddItemToCart_Click(object sender, EventArgs e)
         {
             if (IsTodayClosed())
             {
@@ -367,7 +403,16 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            if (string.IsNullOrEmpty(txtSaleName.Text) || !int.TryParse(txtSaleQty.Text, out int qtySold)) return;
+            if (string.IsNullOrEmpty(txtSaleName.Text) || !int.TryParse(txtSaleQty.Text, out int qtySold) || qtySold <= 0)
+            {
+                MessageBox.Show("من فضلك امسح باركود صنف صحيح وحدد كمية أكبر من صفر.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (!decimal.TryParse(txtCustomerPrice.Text, out decimal unitPrice))
+            {
+                MessageBox.Show("من فضلك أدخل سعر بيع صحيح.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
             string selectedImei = null;
             if (lblSaleImei.Visible)
@@ -378,10 +423,80 @@ namespace Temo_Mobile_Store
                     return;
                 }
                 selectedImei = cmbSaleImei.SelectedValue.ToString();
+                if (currentSaleItems.Exists(x => x.Imei == selectedImei))
+                {
+                    MessageBox.Show("الجهاز ده اتضاف للسلة بالفعل.", "مكرر", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
+            currentSaleItems.Add(new SaleLine
+            {
+                Barcode = txtSaleBarcode.Text.Trim(),
+                ProductName = txtSaleName.Text,
+                UnitPrice = unitPrice,
+                Quantity = qtySold,
+                Total = unitPrice * qtySold,
+                Imei = selectedImei
+            });
+
+            RefreshSaleCartGrid();
+            ClearCurrentItemInputs();
+        }
+
+        private void RefreshSaleCartGrid()
+        {
+            DataTable dt = new DataTable();
+            dt.Columns.AddRange(new DataColumn[] { new DataColumn("المنتج"), new DataColumn("الكمية"), new DataColumn("السعر"), new DataColumn("الإجمالي") });
+
+            decimal grandTotal = 0;
+            foreach (var item in currentSaleItems)
+            {
+                dt.Rows.Add(item.ProductName, item.Quantity, item.UnitPrice.ToString("N2"), item.Total.ToString("N2"));
+                grandTotal += item.Total;
+            }
+
+            dgvSaleCart.DataSource = dt;
+            lblSaleCartTotal.Text = $"إجمالي السلة: {grandTotal:N2} ج.م";
+        }
+
+        private void DgvSaleCart_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= currentSaleItems.Count) return;
+            currentSaleItems.RemoveAt(e.RowIndex);
+            RefreshSaleCartGrid();
+        }
+
+        // بيمسح خانات "الصنف الحالي" بس (الباركود/الاسم/السعر/الكمية/الـIMEI) عشان
+        // المستخدم يمسح الصنف اللي بعده، من غير ما يلمس السلة أو بيانات العميل/الدفع
+        private void ClearCurrentItemInputs()
+        {
+            txtSaleBarcode.Clear(); txtSaleName.Clear(); txtCustomerPrice.Clear(); txtSaleQty.Text = "1"; txtSaleTotal.Clear();
+            lblSaleImei.Visible = false;
+            cmbSaleImei.Visible = false;
+            txtSaleQty.ReadOnly = false;
+            txtSaleBarcode.Focus();
+        }
+
+        // ==========================================================================
+        // تنفيذ عملية البيع - بتسجّل كل أصناف السلة مرة واحدة تحت رقم فاتورة واحد مشترك
+        // ==========================================================================
+        private void BtnAddToBill_Click(object sender, EventArgs e)
+        {
+            if (IsTodayClosed())
+            {
+                MessageBox.Show("تم إقفال اليوم بالفعل، لا يمكن تسجيل مبيعات جديدة.", "اليوم مقفول", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (currentSaleItems.Count == 0)
+            {
+                MessageBox.Show("من فضلك ضيف صنف واحد على الأقل للسلة أولاً.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
 
             string paymentType = cmbSalePaymentType.SelectedItem?.ToString() == "آجل" ? "Credit" : "Cash";
-            object customerIdParam = DBNull.Value;
+            int? customerId = null;
             if (paymentType == "Credit")
             {
                 if (cmbSaleCustomer.SelectedValue == null)
@@ -389,7 +504,7 @@ namespace Temo_Mobile_Store
                     MessageBox.Show("البيع بالآجل لازم يكون له عميل محدد. اختار العميل أو ضيفه الأول من تاب العملاء.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                customerIdParam = Convert.ToInt32(cmbSaleCustomer.SelectedValue);
+                customerId = Convert.ToInt32(cmbSaleCustomer.SelectedValue);
             }
 
             string paymentMethod = null;
@@ -408,15 +523,10 @@ namespace Temo_Mobile_Store
             {
                 var result = AppServices.CoreEngine.Execute(new CreateSaleCommand
                 {
-                    Barcode = txtSaleBarcode.Text,
-                    ProductName = txtSaleName.Text,
-                    UnitPrice = Convert.ToDecimal(txtCustomerPrice.Text),
-                    Quantity = qtySold,
-                    Total = Convert.ToDecimal(txtSaleTotal.Text),
-                    CustomerId = customerIdParam == DBNull.Value ? (int?)null : Convert.ToInt32(customerIdParam),
+                    Lines = new List<SaleLine>(currentSaleItems),
+                    CustomerId = customerId,
                     PaymentType = paymentType,
                     PaymentMethod = paymentMethod,
-                    Imei = selectedImei,
                     PerformedBy = AuthManager.CurrentUsername
                 });
                 dailyInvoiceNumber = result.DailyInvoiceNumber;
@@ -441,6 +551,8 @@ namespace Temo_Mobile_Store
             txtInvoiceCustomer.Text = paymentType == "Credit" ? cmbSaleCustomer.Text : "عميل نقدي";
 
             MessageBox.Show($"تمت عملية البيع بنجاح!\nرقم الفاتورة اليوم: {dailyInvoiceNumber}", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            currentSaleItems.Clear();
+            RefreshSaleCartGrid();
             LoadSalesData();
             ClearPOSInputs();
         }
@@ -448,6 +560,25 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         // التعديل / الإلغاء
         // ==========================================================================
+        // بيدوّر على عملية بيع برقمها في سجل المبيعات، يحددها ويجيب بياناتها في الخانات
+        // (مستخدمة من نتيجة البحث الشامل Ctrl+F)
+        public void HighlightSale(string saleIdText)
+        {
+            if (!int.TryParse(saleIdText, out int saleId)) return;
+            foreach (DataGridViewRow row in dgvSales.Rows)
+            {
+                if (row.Cells["رقم البيع"].Value != null && Convert.ToInt32(row.Cells["رقم البيع"].Value) == saleId)
+                {
+                    dgvSales.ClearSelection();
+                    row.Selected = true;
+                    dgvSales.CurrentCell = row.Cells[0];
+                    dgvSales.FirstDisplayedScrollingRowIndex = row.Index;
+                    DgvSales_CellClick(dgvSales, new DataGridViewCellEventArgs(0, row.Index));
+                    return;
+                }
+            }
+        }
+
         private void DgvSales_CellClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
@@ -633,17 +764,7 @@ namespace Temo_Mobile_Store
             string saleDate = lastSale.SaleDate;
             string customerPhone = lastSale.CustomerPhone;
             string customerName = lastSale.CustomerName;
-
-            int dailyInvoiceNumber = 0;
-            try
-            {
-                dailyInvoiceNumber = SalesRepository.GetDailyInvoiceNumber(lastSale.SaleId, saleDate);
-            }
-            catch
-            {
-                // البيع نفسه اتسجل بالفعل قبل الوصول هنا - لو رقم الفاتورة فشل يتجاب، بنكمل
-                // برسالة واتساب من غيره بدل ما نوقف/نبلّغ خطأ على حاجة خلصت وسجلت صح
-            }
+            int dailyInvoiceNumber = lastSale.DailyInvoiceNumber;
 
             string greetingName = customerName ?? "عميلنا العزيز";
             string displayDate = DateTime.TryParse(saleDate, out DateTime parsedDate) ? parsedDate.ToString("yyyy-MM-dd") : saleDate;
@@ -684,8 +805,8 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            ReceiptData receipt = LoadReceiptForPrinting();
-            if (receipt == null) return;
+            List<ReceiptData> items = LoadReceiptForPrinting();
+            if (items == null) return;
 
             try
             {
@@ -696,8 +817,8 @@ namespace Temo_Mobile_Store
                 string filePath = System.IO.Path.Combine(folder, fileName);
 
                 PrintDocument pd = new PrintDocument();
-                pd.PrintPage += (s, ev) => RenderReceiptPage(ev, receipt);
-                pd.DefaultPageSettings.PaperSize = BuildReceiptPaperSize(receipt);
+                pd.PrintPage += (s, ev) => RenderReceiptPage(ev, items);
+                pd.DefaultPageSettings.PaperSize = BuildReceiptPaperSize(items);
                 pd.PrinterSettings.PrinterName = "Microsoft Print to PDF";
                 pd.PrinterSettings.PrintToFile = true;
                 pd.PrinterSettings.PrintFileName = filePath;
@@ -716,12 +837,12 @@ namespace Temo_Mobile_Store
 
         private void BtnPrintInvoice_Click(object sender, EventArgs e)
         {
-            ReceiptData receipt = LoadReceiptForPrinting();
-            if (receipt == null) return;
+            List<ReceiptData> items = LoadReceiptForPrinting();
+            if (items == null) return;
 
             PrintDocument pd = new PrintDocument();
-            pd.PrintPage += (s, ev) => RenderReceiptPage(ev, receipt);
-            pd.DefaultPageSettings.PaperSize = BuildReceiptPaperSize(receipt);
+            pd.PrintPage += (s, ev) => RenderReceiptPage(ev, items);
+            pd.DefaultPageSettings.PaperSize = BuildReceiptPaperSize(items);
             PrintPreviewDialog pdd = new PrintPreviewDialog() { Document = pd };
             pdd.ShowDialog();
         }
@@ -729,29 +850,29 @@ namespace Temo_Mobile_Store
         // بيجيب بيانات آخر عملية بيع كاملة (مرة واحدة) عشان نفس البيانات المستخدمة في حساب
         // ارتفاع الصفحة الديناميكي هي بالظبط اللي هتترسم - من غير خطر إن بيع جديد يتسجل
         // في نفس اللحظة بين حساب الارتفاع والطباعة الفعلية
-        private ReceiptData LoadReceiptForPrinting()
+        private List<ReceiptData> LoadReceiptForPrinting()
         {
-            ReceiptData receipt;
-            try { receipt = SalesRepository.GetLastSaleForReceipt(); }
+            List<ReceiptData> items;
+            try { items = SalesRepository.GetLastInvoiceForReceipt(); }
             catch (Exception ex)
             {
                 MessageBox.Show("حدث خطأ أثناء تجهيز الفاتورة: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return null;
             }
 
-            if (receipt == null)
+            if (items == null || items.Count == 0)
             {
                 MessageBox.Show("لا توجد عمليات بيع مسجلة بعد.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return null;
             }
 
-            return receipt;
+            return items;
         }
 
         // بيبني مقاس الورقة، وللطابعات الحرارية (80/58مم) بيحسب الارتفاع المطلوب فعليًا حسب
         // محتوى الفاتورة (مفيش IMEI؟ عميل نقدي؟ فمفيش أسطر فاضية) بدل ارتفاع ثابت ضخم بيسيب
         // مسافة بيضا في آخر كل إيصال
-        private PaperSize BuildReceiptPaperSize(ReceiptData receipt)
+        private PaperSize BuildReceiptPaperSize(List<ReceiptData> items)
         {
             PaperSize paperSize = GetSelectedInvoicePaperSize();
             if (paperSize.Width < 500)
@@ -759,29 +880,31 @@ namespace Temo_Mobile_Store
                 using (var tempBmp = new Bitmap(1, 1))
                 using (var measureG = Graphics.FromImage(tempBmp))
                 {
-                    float contentHeight = RenderReceipt(measureG, paperSize.Width, true, receipt);
+                    float contentHeight = RenderReceipt(measureG, paperSize.Width, true, items);
                     paperSize.Height = (int)Math.Ceiling(contentHeight) + 20;
                 }
             }
             return paperSize;
         }
 
-        private void RenderReceiptPage(PrintPageEventArgs e, ReceiptData receipt)
+        private void RenderReceiptPage(PrintPageEventArgs e, List<ReceiptData> items)
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-            RenderReceipt(g, e.PageBounds.Width, false, receipt);
+            RenderReceipt(g, e.PageBounds.Width, false, items);
         }
 
         // ==========================================================================
         // رسم/قياس الإيصال - نفس الدالة تستخدم مرتين: مرة "قياس بس" (measureOnly=true،
         // بترجع الارتفاع المطلوب من غير ما ترسم حاجة فعليًا) قبل الطباعة عشان نظبط مقاس
         // الورقة، ومرة تانية "رسم فعلي" وقت الطباعة الحقيقية - بنفس المنطق بالظبط، فمفيش
-        // احتمال إن القياس يختلف عن الرسم الفعلي.
+        // احتمال إن القياس يختلف عن الرسم الفعلي. items ممكن تحتوي أكتر من صنف لو الفاتورة
+        // فيها أكتر من منتج - بيانات الفاتورة المشتركة (رقمها/تاريخها/العميل) بتتاخد من أول عنصر.
         // ==========================================================================
-        private float RenderReceipt(Graphics g, float pageWidth, bool measureOnly, ReceiptData receipt)
+        private float RenderReceipt(Graphics g, float pageWidth, bool measureOnly, List<ReceiptData> items)
         {
+            ReceiptData receipt = items[0];
             bool isThermal = pageWidth < 500;
             float margin = isThermal ? 14 : 24;
             float contentWidth = pageWidth - margin * 2;
@@ -890,10 +1013,7 @@ namespace Temo_Mobile_Store
             Text("تفاصيل الصنف", fontSectionHeader, Color.White, new RectangleF(margin, yPos, contentWidth, sectionBarH), center);
             yPos += sectionBarH + (isThermal ? 10 : 14);
 
-            // 8) كارت الصنف - بيتكرر لكل صنف في الفاتورة (النظام الحالي بيسجل صنف واحد بالظبط
-            // لكل عملية بيع، فالحلقة دي هتلف مرة واحدة بس - جاهزة تلقائيًا لو تعدد الأصناف
-            // اتضاف مستقبلًا من غير ما يتغير شكل الطباعة)
-            var items = new List<ReceiptData> { receipt };
+            // 8) كارت الصنف - بيتكرر لكل صنف في الفاتورة
             foreach (var item in items)
             {
                 float iconSize = isThermal ? 34 : 44;
@@ -929,7 +1049,8 @@ namespace Temo_Mobile_Store
             yPos += isThermal ? 12 : 16;
 
             // 9) الإجماليات (خصم=0 دايمًا حاليًا - النظام مفيهوش خاصية خصم على مستوى البيع)
-            decimal subtotal = receipt.Total;
+            decimal subtotal = 0m;
+            foreach (var item in items) subtotal += item.Total;
             decimal discount = 0m;
             decimal grandTotal = subtotal - discount;
 

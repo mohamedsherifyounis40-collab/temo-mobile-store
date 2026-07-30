@@ -50,6 +50,7 @@ namespace Temo_Mobile_Store
         public AttendancePageControl()
         {
             this.Dock = DockStyle.Fill;
+            this.Size = new Size(1150, 1150); // مقاس مبدئي واقعي قبل بناء الشاشة، عشان حسابات Anchor متبقاش غلط (راجع نفس التعليق في SalesPageControl)
             this.AutoScroll = true;
             this.BackColor = ColorBackground;
 
@@ -69,10 +70,11 @@ namespace Temo_Mobile_Store
             cmbAttendanceOperationType.Items.AddRange(new string[] { "تسجيل الحضور اليومي 📅", "كشف الرواتب 💰", "كشف حساب موظف 📋", "إدارة الموظفين 👥" });
             cmbAttendanceOperationType.SelectedIndexChanged += CmbAttendanceOperationType_SelectedIndexChanged;
 
-            pnlAttendanceOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
-            pnlPayrollOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
-            pnlStatementOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
-            pnlEmployeesOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660) };
+            AnchorStyles opsAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            pnlAttendanceOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660), Anchor = opsAnchor };
+            pnlPayrollOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660), Anchor = opsAnchor };
+            pnlStatementOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660), Anchor = opsAnchor };
+            pnlEmployeesOps = new Panel() { Location = new Point(20, 55), Size = new Size(1100, 660), Anchor = opsAnchor };
 
             BuildAttendancePanel();
             BuildPayrollPanel();
@@ -103,7 +105,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildAttendancePanel()
         {
-            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 70), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 70), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblDate = new Label() { Text = "التاريخ:", Location = new Point(20, 27), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(85, 92, 102) };
             dtpAttendanceDate = new DateTimePicker() { Location = new Point(80, 22), Width = 180, Format = DateTimePickerFormat.Short, Value = DateTime.Now };
             dtpAttendanceDate.ValueChanged += (s, e) => LoadAttendanceGrid();
@@ -113,8 +115,9 @@ namespace Temo_Mobile_Store
 
             pnlToolbar.Controls.AddRange(new Control[] { lblDate, dtpAttendanceDate, btnSaveAttendance });
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 85), Size = new Size(1100, 575), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            dgvAttendance = new DataGridView() { Location = new Point(20, 20), Size = new Size(1060, 535), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AllowUserToAddRows = false, RowHeadersVisible = false };
+            AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 85), Size = new Size(1100, 575), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            dgvAttendance = new DataGridView() { Location = new Point(20, 20), Size = new Size(1060, 535), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AllowUserToAddRows = false, RowHeadersVisible = false };
             dgvAttendance.CurrentCellDirtyStateChanged += (s, e) => { if (dgvAttendance.IsCurrentCellDirty) dgvAttendance.CommitEdit(DataGridViewDataErrorContexts.Commit); };
             StyleDataGridView(dgvAttendance);
             pnlGridCard.Controls.Add(dgvAttendance);
@@ -198,7 +201,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildPayrollPanel()
         {
-            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 70), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 70), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblMonth = new Label() { Text = "الشهر:", Location = new Point(20, 27), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(85, 92, 102) };
             dtpPayrollMonth = new DateTimePicker() { Location = new Point(75, 22), Width = 180, Format = DateTimePickerFormat.Custom, CustomFormat = "MMMM yyyy", Value = DateTime.Now };
             dtpPayrollMonth.ValueChanged += (s, e) => LoadPayrollGrid();
@@ -211,8 +214,9 @@ namespace Temo_Mobile_Store
 
             pnlToolbar.Controls.AddRange(new Control[] { lblMonth, dtpPayrollMonth, btnClosePayrollMonth, btnReopenPayrollMonth });
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 85), Size = new Size(1100, 575), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            dgvPayroll = new DataGridView() { Location = new Point(20, 20), Size = new Size(1060, 495), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false };
+            // ملحوظة: dgvPayroll نفسه بناخده Right بس من غير Bottom عشان تحته لافتة "lblPayrollTotals" ثابتة، مينفعش الجدول يكبر لتحت ويغطيها
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 85), Size = new Size(1100, 575), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            dgvPayroll = new DataGridView() { Location = new Point(20, 20), Size = new Size(1060, 495), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false };
             StyleDataGridView(dgvPayroll);
 
             lblPayrollTotals = new Label() { Text = "", Location = new Point(20, 530), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
@@ -352,9 +356,10 @@ namespace Temo_Mobile_Store
 
             gbPay.Controls.AddRange(new Control[] { lblPayTitle, lblPayMethod, cmbPayMethod, lblPayType, cmbPayType, lblPayAmount, txtPayAmount, lblPayDesc, txtPayDescription, btnPayEmployee });
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(320, 0), Size = new Size(780, 660), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor2 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(320, 0), Size = new Size(780, 660), Anchor = gridFillAnchor2, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📋 كشف الحساب (بالترتيب الزمني)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
-            dgvEmployeeStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 590), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvEmployeeStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 590), Anchor = gridFillAnchor2, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             StyleDataGridView(dgvEmployeeStatement);
             pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvEmployeeStatement });
 
@@ -497,9 +502,10 @@ namespace Temo_Mobile_Store
 
             gbEmployeeActions.Controls.AddRange(new Control[] { btnSaveEmployeeEdit, btnDeleteEmployee });
 
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 660), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            AnchorStyles gridFillAnchor3 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 660), Anchor = gridFillAnchor3, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "👥 الموظفين", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
-            dgvEmployees = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 590), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvEmployees = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 590), Anchor = gridFillAnchor3, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvEmployees.CellClick += DgvEmployees_CellClick;
             StyleDataGridView(dgvEmployees);
             pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvEmployees });

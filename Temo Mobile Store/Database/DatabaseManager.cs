@@ -49,7 +49,8 @@ namespace Temo_Mobile_Store.Database
                     CustomerId INTEGER,
                     PaymentType TEXT,
                     IMEI TEXT,
-                    SaleDate TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+                    SaleDate TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    SalesInvoiceId INTEGER
                 );");
 
                 ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS Customers (
@@ -313,6 +314,7 @@ namespace Temo_Mobile_Store.Database
                 EnsureCashMovementsSaleIdColumn(conn);
                 EnsureCashMovementsLinkedMovementIdColumn(conn);
                 EnsureSalesPaymentMethodColumn(conn);
+                EnsureSalesInvoiceIdColumn(conn);
                 EnsureStoreSettingsCatalogSyncColumns(conn);
                 EnsureDailyClosuresAdjustmentMovementIdColumn(conn);
                 EnsureEmployeesStandardHoursPerDayColumn(conn);
@@ -815,6 +817,35 @@ namespace Temo_Mobile_Store.Database
 
             if (!columnExists)
                 ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN PaymentMethod TEXT;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود SalesInvoiceId لجدول Sales - بيربط عدة أصناف (صفوف) في نفس عملية
+        // البيع تحت رقم فاتورة واحد مشترك (بدل ما كل صنف ياخد رقم فاتورة منفصل زي الأول).
+        // القيمة = SaleID بتاع أول صنف اتسجل في الفاتورة نفسها. المبيعات القديمة قبل
+        // التحديث ده كانت أصلًا صنف واحد بالظبط لكل فاتورة، فبنعتبر كل صف فاتورة مستقلة
+        // بنفسه (SalesInvoiceId = SaleID نفسه) عشان ترقيم الفواتير القديم يفضل زي ما هو.
+        // ==========================================================================
+        private static void EnsureSalesInvoiceIdColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(Sales);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "SalesInvoiceId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN SalesInvoiceId INTEGER;");
+
+            ExecuteNonQuery(conn, "UPDATE Sales SET SalesInvoiceId = SaleID WHERE SalesInvoiceId IS NULL;");
         }
 
         // ==========================================================================
