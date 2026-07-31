@@ -599,13 +599,11 @@ namespace Temo_Mobile_Store
             {
                 conn.Open();
 
-                decimal salesTotal = 0, expensesTotal = 0;
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Total) FROM Sales WHERE SaleDate LIKE @Today AND (PaymentType IS NULL OR PaymentType = 'Cash')", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Today", today + "%");
-                    var r = cmd.ExecuteScalar();
-                    salesTotal = (r != null && r != DBNull.Value) ? Convert.ToDecimal(r) : 0;
-                }
+                // مبيعات الكاش متسجلة بالفعل كحركة "قبض" في CashMovements عن طريق محرك
+                // الخزنة (CashDrawerEngine.Credit)، فبتتجمع أوتوماتيك في methodIn تحت
+                // وسيلة الدفع الصح - مفيش داعي لجمعها تاني من جدول Sales هنا (كان ده
+                // بيضاعف قيمة مبيعات النهار على وسيلة "نقدي" ويضخّم الرصيد المتوقع).
+                decimal expensesTotal = 0;
                 using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM Expenses WHERE ExpenseDate LIKE @Today", conn))
                 {
                     cmd.Parameters.AddWithValue("@Today", today + "%");
@@ -633,7 +631,7 @@ namespace Temo_Mobile_Store
                         methodOut = (r != null && r != DBNull.Value) ? Convert.ToDecimal(r) : 0;
                     }
 
-                    decimal totalIn = methodIn + (method == "نقدي" ? salesTotal : 0);
+                    decimal totalIn = methodIn;
                     decimal totalOut = methodOut + (method == "نقدي" ? expensesTotal : 0);
                     decimal expectedClosing = opening + totalIn - totalOut;
 
