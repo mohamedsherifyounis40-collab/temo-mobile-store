@@ -41,28 +41,28 @@ namespace Temo_Mobile_Store
 
         private void BuildUI()
         {
-            Guna2Panel gbCustomer = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(300, 230), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbCustomer = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(300, 230), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblCustomerTitle = new Label() { Text = "👤 إضافة / تعديل عميل", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
             Label lblCustomerName = new Label() { Text = "اسم العميل:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtCustomerName = new Guna2TextBox() { Location = new Point(20, 70), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
             Label lblCustomerPhone = new Label() { Text = "رقم التليفون:", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtCustomerPhone = new Guna2TextBox() { Location = new Point(20, 128), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnAddCustomer = new Guna2Button() { Text = "إضافة عميل جديد ✅", Location = new Point(20, 166), Width = 260, Height = 34, FillColor = ColorSuccess, BorderRadius = 9 };
+            Guna2Button btnAddCustomer = new Guna2Button() { Text = "إضافة عميل جديد ✅", Location = new Point(20, 166), Width = 260, Height = 34, FillColor = UIHelpers.ColorGreen, BorderRadius = 9 };
             btnAddCustomer.Click += BtnAddCustomer_Click;
 
             gbCustomer.Controls.AddRange(new Control[] { lblCustomerTitle, lblCustomerName, txtCustomerName, lblCustomerPhone, txtCustomerPhone, btnAddCustomer });
 
-            Guna2Panel gbCustomerActions = new Guna2Panel() { Location = new Point(20, 260), Size = new Size(300, 110), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            btnSaveCustomerEdit = new Guna2Button() { Text = "حفظ التعديل 💾", Location = new Point(20, 18), Width = 260, Height = 32, FillColor = ColorWarning, Enabled = false, BorderRadius = 9 };
+            Guna2Panel gbCustomerActions = new Guna2Panel() { Location = new Point(20, 260), Size = new Size(300, 110), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            btnSaveCustomerEdit = new Guna2Button() { Text = "حفظ التعديل 💾", Location = new Point(20, 18), Width = 260, Height = 32, FillColor = UIHelpers.ColorOrange, Enabled = false, BorderRadius = 9 };
             btnSaveCustomerEdit.Click += BtnSaveCustomerEdit_Click;
 
-            Guna2Button btnDeleteCustomer = new Guna2Button() { Text = "حذف العميل ❌", Location = new Point(20, 60), Width = 260, Height = 32, FillColor = ColorDanger, BorderRadius = 9 };
+            Guna2Button btnDeleteCustomer = new Guna2Button() { Text = "حذف العميل ❌", Location = new Point(20, 60), Width = 260, Height = 32, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnDeleteCustomer.Click += BtnDeleteCustomer_Click;
 
             gbCustomerActions.Controls.AddRange(new Control[] { btnSaveCustomerEdit, btnDeleteCustomer });
 
-            Guna2Panel gbCollect = new Guna2Panel() { Location = new Point(20, 385), Size = new Size(300, 300), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbCollect = new Guna2Panel() { Location = new Point(20, 385), Size = new Size(300, 300), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblCollectTitle = new Label() { Text = "💰 تحصيل من عميل (سداد دين)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
             Label lblCollectCustomer = new Label() { Text = "العميل:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             cmbCollectCustomer = new Guna2ComboBox() { Location = new Point(20, 70), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
@@ -74,21 +74,21 @@ namespace Temo_Mobile_Store
             Label lblCollectAmount = new Label() { Text = "المبلغ المحصّل:", Location = new Point(20, 166), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtCollectAmount = new Guna2TextBox() { Location = new Point(20, 186), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnCollect = new Guna2Button() { Text = "تسجيل التحصيل ✅", Location = new Point(20, 226), Width = 260, Height = 38, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnCollect = new Guna2Button() { Text = "تسجيل التحصيل ✅", Location = new Point(20, 226), Width = 260, Height = 38, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnCollect.Click += BtnCollectFromCustomer_Click;
 
             gbCollect.Controls.AddRange(new Control[] { lblCollectTitle, lblCollectCustomer, cmbCollectCustomer, lblCollectMethod, cmbCollectPaymentMethod, lblCollectAmount, txtCollectAmount, btnCollect });
 
             // الكارتين دول واقفين فوق بعض عموديًا، فبنمدّهم عرضًا بس (Top|Left|Right) من غير Bottom عشان محدش يغطي التاني
             AnchorStyles widenAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 320), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 320), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblCustomersGridTitle = new Label() { Text = "👥 العملاء وأرصدتهم", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
             dgvCustomers = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 255), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvCustomers.CellClick += DgvCustomers_CellClick;
             StyleDataGridView(dgvCustomers);
             pnlGridCard.Controls.AddRange(new Control[] { lblCustomersGridTitle, dgvCustomers });
 
-            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 355), Size = new Size(780, 310), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 355), Size = new Size(780, 310), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblCustomerStatementTitle = new Label() { Text = "📋 كشف حساب العميل المحدد (دوس على أي صف فوق)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
             dgvCustomerStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 245), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             StyleDataGridView(dgvCustomerStatement);
@@ -122,6 +122,13 @@ namespace Temo_Mobile_Store
                 if (dgvCustomers.Columns["CustomerId"] != null) dgvCustomers.Columns["CustomerId"].Visible = false;
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        // بيجهّز فورم "إضافة عميل جديد" فاضي وجاهز للكتابة - مستخدم من كارت "عميل جديد" السريع في الداشبورد
+        public void FocusAddCustomerEntry()
+        {
+            ClearCustomerInputs();
+            txtCustomerName.Focus();
         }
 
         // بيدوّر على عميل برقمه، يحدده في الجدول، ويجيب بياناته وكشف حسابه (مستخدمة من نتيجة البحث الشامل Ctrl+F)

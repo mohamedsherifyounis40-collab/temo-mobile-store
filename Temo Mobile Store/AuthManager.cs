@@ -15,6 +15,13 @@ namespace Temo_Mobile_Store
 
         public static bool IsAdmin => CurrentRole == "Admin";
 
+        // بيمسح المستخدم الحالي عشان نرجع لشاشة تسجيل الدخول (زرار Logout في الـ Sidebar)
+        public static void Logout()
+        {
+            CurrentUsername = null;
+            CurrentRole = null;
+        }
+
         // بيعمل جدول المستخدمين لو مش موجود، وبيزرع حساب أدمن افتراضي أول مرة بس
         public static void EnsureUsersTableExists()
         {

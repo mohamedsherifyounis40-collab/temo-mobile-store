@@ -135,7 +135,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildExpensesPanel()
         {
-            Guna2Panel gbAddExpense = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 410), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbAddExpense = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 410), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblExpTitleCard = new Label() { Text = "💸 تسجيل مصروف", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblExpAcc = new Label() { Text = "اختر بند الحساب المصروف:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -148,21 +148,21 @@ namespace Temo_Mobile_Store
             cmbExpensePaymentMethod = new Guna2ComboBox() { Location = new Point(20, 198), Width = 240, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbExpensePaymentMethod.Items.AddRange(UIHelpers.PaymentMethods);
 
-            Guna2Button btnAddExpense = new Guna2Button() { Text = "تسجيل مصروف جديد 💸", Location = new Point(20, 240), Width = 240, Height = 38, FillColor = ColorSuccess, Font = new Font("Segoe UI", 9, FontStyle.Bold), BorderRadius = 10 };
+            Guna2Button btnAddExpense = new Guna2Button() { Text = "تسجيل مصروف جديد 💸", Location = new Point(20, 240), Width = 240, Height = 38, FillColor = UIHelpers.ColorGreen, Font = new Font("Segoe UI", 9, FontStyle.Bold), BorderRadius = 10 };
             btnAddExpense.Click += BtnAddExpense_Click;
 
-            btnEditExpenseMode = new Guna2Button() { Text = "تعديل البند المحدّد", Location = new Point(20, 286), Width = 240, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
+            btnEditExpenseMode = new Guna2Button() { Text = "تعديل البند المحدّد", Location = new Point(20, 286), Width = 240, Height = 34, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
             btnEditExpenseMode.Click += BtnEditExpenseMode_Click;
 
-            btnSaveExpenseUpdate = new Guna2Button() { Text = "حفظ تعديل المصروف 💾", Location = new Point(20, 326), Width = 240, Height = 34, FillColor = ColorWarning, Font = new Font("Segoe UI", 9, FontStyle.Bold), Enabled = false, BorderRadius = 9 };
+            btnSaveExpenseUpdate = new Guna2Button() { Text = "حفظ تعديل المصروف 💾", Location = new Point(20, 326), Width = 240, Height = 34, FillColor = UIHelpers.ColorGreen, Font = new Font("Segoe UI", 9, FontStyle.Bold), Enabled = false, BorderRadius = 9 };
             btnSaveExpenseUpdate.Click += BtnSaveExpenseUpdate_Click;
 
-            btnDeleteExpense = new Guna2Button() { Text = "حذف بند المصروف", Location = new Point(20, 368), Width = 240, Height = 32, FillColor = ColorDanger, BorderRadius = 9 };
+            btnDeleteExpense = new Guna2Button() { Text = "حذف بند المصروف", Location = new Point(20, 368), Width = 240, Height = 32, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnDeleteExpense.Click += BtnDeleteExpense_Click;
 
             gbAddExpense.Controls.AddRange(new Control[] { lblExpTitleCard, lblExpAcc, cmbExpenseAccounts, lblExpAmount, txtExpenseAmount, lblExpPaymentMethod, cmbExpensePaymentMethod, btnAddExpense, btnEditExpenseMode, btnSaveExpenseUpdate, btnDeleteExpense });
 
-            Guna2Panel pnlExpGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 645), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlExpGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 645), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblExpTitle = new Label() { Text = "📖 دفتر حركات المصروفات العمومية", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             dgvExpenses = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 580), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvExpenses.CellClick += DgvExpenses_CellClick;
@@ -177,7 +177,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildMovementsPanel()
         {
-            Guna2Panel gbMovement = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 645), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbMovement = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 645), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblMovementTitle = new Label() { Text = "💰 حركة قبض / صرف", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblType = new Label() { Text = "نوع الحركة:", Location = new Point(20, 55), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -203,21 +203,21 @@ namespace Temo_Mobile_Store
             Label lblMovementAccount = new Label() { Text = "الحساب المرتبط (اختياري):", Location = new Point(20, 400), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
             cmbMovementAccount = new Guna2ComboBox() { Location = new Point(20, 420), Width = 240, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
 
-            Guna2Button btnAddMovement = new Guna2Button() { Text = "تسجيل الحركة ✅", Location = new Point(20, 462), Width = 240, Height = 38, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnAddMovement = new Guna2Button() { Text = "تسجيل الحركة ✅", Location = new Point(20, 462), Width = 240, Height = 38, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnAddMovement.Click += BtnAddMovement_Click;
 
-            btnEditMovement = new Guna2Button() { Text = "تعديل الحركة المحددة ✏️", Location = new Point(20, 505), Width = 240, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
+            btnEditMovement = new Guna2Button() { Text = "تعديل الحركة المحددة ✏️", Location = new Point(20, 505), Width = 240, Height = 34, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
             btnEditMovement.Click += BtnEditMovement_Click;
 
-            btnSaveMovementEdit = new Guna2Button() { Text = "حفظ تعديل الحركة 💾", Location = new Point(20, 544), Width = 240, Height = 34, FillColor = ColorWarning, Enabled = false, BorderRadius = 9 };
+            btnSaveMovementEdit = new Guna2Button() { Text = "حفظ تعديل الحركة 💾", Location = new Point(20, 544), Width = 240, Height = 34, FillColor = UIHelpers.ColorGreen, Enabled = false, BorderRadius = 9 };
             btnSaveMovementEdit.Click += BtnSaveMovementEdit_Click;
 
-            btnCancelMovement = new Guna2Button() { Text = "إلغاء الحركة المحددة ❌", Location = new Point(20, 583), Width = 240, Height = 34, FillColor = ColorDanger, BorderRadius = 9 };
+            btnCancelMovement = new Guna2Button() { Text = "إلغاء الحركة المحددة ❌", Location = new Point(20, 583), Width = 240, Height = 34, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnCancelMovement.Click += BtnCancelMovement_Click;
 
             gbMovement.Controls.AddRange(new Control[] { lblMovementTitle, lblType, cmbMovementType, lblMethod, cmbPaymentMethod, lblMethodBalance, lblAmount, txtMovementAmount, lblRef, txtMovementReference, lblDesc, txtMovementDescription, lblMovementAccount, cmbMovementAccount, btnAddMovement, btnEditMovement, btnSaveMovementEdit, btnCancelMovement });
 
-            Guna2Panel pnlMovGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 645), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlMovGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 645), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblMovGridTitle = new Label() { Text = "📖 سجل حركات القبض والصرف", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             dgvCashMovements = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 580), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvCashMovements.CellClick += DgvCashMovements_CellClick;
@@ -233,7 +233,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildTransferPanel()
         {
-            Guna2Panel gbTransfer = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 420), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbTransfer = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 420), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblTransferTitle = new Label() { Text = "🔄 تحويل بين وسائل الدفع", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblFrom = new Label() { Text = "من وسيلة:", Location = new Point(20, 55), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -253,7 +253,7 @@ namespace Temo_Mobile_Store
             Label lblTransferDesc = new Label() { Text = "الوصف (اختياري):", Location = new Point(20, 261), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtTransferDescription = new Guna2TextBox() { Location = new Point(20, 281), Width = 240, Height = 55, Multiline = true, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnSaveTransfer = new Guna2Button() { Text = "تسجيل التحويل ✅", Location = new Point(20, 348), Width = 240, Height = 38, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnSaveTransfer = new Guna2Button() { Text = "تسجيل التحويل ✅", Location = new Point(20, 348), Width = 240, Height = 38, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnSaveTransfer.Click += BtnSaveTransfer_Click;
 
             gbTransfer.Controls.AddRange(new Control[] { lblTransferTitle, lblFrom, cmbTransferFromMethod, lblTransferFromBalance, lblTo, cmbTransferToMethod, lblTransferAmount, txtTransferAmount, lblTransferDesc, txtTransferDescription, btnSaveTransfer });

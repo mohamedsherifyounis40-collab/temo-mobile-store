@@ -41,11 +41,11 @@ namespace Temo_Mobile_Store
         private DataGridView dgvPurchaseCart;
         private Label lblPurchaseCartTotal;
         private List<PurchaseCartItem> currentPurchaseItems = new List<PurchaseCartItem>();
-        private Guna2Button btnSavePurchase, btnCancelEditPurchase;
+        private Guna2Button btnSavePurchase, btnCancelEditPurchase, btnViewFullCart;
         private int? editingPurchaseId = null;
 
         // ---------- تعديل/إلغاء فاتورة شراء محفوظة (من جدول كشف الحساب) ----------
-        private Guna2Button btnEditPurchaseInvoice, btnCancelPurchaseInvoice;
+        private Guna2Button btnEditPurchaseInvoice, btnCancelPurchaseInvoice, btnViewPurchaseInvoice;
         private int? selectedStatementPurchaseId = null;
 
         // ---------- سداد مورد ----------
@@ -69,33 +69,33 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildUI()
         {
-            Guna2Panel gbSupplier = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(300, 250), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbSupplier = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(300, 250), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblSupplierTitle = new Label() { Text = "🚚 إضافة / تعديل مورد", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
             Label lblSupplierName = new Label() { Text = "اسم المورد:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtSupplierName = new Guna2TextBox() { Location = new Point(20, 70), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
             Label lblSupplierPhone = new Label() { Text = "رقم التليفون:", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtSupplierPhone = new Guna2TextBox() { Location = new Point(20, 128), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnAddSupplier = new Guna2Button() { Text = "إضافة مورد جديد ✅", Location = new Point(20, 166), Width = 260, Height = 32, FillColor = ColorSuccess, BorderRadius = 9 };
+            Guna2Button btnAddSupplier = new Guna2Button() { Text = "إضافة مورد جديد ✅", Location = new Point(20, 166), Width = 260, Height = 32, FillColor = UIHelpers.ColorGreen, BorderRadius = 9 };
             btnAddSupplier.Click += BtnAddSupplier_Click;
 
-            btnSaveSupplierEdit = new Guna2Button() { Text = "حفظ التعديل 💾", Location = new Point(20, 204), Width = 125, Height = 30, FillColor = ColorWarning, Enabled = false, BorderRadius = 9 };
+            btnSaveSupplierEdit = new Guna2Button() { Text = "حفظ التعديل 💾", Location = new Point(20, 204), Width = 125, Height = 30, FillColor = UIHelpers.ColorOrange, Enabled = false, BorderRadius = 9 };
             btnSaveSupplierEdit.Click += BtnSaveSupplierEdit_Click;
 
-            Guna2Button btnDeleteSupplier = new Guna2Button() { Text = "حذف المورد ❌", Location = new Point(155, 204), Width = 125, Height = 30, FillColor = ColorDanger, BorderRadius = 9 };
+            Guna2Button btnDeleteSupplier = new Guna2Button() { Text = "حذف المورد ❌", Location = new Point(155, 204), Width = 125, Height = 30, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnDeleteSupplier.Click += BtnDeleteSupplier_Click;
 
             gbSupplier.Controls.AddRange(new Control[] { lblSupplierTitle, lblSupplierName, txtSupplierName, lblSupplierPhone, txtSupplierPhone, btnAddSupplier, btnSaveSupplierEdit, btnDeleteSupplier });
 
             // ---------- كارت العمليات (فاتورة شراء / سداد) ----------
-            Guna2Panel pnlOperationCard = new Guna2Panel() { Location = new Point(20, 285), Size = new Size(300, 930), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlOperationCard = new Guna2Panel() { Location = new Point(20, 285), Size = new Size(300, 1030), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
 
             Label lblOpType = new Label() { Text = "نوع العملية:", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             cmbSupplierOperationType = new Guna2ComboBox() { Location = new Point(20, 38), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbSupplierOperationType.Items.AddRange(new string[] { "فاتورة شراء جديدة 📦", "سداد لمورد 💵" });
             cmbSupplierOperationType.SelectedIndexChanged += CmbSupplierOperationType_SelectedIndexChanged;
 
-            pnlNewPurchase = new Panel() { Location = new Point(20, 78), Size = new Size(260, 830), AutoScroll = false };
+            pnlNewPurchase = new Panel() { Location = new Point(20, 78), Size = new Size(260, 930), AutoScroll = false };
             pnlSupplierPayment = new Panel() { Location = new Point(20, 78), Size = new Size(260, 420) };
 
             BuildNewPurchasePanel();
@@ -108,7 +108,7 @@ namespace Temo_Mobile_Store
             // ملحوظة: الكارتين دول واقفين فوق بعض عموديًا في نفس العمود، فبنمدّهم عرضًا بس (Top|Left|Right)
             // من غير Bottom عشان محدش يكبر لتحت ويغطي التاني
             AnchorStyles widenAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlSuppliersGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 335), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlSuppliersGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 335), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblSuppliersGridTitle = new Label() { Text = "🚚 الموردون وأرصدتهم", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             dgvSuppliers = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 270), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvSuppliers.CellClick += DgvSuppliers_CellClick;
@@ -116,19 +116,22 @@ namespace Temo_Mobile_Store
             pnlSuppliersGridCard.Controls.AddRange(new Control[] { lblSuppliersGridTitle, dgvSuppliers });
 
             // ---------- كارت كشف حساب المورد ----------
-            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 370), Size = new Size(780, 375), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlStatementCard = new Guna2Panel() { Location = new Point(340, 370), Size = new Size(780, 375), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblStatementTitle = new Label() { Text = "📋 كشف حساب المورد المحدد (دوس على فاتورة شراء عشان تعدلها أو تلغيها)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             dgvSupplierStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 230), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
             dgvSupplierStatement.CellClick += DgvSupplierStatement_CellClick;
             StyleDataGridView(dgvSupplierStatement);
 
-            btnEditPurchaseInvoice = new Guna2Button() { Text = "تعديل الفاتورة المحددة ✏️", Location = new Point(20, 290), Width = 240, Height = 34, FillColor = ColorWarning, BorderRadius = 9 };
+            btnEditPurchaseInvoice = new Guna2Button() { Text = "تعديل الفاتورة المحددة ✏️", Location = new Point(20, 290), Width = 240, Height = 34, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
             btnEditPurchaseInvoice.Click += BtnEditPurchaseInvoice_Click;
 
-            btnCancelPurchaseInvoice = new Guna2Button() { Text = "إلغاء الفاتورة المحددة ❌", Location = new Point(270, 290), Width = 240, Height = 34, FillColor = ColorDanger, BorderRadius = 9 };
+            btnCancelPurchaseInvoice = new Guna2Button() { Text = "إلغاء الفاتورة المحددة ❌", Location = new Point(270, 290), Width = 240, Height = 34, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnCancelPurchaseInvoice.Click += BtnCancelPurchaseInvoice_Click;
 
-            pnlStatementCard.Controls.AddRange(new Control[] { lblStatementTitle, dgvSupplierStatement, btnEditPurchaseInvoice, btnCancelPurchaseInvoice });
+            btnViewPurchaseInvoice = new Guna2Button() { Text = "عرض الفاتورة 👁️", Location = new Point(520, 290), Width = 240, Height = 34, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
+            btnViewPurchaseInvoice.Click += BtnViewPurchaseInvoice_Click;
+
+            pnlStatementCard.Controls.AddRange(new Control[] { lblStatementTitle, dgvSupplierStatement, btnEditPurchaseInvoice, btnCancelPurchaseInvoice, btnViewPurchaseInvoice });
 
             this.Controls.AddRange(new Control[] { gbSupplier, pnlOperationCard, pnlSuppliersGridCard, pnlStatementCard });
 
@@ -173,24 +176,27 @@ namespace Temo_Mobile_Store
             Label lblSalePrice = new Label() { Text = "سعر البيع المقترح (لو منتج جديد بس):", Location = new Point(0, 482), Size = new Size(260, 20), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtPurchaseSalePrice = new Guna2TextBox() { Location = new Point(0, 502), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnAddToCart = new Guna2Button() { Text = "إضافة للمخزن ➕", Location = new Point(0, 538), Width = 260, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnAddToCart = new Guna2Button() { Text = "إضافة للمخزن ➕", Location = new Point(0, 538), Width = 260, Height = 34, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 9 };
             btnAddToCart.Click += BtnAddPurchaseItem_Click;
 
-            dgvPurchaseCart = new DataGridView() { Location = new Point(0, 578), Size = new Size(260, 130), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
+            dgvPurchaseCart = new DataGridView() { Location = new Point(0, 578), Size = new Size(260, 170), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvPurchaseCart.CellDoubleClick += DgvPurchaseCart_CellDoubleClick;
             StyleDataGridView(dgvPurchaseCart);
 
-            Label lblCartHint = new Label() { Text = "دبل كليك على صنف في الجدول عشان تشيله من الفاتورة", Location = new Point(0, 710), Size = new Size(260, 15), Font = new Font("Segoe UI", 7F), ForeColor = Color.FromArgb(150, 155, 165) };
+            btnViewFullCart = new Guna2Button() { Text = "🔍 عرض الفاتورة كاملة", Location = new Point(0, 756), Width = 260, Height = 30, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
+            btnViewFullCart.Click += BtnViewFullCart_Click;
 
-            lblPurchaseCartTotal = new Label() { Text = "إجمالي الفاتورة: 0.00 ج.م", Location = new Point(0, 728), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorSuccess };
+            Label lblCartHint = new Label() { Text = "دبل كليك على صنف في الجدول عشان تشيله من الفاتورة", Location = new Point(0, 794), Size = new Size(260, 15), Font = new Font("Segoe UI", 7F), ForeColor = Color.FromArgb(150, 155, 165) };
 
-            btnSavePurchase = new Guna2Button() { Text = "حفظ فاتورة الشراء 💾", Location = new Point(0, 757), Width = 260, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
+            lblPurchaseCartTotal = new Label() { Text = "إجمالي الفاتورة: 0.00 ج.م", Location = new Point(0, 812), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = UIHelpers.ColorGreen };
+
+            btnSavePurchase = new Guna2Button() { Text = "حفظ فاتورة الشراء 💾", Location = new Point(0, 841), Width = 260, Height = 36, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnSavePurchase.Click += BtnSavePurchase_Click;
 
-            btnCancelEditPurchase = new Guna2Button() { Text = "إلغاء التعديل ⬅️", Location = new Point(0, 797), Width = 260, Height = 30, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9, Visible = false };
+            btnCancelEditPurchase = new Guna2Button() { Text = "إلغاء التعديل ⬅️", Location = new Point(0, 881), Width = 260, Height = 30, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9, Visible = false };
             btnCancelEditPurchase.Click += BtnCancelEditPurchase_Click;
 
-            pnlNewPurchase.Controls.AddRange(new Control[] { lblPurchaseSupplier, cmbPurchaseSupplier, lblPurchasePaymentTypeLbl, cmbPurchasePaymentType, lblPurchasePayMethodLbl, cmbPurchasePaymentMethod, lblBarcode, txtPurchaseBarcode, lblProductName, txtPurchaseProductName, chkPurchaseSerialized, lblQty, txtPurchaseQty, lblUnitCost, txtPurchaseUnitCost, lblImeiList, txtPurchaseImeiList, lblSalePrice, txtPurchaseSalePrice, btnAddToCart, dgvPurchaseCart, lblCartHint, lblPurchaseCartTotal, btnSavePurchase, btnCancelEditPurchase });
+            pnlNewPurchase.Controls.AddRange(new Control[] { lblPurchaseSupplier, cmbPurchaseSupplier, lblPurchasePaymentTypeLbl, cmbPurchasePaymentType, lblPurchasePayMethodLbl, cmbPurchasePaymentMethod, lblBarcode, txtPurchaseBarcode, lblProductName, txtPurchaseProductName, chkPurchaseSerialized, lblQty, txtPurchaseQty, lblUnitCost, txtPurchaseUnitCost, lblImeiList, txtPurchaseImeiList, lblSalePrice, txtPurchaseSalePrice, btnAddToCart, dgvPurchaseCart, btnViewFullCart, lblCartHint, lblPurchaseCartTotal, btnSavePurchase, btnCancelEditPurchase });
         }
 
         private void BuildSupplierPaymentPanel()
@@ -205,7 +211,7 @@ namespace Temo_Mobile_Store
             Label lblAmount = new Label() { Text = "المبلغ المدفوع:", Location = new Point(0, 116), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtSupplierPaymentAmount = new Guna2TextBox() { Location = new Point(0, 136), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnPaySupplier = new Guna2Button() { Text = "تسجيل السداد ✅", Location = new Point(0, 176), Width = 260, Height = 38, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnPaySupplier = new Guna2Button() { Text = "تسجيل السداد ✅", Location = new Point(0, 176), Width = 260, Height = 38, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnPaySupplier.Click += BtnPaySupplier_Click;
 
             pnlSupplierPayment.Controls.AddRange(new Control[] { lblPaymentSupplier, cmbPaymentSupplier, lblPaymentMethod, cmbSupplierPaymentMethod, lblAmount, txtSupplierPaymentAmount, btnPaySupplier });
@@ -268,6 +274,15 @@ namespace Temo_Mobile_Store
                 if (dgvSuppliers.Columns["SupplierId"] != null) dgvSuppliers.Columns["SupplierId"].Visible = false;
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        // بيحوّل لتاب "فاتورة شراء جديدة" ويجهّزه فاضي - مستخدم من كارت "فاتورة شراء" السريع في الداشبورد
+        public void FocusNewPurchaseEntry()
+        {
+            cmbSupplierOperationType.SelectedIndex = 0;
+            pnlNewPurchase.Visible = true; // احتياطًا: لو كانت أصلاً على index 0 (فمفيش SelectedIndexChanged هيتنادى) والنافذة كانت متسيبة على تاب السداد
+            pnlSupplierPayment.Visible = false;
+            txtPurchaseBarcode.Focus();
         }
 
         // بيدوّر على مورد برقمه، يحدده في الجدول، ويجيب بياناته وكشف حسابه (مستخدمة من نتيجة البحث الشامل Ctrl+F)
@@ -488,6 +503,93 @@ namespace Temo_Mobile_Store
             txtPurchaseImeiList.Clear();
             chkPurchaseSerialized.Checked = false;
             txtPurchaseBarcode.Focus();
+        }
+
+        private void BtnViewFullCart_Click(object sender, EventArgs e)
+        {
+            if (currentPurchaseItems.Count == 0)
+            {
+                MessageBox.Show("مفيش أصناف في الفاتورة لسه.", "الفاتورة فارغة", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            ShowInvoiceItemsPopup(currentPurchaseItems, "🔍 عرض الفاتورة كاملة");
+        }
+
+        private void BtnViewPurchaseInvoice_Click(object sender, EventArgs e)
+        {
+            if (selectedStatementPurchaseId == null)
+            {
+                MessageBox.Show("من فضلك اختر فاتورة شراء من كشف الحساب فوق أولاً.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            List<PurchaseCartItem> items;
+            try
+            {
+                items = SuppliersRepository.GetPurchaseItemsForInvoice(selectedStatementPurchaseId.Value);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (items.Count == 0)
+            {
+                MessageBox.Show("لم يتم العثور على بنود لهذه الفاتورة.", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            ShowInvoiceItemsPopup(items, "👁️ عرض فاتورة شراء محفوظة");
+        }
+
+        private void ShowInvoiceItemsPopup(List<PurchaseCartItem> items, string title)
+        {
+            DataTable dt = new DataTable();
+            dt.Columns.AddRange(new DataColumn[] { new DataColumn("المنتج"), new DataColumn("الكمية"), new DataColumn("السعر"), new DataColumn("الإجمالي"), new DataColumn("IMEI؟") });
+
+            decimal grandTotal = 0;
+            foreach (var item in items)
+            {
+                dt.Rows.Add(item.ProductName, item.Qty, item.UnitCost.ToString("N2"), item.LineTotal.ToString("N2"), item.IsSerialized ? "✅" : "-");
+                grandTotal += item.LineTotal;
+            }
+
+            using Form popup = new Form()
+            {
+                Text = title,
+                StartPosition = FormStartPosition.CenterParent,
+                Size = new Size(900, 600),
+                MinimumSize = new Size(650, 400),
+                Font = new Font("Segoe UI", 9F),
+                BackColor = ColorBackground
+            };
+
+            DataGridView dgvFull = new DataGridView()
+            {
+                Dock = DockStyle.Fill,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ReadOnly = true,
+                AllowUserToAddRows = false,
+                RowTemplate = { Height = 32 },
+                DataSource = dt
+            };
+            StyleDataGridView(dgvFull);
+
+            Label lblTotal = new Label()
+            {
+                Text = $"إجمالي الفاتورة: {grandTotal:N2} ج.م",
+                Dock = DockStyle.Bottom,
+                Height = 40,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                ForeColor = UIHelpers.ColorGreen
+            };
+
+            popup.Controls.Add(dgvFull);
+            popup.Controls.Add(lblTotal);
+            popup.ShowDialog(this.FindForm());
         }
 
         private void RefreshPurchaseCartGrid()

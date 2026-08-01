@@ -40,24 +40,24 @@ namespace Temo_Mobile_Store
         private void BuildUI()
         {
             AnchorStyles widenAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(1100, 90), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(1100, 90), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
 
             Label lblSearch = new Label() { Text = "بحث بالاسم أو الباركود:", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtInventorySearch = new Guna2TextBox() { Location = new Point(20, 38), Width = 280, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
             txtInventorySearch.TextChanged += (s, e) => FilterInventoryCountGrid();
 
-            Guna2Button btnRefreshInventoryCount = new Guna2Button() { Text = "بدء جرد جديد 🔄", Location = new Point(320, 38), Width = 190, Height = 34, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnRefreshInventoryCount = new Guna2Button() { Text = "بدء جرد جديد 🔄", Location = new Point(320, 38), Width = 190, Height = 34, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
             btnRefreshInventoryCount.Click += BtnRefreshInventoryCount_Click;
 
-            Guna2Button btnViewAdjustmentsLog = new Guna2Button() { Text = "سجل التسويات السابقة 📜", Location = new Point(520, 38), Width = 220, Height = 34, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnViewAdjustmentsLog = new Guna2Button() { Text = "سجل التسويات السابقة 📜", Location = new Point(520, 38), Width = 220, Height = 34, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
             btnViewAdjustmentsLog.Click += BtnViewAdjustmentsLog_Click;
 
-            Guna2Button btnSaveInventoryCount = new Guna2Button() { Text = "حفظ نتيجة الجرد وتسوية الفروقات ✅", Location = new Point(750, 38), Width = 330, Height = 34, FillColor = ColorSuccess, BorderRadius = 9 };
+            Guna2Button btnSaveInventoryCount = new Guna2Button() { Text = "حفظ نتيجة الجرد وتسوية الفروقات ✅", Location = new Point(750, 38), Width = 330, Height = 34, FillColor = UIHelpers.ColorGreen, BorderRadius = 9 };
             btnSaveInventoryCount.Click += BtnSaveInventoryCount_Click;
 
             pnlToolbar.Controls.AddRange(new Control[] { lblSearch, txtInventorySearch, btnRefreshInventoryCount, btnViewAdjustmentsLog, btnSaveInventoryCount });
 
-            Guna2Panel pnlNote = new Guna2Panel() { Location = new Point(20, 120), Size = new Size(1100, 45), Anchor = widenAnchor, FillColor = Color.FromArgb(255, 249, 230), BorderRadius = 10 };
+            Guna2Panel pnlNote = new Guna2Panel() { Location = new Point(20, 120), Size = new Size(1100, 45), Anchor = widenAnchor, FillColor = UIHelpers.LightTint(UIHelpers.ColorOrange, 0.85f), BorderRadius = 10 };
             Label lblNote = new Label()
             {
                 Text = "اكتب الكمية الفعلية اللي عددتها بإيدك في عمود \"الكمية الفعلية\" لأي صنف جردته، والباقي سيبه فاضي. عمود \"الفرق\" هيتحسب لوحده. لما تخلص، دوس \"حفظ نتيجة الجرد\".",
@@ -69,7 +69,7 @@ namespace Temo_Mobile_Store
             pnlNote.Controls.Add(lblNote);
 
             AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(20, 180), Size = new Size(1100, 545), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(20, 180), Size = new Size(1100, 545), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📋 جدول الجرد", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvInventoryCount = new DataGridView() { Location = new Point(20, 50), Size = new Size(1060, 480), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AllowUserToAddRows = false, RowHeadersVisible = false };
@@ -144,9 +144,9 @@ namespace Temo_Mobile_Store
             string val = e.Value?.ToString();
             if (string.IsNullOrEmpty(val)) return;
 
-            if (val == "مطابق") e.CellStyle.ForeColor = ColorSuccess;
-            else if (val.StartsWith("+")) e.CellStyle.ForeColor = Color.FromArgb(41, 128, 185); // أزرق: زيادة عن المسجل بالنظام
-            else e.CellStyle.ForeColor = ColorDanger; // نقص عن المسجل بالنظام
+            if (val == "مطابق") e.CellStyle.ForeColor = UIHelpers.ColorGreen;
+            else if (val.StartsWith("+")) e.CellStyle.ForeColor = UIHelpers.ColorAccentPrimary; // زيادة عن المسجل بالنظام
+            else e.CellStyle.ForeColor = UIHelpers.ColorRed; // نقص عن المسجل بالنظام
         }
 
         private void BtnRefreshInventoryCount_Click(object sender, EventArgs e)

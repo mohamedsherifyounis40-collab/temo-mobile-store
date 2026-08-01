@@ -39,14 +39,25 @@ namespace Temo_Mobile_Store
 
             AuthManager.EnsureUsersTableExists();
 
-            LoginForm loginForm = new LoginForm();
-            if (loginForm.ShowDialog() == DialogResult.OK)
+            // ---------- حلقة تسجيل الدخول/الخروج: تفتح Login تاني لو المستخدم عمل Logout من الـ Sidebar ----------
+            bool keepRunning = true;
+            while (keepRunning)
             {
-                Application.Run(new MainShell());
-            }
-            else
-            {
-                Application.Exit();
+                using (LoginForm loginForm = new LoginForm())
+                {
+                    if (loginForm.ShowDialog() != DialogResult.OK)
+                    {
+                        keepRunning = false;
+                        break;
+                    }
+                }
+
+                using (MainShell shell = new MainShell())
+                {
+                    Application.Run(shell);
+                    keepRunning = shell.LogoutRequested;
+                    if (keepRunning) AuthManager.Logout();
+                }
             }
         }
     }

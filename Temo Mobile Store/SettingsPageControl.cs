@@ -104,16 +104,16 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildStoreSettingsPanel()
         {
-            Guna2Panel gbLogo = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(260, 280), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbLogo = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(260, 280), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblLogoTitle = new Label() { Text = "🖼️ شعار المحل", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             picStoreLogo = new PictureBox() { Location = new Point(30, 50), Size = new Size(200, 140), SizeMode = PictureBoxSizeMode.Zoom, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.White };
-            Guna2Button btnUploadLogo = new Guna2Button() { Text = "رفع شعار 🖼️", Location = new Point(30, 200), Width = 200, Height = 32, FillColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnUploadLogo = new Guna2Button() { Text = "رفع شعار 🖼️", Location = new Point(30, 200), Width = 200, Height = 32, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 9 };
             btnUploadLogo.Click += BtnUploadLogo_Click;
-            Guna2Button btnRemoveLogo = new Guna2Button() { Text = "إزالة الشعار 🗑️", Location = new Point(30, 238), Width = 200, Height = 30, FillColor = ColorDanger, BorderRadius = 9 };
+            Guna2Button btnRemoveLogo = new Guna2Button() { Text = "إزالة الشعار 🗑️", Location = new Point(30, 238), Width = 200, Height = 30, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnRemoveLogo.Click += BtnRemoveLogo_Click;
             gbLogo.Controls.AddRange(new Control[] { lblLogoTitle, picStoreLogo, btnUploadLogo, btnRemoveLogo });
 
-            Guna2Panel gbInfo = new Guna2Panel() { Location = new Point(280, 0), Size = new Size(440, 360), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbInfo = new Guna2Panel() { Location = new Point(280, 0), Size = new Size(440, 360), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblInfoTitle = new Label() { Text = "⚙️ بيانات المحل", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblStoreName = new Label() { Text = "اسم المحل:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -128,7 +128,7 @@ namespace Temo_Mobile_Store
             Label lblAddress = new Label() { Text = "العنوان:", Location = new Point(20, 224), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtSettingsAddress = new Guna2TextBox() { Location = new Point(20, 244), Width = 400, Height = 55, Multiline = true, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnSaveStoreSettings = new Guna2Button() { Text = "حفظ الإعدادات 💾", Location = new Point(20, 306), Width = 400, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnSaveStoreSettings = new Guna2Button() { Text = "حفظ الإعدادات 💾", Location = new Point(20, 306), Width = 400, Height = 36, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnSaveStoreSettings.Click += BtnSaveStoreSettings_Click;
 
             gbInfo.Controls.AddRange(new Control[] { lblInfoTitle, lblStoreName, txtSettingsStoreName, lblPhone, txtSettingsPhone, lblWhatsApp, txtSettingsWhatsApp, lblAddress, txtSettingsAddress, btnSaveStoreSettings });
@@ -141,7 +141,7 @@ namespace Temo_Mobile_Store
                 ForeColor = Color.FromArgb(85, 92, 102)
             };
 
-            Guna2Panel gbCatalogSync = new Guna2Panel() { Location = new Point(0, 425), Size = new Size(1080, 235), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbCatalogSync = new Guna2Panel() { Location = new Point(0, 425), Size = new Size(1080, 235), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblSyncTitle = new Label() { Text = "🌐 مزامنة موقع الكتالوج", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             Label lblSyncNote = new Label()
             {
@@ -157,10 +157,10 @@ namespace Temo_Mobile_Store
 
             chkCatalogSyncEnabled = new CheckBox() { Text = "تفعيل المزامنة التلقائية", Location = new Point(20, 155), AutoSize = true, Font = new Font("Segoe UI", 9F) };
 
-            Guna2Button btnSaveCatalogSync = new Guna2Button() { Text = "حفظ إعدادات المزامنة 💾", Location = new Point(20, 185), Width = 230, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnSaveCatalogSync = new Guna2Button() { Text = "حفظ إعدادات المزامنة 💾", Location = new Point(20, 185), Width = 230, Height = 36, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnSaveCatalogSync.Click += BtnSaveCatalogSync_Click;
 
-            Guna2Button btnSyncNow = new Guna2Button() { Text = "مزامنة الآن 🔄", Location = new Point(260, 185), Width = 180, Height = 36, FillColor = ColorPrimary, BorderRadius = 10 };
+            Guna2Button btnSyncNow = new Guna2Button() { Text = "مزامنة الآن 🔄", Location = new Point(260, 185), Width = 180, Height = 36, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 10 };
             btnSyncNow.Click += BtnSyncCatalogNow_Click;
 
             lblCatalogSyncStatus = new Label() { Text = "", Location = new Point(460, 195), AutoSize = true, Font = new Font("Segoe UI", 8.5F) };
@@ -195,12 +195,12 @@ namespace Temo_Mobile_Store
             try
             {
                 SettingsRepository.SaveCatalogSyncSettings(txtCatalogSyncUrl.Text.Trim(), txtCatalogSyncSecret.Text.Trim(), chkCatalogSyncEnabled.Checked);
-                lblCatalogSyncStatus.ForeColor = ColorSuccess;
+                lblCatalogSyncStatus.ForeColor = UIHelpers.ColorGreen;
                 lblCatalogSyncStatus.Text = "تم الحفظ ✅";
             }
             catch (Exception ex)
             {
-                lblCatalogSyncStatus.ForeColor = ColorDanger;
+                lblCatalogSyncStatus.ForeColor = UIHelpers.ColorRed;
                 lblCatalogSyncStatus.Text = "حصل خطأ: " + ex.Message;
             }
         }
@@ -217,7 +217,7 @@ namespace Temo_Mobile_Store
 
             var (success, message) = await WebCatalogSyncService.SyncNowAsync();
 
-            lblCatalogSyncStatus.ForeColor = success ? ColorSuccess : ColorDanger;
+            lblCatalogSyncStatus.ForeColor = success ? UIHelpers.ColorGreen : UIHelpers.ColorRed;
             lblCatalogSyncStatus.Text = message;
         }
 
@@ -305,21 +305,21 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildBackupPanel()
         {
-            Guna2Panel pnlInfoCard = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1080, 175), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlInfoCard = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1080, 175), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblTitle = new Label() { Text = "💾 النسخ الاحتياطي والاسترجاع", Font = new Font("Segoe UI", 12, FontStyle.Bold), ForeColor = ColorPrimary, Location = new Point(20, 15), AutoSize = true };
             lblBackupStatus = new Label() { Text = "", Location = new Point(20, 50), AutoSize = true, ForeColor = Color.FromArgb(85, 92, 102) };
             lblCloudStatus = new Label() { Text = "", Location = new Point(20, 73), AutoSize = true };
 
-            Guna2Button btnCreateBackupNow = new Guna2Button() { Text = "عمل نسخة احتياطية الآن 💾", Location = new Point(20, 105), Width = 230, Height = 40, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnCreateBackupNow = new Guna2Button() { Text = "عمل نسخة احتياطية الآن 💾", Location = new Point(20, 105), Width = 230, Height = 40, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnCreateBackupNow.Click += BtnCreateBackupNow_Click;
 
-            Guna2Button btnRestoreBackup = new Guna2Button() { Text = "استرجاع النسخة المحددة ⏪", Location = new Point(260, 105), Width = 230, Height = 40, FillColor = ColorWarning, BorderRadius = 10 };
+            Guna2Button btnRestoreBackup = new Guna2Button() { Text = "استرجاع النسخة المحددة ⏪", Location = new Point(260, 105), Width = 230, Height = 40, FillColor = UIHelpers.ColorOrange, BorderRadius = 10 };
             btnRestoreBackup.Click += BtnRestoreBackup_Click;
 
-            Guna2Button btnDeleteBackup = new Guna2Button() { Text = "حذف النسخة المحددة 🗑️", Location = new Point(500, 105), Width = 220, Height = 40, FillColor = ColorDanger, BorderRadius = 10 };
+            Guna2Button btnDeleteBackup = new Guna2Button() { Text = "حذف النسخة المحددة 🗑️", Location = new Point(500, 105), Width = 220, Height = 40, FillColor = UIHelpers.ColorRed, BorderRadius = 10 };
             btnDeleteBackup.Click += BtnDeleteBackup_Click;
 
-            Guna2Button btnOpenBackupFolder = new Guna2Button() { Text = "فتح مجلد النسخ 📂", Location = new Point(730, 105), Width = 200, Height = 40, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 10 };
+            Guna2Button btnOpenBackupFolder = new Guna2Button() { Text = "فتح مجلد النسخ 📂", Location = new Point(730, 105), Width = 200, Height = 40, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 10 };
             btnOpenBackupFolder.Click += BtnOpenBackupFolder_Click;
 
             pnlInfoCard.Controls.AddRange(new Control[] { lblTitle, lblBackupStatus, lblCloudStatus, btnCreateBackupNow, btnRestoreBackup, btnDeleteBackup, btnOpenBackupFolder });
@@ -333,7 +333,7 @@ namespace Temo_Mobile_Store
             };
 
             AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 230), Size = new Size(1080, 470), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 230), Size = new Size(1080, 470), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             dgvBackups = new DataGridView() { Location = new Point(20, 20), Size = new Size(1040, 430), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect };
             StyleDataGridView(dgvBackups);
             pnlGridCard.Controls.Add(dgvBackups);
@@ -382,7 +382,7 @@ namespace Temo_Mobile_Store
             lblCloudStatus.Text = cloudFolder != null
                 ? $"☁️ متصل بخدمة تخزين سحابي، وبيتحفظ فيها نسخة إضافية تلقائيًا: {cloudFolder}"
                 : "☁️ مفيش Google Drive أو OneDrive متزامن على الجهاز ده حاليًا، فالنسخ بتتحفظ محليًا بس.";
-            lblCloudStatus.ForeColor = cloudFolder != null ? ColorSuccess : ColorDanger;
+            lblCloudStatus.ForeColor = cloudFolder != null ? UIHelpers.ColorGreen : UIHelpers.ColorRed;
         }
 
         private void BtnCreateBackupNow_Click(object sender, EventArgs e)
@@ -478,7 +478,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildUsersPanel()
         {
-            Guna2Panel gbAddUser = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 400), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbAddUser = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 400), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblUserTitle = new Label() { Text = "👤 إضافة / تعديل مستخدم", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblUsername = new Label() { Text = "اسم المستخدم:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -492,16 +492,16 @@ namespace Temo_Mobile_Store
             cmbNewUserRole.Items.AddRange(new string[] { "Employee", "Admin" });
             cmbNewUserRole.SelectedIndex = 0;
 
-            Guna2Button btnAddUser = new Guna2Button() { Text = "إضافة مستخدم جديد ✅", Location = new Point(20, 238), Width = 240, Height = 34, FillColor = ColorSuccess, BorderRadius = 9 };
+            Guna2Button btnAddUser = new Guna2Button() { Text = "إضافة مستخدم جديد ✅", Location = new Point(20, 238), Width = 240, Height = 34, FillColor = UIHelpers.ColorGreen, BorderRadius = 9 };
             btnAddUser.Click += BtnAddUser_Click;
 
-            Guna2Button btnEditUserMode = new Guna2Button() { Text = "تعديل المستخدم المحدد ✏️", Location = new Point(20, 278), Width = 240, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnEditUserMode = new Guna2Button() { Text = "تعديل المستخدم المحدد ✏️", Location = new Point(20, 278), Width = 240, Height = 34, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
             btnEditUserMode.Click += BtnEditUserMode_Click;
 
-            btnSaveUserEdit = new Guna2Button() { Text = "حفظ تعديل المستخدم 💾", Location = new Point(20, 318), Width = 240, Height = 34, FillColor = ColorWarning, Enabled = false, BorderRadius = 9 };
+            btnSaveUserEdit = new Guna2Button() { Text = "حفظ تعديل المستخدم 💾", Location = new Point(20, 318), Width = 240, Height = 34, FillColor = UIHelpers.ColorGreen, Enabled = false, BorderRadius = 9 };
             btnSaveUserEdit.Click += BtnSaveUserEdit_Click;
 
-            Guna2Button btnDeleteUser = new Guna2Button() { Text = "حذف المستخدم المحدد ❌", Location = new Point(20, 358), Width = 240, Height = 30, FillColor = ColorDanger, BorderRadius = 9 };
+            Guna2Button btnDeleteUser = new Guna2Button() { Text = "حذف المستخدم المحدد ❌", Location = new Point(20, 358), Width = 240, Height = 30, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnDeleteUser.Click += BtnDeleteUser_Click;
 
             gbAddUser.Controls.AddRange(new Control[] { lblUserTitle, lblUsername, txtNewUsername, lblPassword, txtNewUserPassword, lblRole, cmbNewUserRole, btnAddUser, btnEditUserMode, btnSaveUserEdit, btnDeleteUser });
@@ -518,7 +518,7 @@ namespace Temo_Mobile_Store
             pnlNote.Controls.Add(lblNote);
 
             AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 620), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 620), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "👥 المستخدمين المسجّلين", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvUsers = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 555), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };

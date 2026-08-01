@@ -89,7 +89,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildAccountsTreePanel()
         {
-            Guna2Panel gbAccount = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 320), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbAccount = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 320), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblAccountTitle = new Label() { Text = "🌳 إضافة / تعديل حساب", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblCode = new Label() { Text = "كود الحساب:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -98,16 +98,16 @@ namespace Temo_Mobile_Store
             Label lblName = new Label() { Text = "اسم الحساب:", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtAccountName = new Guna2TextBox() { Location = new Point(20, 128), Width = 240, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnAddAccount = new Guna2Button() { Text = "إضافة حساب جديد ✅", Location = new Point(20, 166), Width = 240, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnAddAccount = new Guna2Button() { Text = "إضافة حساب جديد ✅", Location = new Point(20, 166), Width = 240, Height = 36, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnAddAccount.Click += BtnAddAccount_Click;
 
-            Guna2Button btnEditAccountMode = new Guna2Button() { Text = "تعديل الحساب المحدد ✏️", Location = new Point(20, 210), Width = 240, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnEditAccountMode = new Guna2Button() { Text = "تعديل الحساب المحدد ✏️", Location = new Point(20, 210), Width = 240, Height = 34, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
             btnEditAccountMode.Click += BtnEditAccountMode_Click;
 
-            btnSaveAccountEdit = new Guna2Button() { Text = "حفظ تعديل الحساب 💾", Location = new Point(20, 250), Width = 240, Height = 34, FillColor = ColorWarning, Enabled = false, BorderRadius = 9 };
+            btnSaveAccountEdit = new Guna2Button() { Text = "حفظ تعديل الحساب 💾", Location = new Point(20, 250), Width = 240, Height = 34, FillColor = UIHelpers.ColorGreen, Enabled = false, BorderRadius = 9 };
             btnSaveAccountEdit.Click += BtnSaveAccountEdit_Click;
 
-            Guna2Button btnDeleteAccount = new Guna2Button() { Text = "حذف الحساب المحدد ❌", Location = new Point(20, 290), Width = 240, Height = 30, FillColor = ColorDanger, BorderRadius = 9 };
+            Guna2Button btnDeleteAccount = new Guna2Button() { Text = "حذف الحساب المحدد ❌", Location = new Point(20, 290), Width = 240, Height = 30, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnDeleteAccount.Click += BtnDeleteAccount_Click;
 
             gbAccount.Controls.AddRange(new Control[] { lblAccountTitle, lblCode, txtAccountCode, lblName, txtAccountName, btnAddAccount, btnEditAccountMode, btnSaveAccountEdit, btnDeleteAccount });
@@ -124,7 +124,7 @@ namespace Temo_Mobile_Store
             pnlNote.Controls.Add(lblNote);
 
             AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📒 كل الحسابات المسجّلة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvAccountsTree = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 615), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
@@ -142,7 +142,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildIncomeStatementPanel()
         {
-            Guna2Panel gbFilter = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 190), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbFilter = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 190), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblFilterTitle = new Label() { Text = "📅 الفترة الزمنية", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblFrom = new Label() { Text = "من تاريخ:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -151,13 +151,13 @@ namespace Temo_Mobile_Store
             Label lblTo = new Label() { Text = "إلى تاريخ:", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             dtpIncomeTo = new DateTimePicker() { Location = new Point(20, 128), Width = 240, Format = DateTimePickerFormat.Short, Value = DateTime.Now };
 
-            Guna2Button btnShowIncome = new Guna2Button() { Text = "عرض قائمة الدخل 📈", Location = new Point(20, 158), Width = 240, Height = 34, FillColor = ColorPrimary, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), BorderRadius = 8 };
+            Guna2Button btnShowIncome = new Guna2Button() { Text = "عرض قائمة الدخل 📈", Location = new Point(20, 158), Width = 240, Height = 34, FillColor = UIHelpers.ColorAccentPrimary, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), BorderRadius = 8 };
             btnShowIncome.Click += (s, e) => ShowIncomeStatement();
 
             gbFilter.Controls.AddRange(new Control[] { lblFilterTitle, lblFrom, dtpIncomeFrom, lblTo, dtpIncomeTo, btnShowIncome });
             gbFilter.Size = new Size(280, 205);
 
-            Guna2Button btnPrintIncome = new Guna2Button() { Text = "طباعة / PDF 🖨️", Location = new Point(0, 425), Width = 280, Height = 32, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnPrintIncome = new Guna2Button() { Text = "طباعة / PDF 🖨️", Location = new Point(0, 425), Width = 280, Height = 32, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
             btnPrintIncome.Click += (s, e) => GridPrintHelper.Print(dgvIncomeStatement, "قائمة الدخل", this.FindForm());
 
             Guna2Panel pnlNote = new Guna2Panel() { Location = new Point(0, 220), Size = new Size(280, 130), FillColor = Color.FromArgb(248, 249, 251), BorderRadius = 12 };
@@ -172,7 +172,7 @@ namespace Temo_Mobile_Store
             pnlNote.Controls.Add(lblNote);
 
             AnchorStyles gridFillAnchor2 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), Anchor = gridFillAnchor2, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), Anchor = gridFillAnchor2, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📈 قائمة الدخل التفصيلية", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvIncomeStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 615), Anchor = gridFillAnchor2, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
@@ -188,11 +188,11 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildTrialBalancePanel()
         {
-            Guna2Panel gbAction = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 140), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            Guna2Button btnShowTrial = new Guna2Button() { Text = "عرض ميزان المراجعة ⚖️", Location = new Point(20, 20), Width = 240, Height = 40, FillColor = ColorPrimary, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), BorderRadius = 10 };
+            Guna2Panel gbAction = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 140), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Button btnShowTrial = new Guna2Button() { Text = "عرض ميزان المراجعة ⚖️", Location = new Point(20, 20), Width = 240, Height = 40, FillColor = UIHelpers.ColorAccentPrimary, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), BorderRadius = 10 };
             btnShowTrial.Click += (s, e) => ShowTrialBalance();
 
-            Guna2Button btnPrintTrial = new Guna2Button() { Text = "طباعة / PDF 🖨️", Location = new Point(20, 68), Width = 240, Height = 32, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnPrintTrial = new Guna2Button() { Text = "طباعة / PDF 🖨️", Location = new Point(20, 68), Width = 240, Height = 32, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
             btnPrintTrial.Click += (s, e) => GridPrintHelper.Print(dgvTrialBalance, "ميزان المراجعة", this.FindForm());
 
             gbAction.Controls.AddRange(new Control[] { btnShowTrial, btnPrintTrial });
@@ -209,7 +209,7 @@ namespace Temo_Mobile_Store
             pnlNote.Controls.Add(lblNote);
 
             AnchorStyles gridFillAnchor3 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), Anchor = gridFillAnchor3, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(780, 680), Anchor = gridFillAnchor3, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "⚖️ ميزان المراجعة - كل الحسابات", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvTrialBalance = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 615), Anchor = gridFillAnchor3, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };

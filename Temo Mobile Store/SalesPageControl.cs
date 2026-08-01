@@ -95,7 +95,7 @@ namespace Temo_Mobile_Store
                 Location = new Point(20, 20),
                 Size = new Size(300, 1140),
                 FillColor = Color.White,
-                BorderRadius = 14,
+                BorderRadius = UIHelpers.CardBorderRadius,
                 BorderColor = Color.FromArgb(230, 232, 238),
                 BorderThickness = 1
             };
@@ -138,7 +138,7 @@ namespace Temo_Mobile_Store
             {
                 Location = new Point(20, 406),
                 Size = new Size(260, 60),
-                FillColor = Color.FromArgb(255, 249, 230),
+                FillColor = UIHelpers.LightTint(UIHelpers.ColorOrange, 0.85f),
                 BorderRadius = 10
             };
             Label lblTotal = new Label() { Text = "إجمالي الصنف الحالي", Location = new Point(15, 8), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -148,13 +148,13 @@ namespace Temo_Mobile_Store
                 Width = 230,
                 ReadOnly = true,
                 BorderRadius = 6,
-                FillColor = Color.FromArgb(255, 249, 230),
+                FillColor = UIHelpers.LightTint(UIHelpers.ColorOrange, 0.85f),
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
-                ForeColor = ColorWarning
+                ForeColor = UIHelpers.ColorOrange
             };
             pnlTotal.Controls.AddRange(new Control[] { lblTotal, txtSaleTotal });
 
-            btnAddItemToCart = new Guna2Button() { Text = "➕ إضافة الصنف للسلة", Location = new Point(20, 474), Width = 260, Height = 38, FillColor = ColorPrimary, BorderRadius = 10, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
+            btnAddItemToCart = new Guna2Button() { Text = "➕ إضافة الصنف للسلة", Location = new Point(20, 474), Width = 260, Height = 38, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 10, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
             btnAddItemToCart.Click += BtnAddItemToCart_Click;
 
             // ---------- السلة الحالية: الأصناف اللي هتتسجل مع بعض تحت رقم فاتورة واحد ----------
@@ -166,7 +166,7 @@ namespace Temo_Mobile_Store
 
             Label lblCartHint = new Label() { Text = "دبل كليك على صنف عشان تشيله من السلة", Location = new Point(20, 676), Size = new Size(260, 15), Font = new Font("Segoe UI", 7F), ForeColor = Color.FromArgb(150, 155, 165) };
 
-            lblSaleCartTotal = new Label() { Text = "إجمالي السلة: 0.00 ج.م", Location = new Point(20, 694), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorSuccess };
+            lblSaleCartTotal = new Label() { Text = "إجمالي السلة: 0.00 ج.م", Location = new Point(20, 694), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = UIHelpers.ColorGreen };
 
             Label lblPaymentType = new Label() { Text = "نوع البيع:", Location = new Point(20, 722), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             cmbSalePaymentType = new Guna2ComboBox() { Location = new Point(20, 742), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
@@ -181,10 +181,10 @@ namespace Temo_Mobile_Store
             Label lblSaleCustomer = new Label() { Text = "العميل (لازم للآجل):", Location = new Point(20, 838), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             cmbSaleCustomer = new Guna2ComboBox() { Location = new Point(20, 858), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false, BorderRadius = 8 };
 
-            btnAddToBill = new Guna2Button() { Text = "إتمام عملية البيع 🛒", Location = new Point(20, 900), Width = 260, Height = 42, FillColor = ColorWarning, BorderRadius = 10, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+            btnAddToBill = new Guna2Button() { Text = "إتمام عملية البيع 🛒", Location = new Point(20, 900), Width = 260, Height = 42, FillColor = UIHelpers.ColorGreen, BorderRadius = 10, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
             btnAddToBill.Click += BtnAddToBill_Click;
 
-            btnPrintInvoice = new Guna2Button() { Text = "طباعة آخر فاتورة 🖨️", Location = new Point(20, 948), Width = 260, Height = 36, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 10 };
+            btnPrintInvoice = new Guna2Button() { Text = "طباعة آخر فاتورة 🖨️", Location = new Point(20, 948), Width = 260, Height = 36, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 10 };
             btnPrintInvoice.Click += BtnPrintInvoice_Click;
 
             Label lblPaperSize = new Label() { Text = "مقاس الطباعة:", Location = new Point(20, 993), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -195,7 +195,7 @@ namespace Temo_Mobile_Store
             Guna2Button btnSendWhatsApp = new Guna2Button() { Text = "إرسال آخر فاتورة واتساب 📱", Location = new Point(20, 1053), Width = 260, Height = 34, FillColor = Color.FromArgb(37, 211, 102), BorderRadius = 9 };
             btnSendWhatsApp.Click += BtnSendInvoiceWhatsApp_Click;
 
-            Guna2Button btnSavePdf = new Guna2Button() { Text = "حفظ آخر فاتورة PDF 📄", Location = new Point(20, 1093), Width = 260, Height = 34, FillColor = Color.FromArgb(192, 57, 43), BorderRadius = 9 };
+            Guna2Button btnSavePdf = new Guna2Button() { Text = "حفظ آخر فاتورة PDF 📄", Location = new Point(20, 1093), Width = 260, Height = 34, FillColor = UIHelpers.ColorPurple, BorderRadius = 9 };
             btnSavePdf.Click += BtnSaveInvoicePdf_Click;
 
             pnlCard.Controls.AddRange(new Control[] {
@@ -206,29 +206,6 @@ namespace Temo_Mobile_Store
                 lblSalePaymentMethod, cmbSalePaymentMethod, lblSaleCustomer, cmbSaleCustomer, btnAddToBill, btnPrintInvoice, lblPaperSize, cmbInvoicePaperSize, btnSendWhatsApp, btnSavePdf
             });
 
-            // ---------- كارت إدارة العمليات (تعديل/إلغاء) - تحت كارت البيع مباشرة ----------
-            Guna2Panel pnlManage = new Guna2Panel()
-            {
-                Location = new Point(20, 1180),
-                Size = new Size(300, 150),
-                FillColor = Color.White,
-                BorderRadius = 14,
-                BorderColor = Color.FromArgb(230, 232, 238),
-                BorderThickness = 1
-            };
-            Label lblManageTitle = new Label() { Text = "✏️ تعديل / إلغاء بيع محدد", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
-
-            btnEditSaleMode = new Guna2Button() { Text = "تعديل البيع المحدد ✏️", Location = new Point(20, 50), Width = 260, Height = 36, FillColor = ColorPrimary, BorderRadius = 9 };
-            btnEditSaleMode.Click += BtnEditSaleMode_Click;
-
-            btnSaveSaleEdit = new Guna2Button() { Text = "حفظ تعديل البيع 💾", Location = new Point(20, 93), Width = 125, Height = 33, FillColor = ColorWarning, Enabled = false, BorderRadius = 9 };
-            btnSaveSaleEdit.Click += BtnSaveSaleEdit_Click;
-
-            btnCancelSale = new Guna2Button() { Text = "إلغاء البيع ❌", Location = new Point(155, 93), Width = 125, Height = 33, FillColor = ColorDanger, BorderRadius = 9 };
-            btnCancelSale.Click += BtnCancelSale_Click;
-
-            pnlManage.Controls.AddRange(new Control[] { lblManageTitle, btnEditSaleMode, btnSaveSaleEdit, btnCancelSale });
-
             // ---------- كارت الجدول (يمين) ----------
             // Anchor بكل الاتجاهات عشان الكارت يتمدد ويملأ المساحة الفاضية لما النافذة تبقى أعرض/أطول
             // (خصوصًا بعد ما بقت الصفحة بتفتح في نافذة مستقلة بمساحة الشاشة كاملة)
@@ -238,16 +215,16 @@ namespace Temo_Mobile_Store
                 Size = new Size(780, 850),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 FillColor = Color.White,
-                BorderRadius = 14,
+                BorderRadius = UIHelpers.CardBorderRadius,
                 BorderColor = Color.FromArgb(230, 232, 238),
                 BorderThickness = 1
             };
-            Label lblGridTitle = new Label() { Text = "📋 سجل المبيعات", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
+            Label lblGridTitle = new Label() { Text = "📋 سجل المبيعات (دوس على فاتورة عشان تعدلها أو تلغيها)", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvSales = new DataGridView()
             {
                 Location = new Point(20, 55),
-                Size = new Size(740, 775),
+                Size = new Size(740, 715),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 ReadOnly = true,
@@ -256,9 +233,20 @@ namespace Temo_Mobile_Store
             dgvSales.CellClick += DgvSales_CellClick;
             StyleDataGridView(dgvSales);
 
-            pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvSales });
+            // ---------- تعديل/إلغاء البيع المحدد - صف أزرار تحت جدول سجل المبيعات مباشرة
+            // (نفس نمط "تعديل/إلغاء فاتورة شراء" في شاشة الموردين) بدل كارت منفصل تحت كارت البيع ----------
+            btnEditSaleMode = new Guna2Button() { Text = "تعديل البيع المحدد ✏️", Location = new Point(20, 785), Width = 240, Height = 34, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
+            btnEditSaleMode.Click += BtnEditSaleMode_Click;
 
-            this.Controls.AddRange(new Control[] { pnlCard, pnlManage, pnlGridCard });
+            btnSaveSaleEdit = new Guna2Button() { Text = "حفظ تعديل البيع 💾", Location = new Point(270, 785), Width = 240, Height = 34, FillColor = UIHelpers.ColorGreen, Enabled = false, BorderRadius = 9 };
+            btnSaveSaleEdit.Click += BtnSaveSaleEdit_Click;
+
+            btnCancelSale = new Guna2Button() { Text = "إلغاء البيع ❌", Location = new Point(520, 785), Width = 240, Height = 34, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
+            btnCancelSale.Click += BtnCancelSale_Click;
+
+            pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvSales, btnEditSaleMode, btnSaveSaleEdit, btnCancelSale });
+
+            this.Controls.AddRange(new Control[] { pnlCard, pnlGridCard });
         }
 
         // ==========================================================================
@@ -560,6 +548,14 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         // التعديل / الإلغاء
         // ==========================================================================
+        // بيركّز على خانة الباركود فاضية وجاهزة للمسح - مستخدمة من كارت "فاتورة جديدة" السريع في الداشبورد
+        public void FocusBarcodeEntry()
+        {
+            txtSaleBarcode.Clear();
+            txtSaleBarcode.ReadOnly = false; // احتياطًا لو كانت آخر حالة للنافذة كانت "عرض فاتورة" (HighlightSale بيخليها ReadOnly)
+            txtSaleBarcode.Focus();
+        }
+
         // بيدوّر على عملية بيع برقمها في سجل المبيعات، يحددها ويجيب بياناتها في الخانات
         // (مستخدمة من نتيجة البحث الشامل Ctrl+F)
         public void HighlightSale(string saleIdText)

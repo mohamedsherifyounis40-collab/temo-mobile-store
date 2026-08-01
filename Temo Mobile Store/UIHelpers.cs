@@ -20,8 +20,31 @@ namespace Temo_Mobile_Store
         public static readonly Color ColorNeutral = Color.FromArgb(236, 240, 241);
         public static readonly Color ColorBackground = Color.FromArgb(245, 246, 250);
 
+        // ---------- Home Dashboard Shell (Sidebar/Header/KPI) redesign palette ----------
+        // شبه ألوان الشاشات التانية (ColorSuccess/Warning/Danger فوق) بس دي بالتحديد
+        // الألوان اللي اتحددت لتصميم الداشبورد الجديد الأخضر/البرتقالي/الأحمر شبه القديم
+        // فبنستخدم القديم لما يكون قريب، والألوان دي جديدة كليًا مالهاش نظير قبل كده.
+        public static readonly Color ColorBackgroundApp = Color.FromArgb(0xF5, 0xF7, 0xFA);
+        public static readonly Color ColorSidebar = Color.FromArgb(0x17, 0x23, 0x3C);
+        public static readonly Color ColorAccentPrimary = Color.FromArgb(0x2D, 0x6C, 0xDF);
+        public static readonly Color ColorGreen = Color.FromArgb(0x22, 0xC5, 0x5E);
+        public static readonly Color ColorOrange = Color.FromArgb(0xF5, 0x9E, 0x0B);
+        public static readonly Color ColorRed = Color.FromArgb(0xEF, 0x44, 0x44);
+        public static readonly Color ColorPurple = Color.FromArgb(0x8B, 0x5C, 0xF6);
+        public const int CardBorderRadius = 18;
+
         public static readonly string[] PaymentMethods =
             { "نقدي", "فوري", "أمان", "سهولة", "فودافون كاش", "إنستاباي" };
+
+        // بيقرّب لون معين من الأبيض (تفتيح) - مستخدم لخلفيات الشرائح/الأيقونات الملوّنة الفاتحة
+        // في كل الشاشات المعاد تصميمها (كان قبل كده نسخة خاصة جوه MainShell بس)
+        public static Color LightTint(Color c, float amount)
+        {
+            int r = c.R + (int)((255 - c.R) * amount);
+            int g = c.G + (int)((255 - c.G) * amount);
+            int b = c.B + (int)((255 - c.B) * amount);
+            return Color.FromArgb(r, g, b);
+        }
 
         public static void StyleDataGridView(DataGridView dgv)
         {

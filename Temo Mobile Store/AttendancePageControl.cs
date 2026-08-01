@@ -105,18 +105,18 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildAttendancePanel()
         {
-            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 70), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 70), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblDate = new Label() { Text = "التاريخ:", Location = new Point(20, 27), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(85, 92, 102) };
             dtpAttendanceDate = new DateTimePicker() { Location = new Point(80, 22), Width = 180, Format = DateTimePickerFormat.Short, Value = DateTime.Now };
             dtpAttendanceDate.ValueChanged += (s, e) => LoadAttendanceGrid();
 
-            Guna2Button btnSaveAttendance = new Guna2Button() { Text = "حفظ الحضور 💾", Location = new Point(290, 18), Width = 160, Height = 34, FillColor = ColorSuccess, BorderRadius = 9 };
+            Guna2Button btnSaveAttendance = new Guna2Button() { Text = "حفظ الحضور 💾", Location = new Point(290, 18), Width = 160, Height = 34, FillColor = UIHelpers.ColorGreen, BorderRadius = 9 };
             btnSaveAttendance.Click += BtnSaveAttendance_Click;
 
             pnlToolbar.Controls.AddRange(new Control[] { lblDate, dtpAttendanceDate, btnSaveAttendance });
 
             AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 85), Size = new Size(1100, 575), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 85), Size = new Size(1100, 575), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             dgvAttendance = new DataGridView() { Location = new Point(20, 20), Size = new Size(1060, 535), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, AllowUserToAddRows = false, RowHeadersVisible = false };
             dgvAttendance.CurrentCellDirtyStateChanged += (s, e) => { if (dgvAttendance.IsCurrentCellDirty) dgvAttendance.CommitEdit(DataGridViewDataErrorContexts.Commit); };
             StyleDataGridView(dgvAttendance);
@@ -201,21 +201,21 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildPayrollPanel()
         {
-            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 70), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlToolbar = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 70), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblMonth = new Label() { Text = "الشهر:", Location = new Point(20, 27), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(85, 92, 102) };
             dtpPayrollMonth = new DateTimePicker() { Location = new Point(75, 22), Width = 180, Format = DateTimePickerFormat.Custom, CustomFormat = "MMMM yyyy", Value = DateTime.Now };
             dtpPayrollMonth.ValueChanged += (s, e) => LoadPayrollGrid();
 
-            Guna2Button btnClosePayrollMonth = new Guna2Button() { Text = "قفل الشهر لكل الموظفين 🔒", Location = new Point(290, 18), Width = 230, Height = 34, FillColor = ColorDanger, BorderRadius = 9 };
+            Guna2Button btnClosePayrollMonth = new Guna2Button() { Text = "قفل الشهر لكل الموظفين 🔒", Location = new Point(290, 18), Width = 230, Height = 34, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnClosePayrollMonth.Click += BtnClosePayrollMonth_Click;
 
-            Guna2Button btnReopenPayrollMonth = new Guna2Button() { Text = "إلغاء قفل الشهر 🔓", Location = new Point(530, 18), Width = 200, Height = 34, FillColor = ColorWarning, BorderRadius = 9 };
+            Guna2Button btnReopenPayrollMonth = new Guna2Button() { Text = "إلغاء قفل الشهر 🔓", Location = new Point(530, 18), Width = 200, Height = 34, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
             btnReopenPayrollMonth.Click += BtnReopenPayrollMonth_Click;
 
             pnlToolbar.Controls.AddRange(new Control[] { lblMonth, dtpPayrollMonth, btnClosePayrollMonth, btnReopenPayrollMonth });
 
             // ملحوظة: dgvPayroll نفسه بناخده Right بس من غير Bottom عشان تحته لافتة "lblPayrollTotals" ثابتة، مينفعش الجدول يكبر لتحت ويغطيها
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 85), Size = new Size(1100, 575), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(0, 85), Size = new Size(1100, 575), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             dgvPayroll = new DataGridView() { Location = new Point(20, 20), Size = new Size(1060, 495), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false };
             StyleDataGridView(dgvPayroll);
 
@@ -319,21 +319,21 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildStatementPanel()
         {
-            Guna2Panel gbSelect = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(300, 175), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbSelect = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(300, 175), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblSelectTitle = new Label() { Text = "👤 اختر الموظف", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
             cmbStatementEmployee = new Guna2ComboBox() { Location = new Point(20, 50), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbStatementEmployee.SelectedIndexChanged += (s, e) => LoadEmployeeStatement();
 
-            Guna2Button btnViewAdvances = new Guna2Button() { Text = "عرض كل السلف الحالية 📋", Location = new Point(20, 95), Width = 260, Height = 32, FillColor = UIHelpers.ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnViewAdvances = new Guna2Button() { Text = "عرض كل السلف الحالية 📋", Location = new Point(20, 95), Width = 260, Height = 32, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
             btnViewAdvances.Click += BtnViewAdvances_Click;
 
             gbSelect.Controls.AddRange(new Control[] { lblSelectTitle, cmbStatementEmployee, btnViewAdvances });
 
-            Guna2Panel pnlBalanceCard = new Guna2Panel() { Location = new Point(0, 190), Size = new Size(300, 70), FillColor = Color.FromArgb(240, 245, 255), BorderRadius = 14 };
+            Guna2Panel pnlBalanceCard = new Guna2Panel() { Location = new Point(0, 190), Size = new Size(300, 70), FillColor = Color.FromArgb(240, 245, 255), BorderRadius = UIHelpers.CardBorderRadius };
             lblEmployeeBalance = new Label() { Text = "الرصيد المستحق: --", Location = new Point(0, 0), Size = new Size(300, 70), TextAlign = ContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
             pnlBalanceCard.Controls.Add(lblEmployeeBalance);
 
-            Guna2Panel gbPay = new Guna2Panel() { Location = new Point(0, 275), Size = new Size(300, 340), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbPay = new Guna2Panel() { Location = new Point(0, 275), Size = new Size(300, 340), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblPayTitle = new Label() { Text = "💸 صرف مرتب / سلفة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblPayMethod = new Label() { Text = "وسيلة الصرف:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -351,13 +351,13 @@ namespace Temo_Mobile_Store
             Label lblPayDesc = new Label() { Text = "بيان (اختياري):", Location = new Point(20, 224), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtPayDescription = new Guna2TextBox() { Location = new Point(20, 244), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnPayEmployee = new Guna2Button() { Text = "صرف المبلغ ✅", Location = new Point(20, 284), Width = 260, Height = 38, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnPayEmployee = new Guna2Button() { Text = "صرف المبلغ ✅", Location = new Point(20, 284), Width = 260, Height = 38, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnPayEmployee.Click += BtnPayEmployee_Click;
 
             gbPay.Controls.AddRange(new Control[] { lblPayTitle, lblPayMethod, cmbPayMethod, lblPayType, cmbPayType, lblPayAmount, txtPayAmount, lblPayDesc, txtPayDescription, btnPayEmployee });
 
             AnchorStyles gridFillAnchor2 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(320, 0), Size = new Size(780, 660), Anchor = gridFillAnchor2, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(320, 0), Size = new Size(780, 660), Anchor = gridFillAnchor2, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📋 كشف الحساب (بالترتيب الزمني)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
             dgvEmployeeStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 590), Anchor = gridFillAnchor2, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             StyleDataGridView(dgvEmployeeStatement);
@@ -420,7 +420,7 @@ namespace Temo_Mobile_Store
 
                 decimal balance = AttendanceRepository.GetEmployeeBalance(employeeId);
                 lblEmployeeBalance.Text = $"الرصيد المستحق: {balance:N2} ج.م";
-                lblEmployeeBalance.ForeColor = balance < 0 ? ColorDanger : ColorPrimary;
+                lblEmployeeBalance.ForeColor = balance < 0 ? UIHelpers.ColorRed : ColorPrimary;
             }
             catch (Exception ex) { MessageBox.Show(ex.Message); }
         }
@@ -470,7 +470,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildEmployeesPanel()
         {
-            Guna2Panel gbEmployee = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 398), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbEmployee = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 398), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblTitle = new Label() { Text = "🧑‍💼 إضافة / تعديل موظف", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblName = new Label() { Text = "الاسم:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -488,22 +488,22 @@ namespace Temo_Mobile_Store
             Label lblHireDate = new Label() { Text = "تاريخ التعيين:", Location = new Point(20, 282), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             dtpEmployeeHireDate = new DateTimePicker() { Location = new Point(20, 302), Width = 240, Format = DateTimePickerFormat.Short, Value = DateTime.Now };
 
-            Guna2Button btnAddEmployee = new Guna2Button() { Text = "إضافة موظف جديد ✅", Location = new Point(20, 350), Width = 240, Height = 34, FillColor = ColorSuccess, BorderRadius = 9 };
+            Guna2Button btnAddEmployee = new Guna2Button() { Text = "إضافة موظف جديد ✅", Location = new Point(20, 350), Width = 240, Height = 34, FillColor = UIHelpers.ColorGreen, BorderRadius = 9 };
             btnAddEmployee.Click += BtnAddEmployee_Click;
 
             gbEmployee.Controls.AddRange(new Control[] { lblTitle, lblName, txtEmployeeName, lblPhone, txtEmployeePhone, lblSalary, txtEmployeeSalary, lblHours, txtEmployeeHours, lblHireDate, dtpEmployeeHireDate, btnAddEmployee });
 
-            Guna2Panel gbEmployeeActions = new Guna2Panel() { Location = new Point(0, 413), Size = new Size(280, 110), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            btnSaveEmployeeEdit = new Guna2Button() { Text = "حفظ التعديل 💾", Location = new Point(20, 18), Width = 240, Height = 32, FillColor = ColorWarning, Enabled = false, BorderRadius = 9 };
+            Guna2Panel gbEmployeeActions = new Guna2Panel() { Location = new Point(0, 413), Size = new Size(280, 110), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            btnSaveEmployeeEdit = new Guna2Button() { Text = "حفظ التعديل 💾", Location = new Point(20, 18), Width = 240, Height = 32, FillColor = UIHelpers.ColorGreen, Enabled = false, BorderRadius = 9 };
             btnSaveEmployeeEdit.Click += BtnSaveEmployeeEdit_Click;
 
-            Guna2Button btnDeleteEmployee = new Guna2Button() { Text = "حذف الموظف ❌", Location = new Point(20, 60), Width = 240, Height = 32, FillColor = ColorDanger, BorderRadius = 9 };
+            Guna2Button btnDeleteEmployee = new Guna2Button() { Text = "حذف الموظف ❌", Location = new Point(20, 60), Width = 240, Height = 32, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnDeleteEmployee.Click += BtnDeleteEmployee_Click;
 
             gbEmployeeActions.Controls.AddRange(new Control[] { btnSaveEmployeeEdit, btnDeleteEmployee });
 
             AnchorStyles gridFillAnchor3 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 660), Anchor = gridFillAnchor3, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 660), Anchor = gridFillAnchor3, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "👥 الموظفين", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
             dgvEmployees = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 590), Anchor = gridFillAnchor3, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvEmployees.CellClick += DgvEmployees_CellClick;

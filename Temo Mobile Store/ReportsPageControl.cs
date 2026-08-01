@@ -101,7 +101,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildSummaryPanel()
         {
-            Guna2Panel gbSummary = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 300), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbSummary = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 300), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblSummaryTitle = new Label() { Text = "📊 خلاصة حركة المال", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblTotalSales = new Label() { Text = "إجمالي المبيعات (الدرج):", Location = new Point(20, 55), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -120,7 +120,7 @@ namespace Temo_Mobile_Store
 
             gbSummary.Controls.AddRange(new Control[] { lblSummaryTitle, lblTotalSales, lblTotalSalesVal, lblTotalCapital, lblTotalCapitalVal, lblTotalExpenses, lblTotalExpensesVal, pnlNetProfit });
 
-            Guna2Panel gbFilter = new Guna2Panel() { Location = new Point(0, 315), Size = new Size(280, 210), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbFilter = new Guna2Panel() { Location = new Point(0, 315), Size = new Size(280, 210), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblFilterTitle = new Label() { Text = "🔍 فلترة بالفترة الزمنية", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             Label lblFrom = new Label() { Text = "من تاريخ:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             dtpFrom = new DateTimePicker() { Location = new Point(20, 70), Width = 240, Format = DateTimePickerFormat.Short };
@@ -128,11 +128,11 @@ namespace Temo_Mobile_Store
             Label lblTo = new Label() { Text = "إلى تاريخ:", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             dtpTo = new DateTimePicker() { Location = new Point(20, 128), Width = 240, Format = DateTimePickerFormat.Short };
 
-            btnFilterReports = new Guna2Button() { Text = "تطبيق الفلتر 🔍", Location = new Point(20, 166), Width = 240, Height = 34, FillColor = ColorSuccess, BorderRadius = 9 };
+            btnFilterReports = new Guna2Button() { Text = "تطبيق الفلتر 🔍", Location = new Point(20, 166), Width = 240, Height = 34, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 9 };
             btnFilterReports.Click += BtnFilterReports_Click;
             gbFilter.Controls.AddRange(new Control[] { lblFilterTitle, lblFrom, dtpFrom, lblTo, dtpTo, btnFilterReports });
 
-            Guna2Panel gbClosure = new Guna2Panel() { Location = new Point(0, 530), Size = new Size(280, 400), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbClosure = new Guna2Panel() { Location = new Point(0, 530), Size = new Size(280, 400), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblClosureTitle = new Label() { Text = "🔒 إقفال اليوم", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             Label lblOpeningBalance = new Label() { Text = "الرصيد الافتتاحي (نقدي):", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
             lblOpeningBalanceVal = new Label() { Text = "0.00 ج.م", Location = new Point(20, 68), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
@@ -150,23 +150,23 @@ namespace Temo_Mobile_Store
 
             gbClosure.Controls.AddRange(new Control[] { lblClosureTitle, lblOpeningBalance, lblOpeningBalanceVal, lblExpectedClosing, lblExpectedClosingVal, lblAllMethodsTitle, dgvClosureSummary });
 
-            Guna2Panel pnlActions = new Guna2Panel() { Location = new Point(0, 940), Size = new Size(280, 165), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            Guna2Button btnRefreshReports = new Guna2Button() { Text = "عرض الكل وتحديث الحسابات 🔄", Location = new Point(20, 15), Width = 240, Height = 38, FillColor = ColorPrimary, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), BorderRadius = 10 };
+            Guna2Panel pnlActions = new Guna2Panel() { Location = new Point(0, 940), Size = new Size(280, 165), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Button btnRefreshReports = new Guna2Button() { Text = "عرض الكل وتحديث الحسابات 🔄", Location = new Point(20, 15), Width = 240, Height = 38, FillColor = UIHelpers.ColorAccentPrimary, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), BorderRadius = 10 };
             btnRefreshReports.Click += (s, e) => { CalculateBusinessMetrics(); RefreshClosureSummary(); };
 
-            btnCloseDay = new Guna2Button() { Text = "إقفال اليوم 🔒", Location = new Point(20, 60), Width = 240, Height = 38, FillColor = ColorDanger, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), BorderRadius = 10 };
+            btnCloseDay = new Guna2Button() { Text = "إقفال اليوم 🔒", Location = new Point(20, 60), Width = 240, Height = 38, FillColor = UIHelpers.ColorRed, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), BorderRadius = 10 };
             btnCloseDay.Click += BtnCloseDay_Click;
 
-            Guna2Button btnReopenDay = new Guna2Button() { Text = "فتح اليوم تاني 🔓", Location = new Point(20, 105), Width = 240, Height = 34, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 10 };
+            Guna2Button btnReopenDay = new Guna2Button() { Text = "فتح اليوم تاني 🔓", Location = new Point(20, 105), Width = 240, Height = 34, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 10 };
             btnReopenDay.Click += BtnReopenDay_Click;
 
             pnlActions.Controls.AddRange(new Control[] { btnRefreshReports, btnCloseDay, btnReopenDay });
 
             AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 1000), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 1000), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblTableTitle = new Label() { Text = "📈 سجل الأرباح التفصيلي", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            Guna2Button btnPrintReport = new Guna2Button() { Text = "طباعة / PDF 🖨️", Location = new Point(640, 12), Width = 140, Height = 30, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 8 };
+            Guna2Button btnPrintReport = new Guna2Button() { Text = "طباعة / PDF 🖨️", Location = new Point(640, 12), Width = 140, Height = 30, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 8 };
             btnPrintReport.Click += (s, e) => GridPrintHelper.Print(dgvReports, "سجل الأرباح التفصيلي", this.FindForm());
 
             dgvReports = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 935), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
@@ -183,7 +183,7 @@ namespace Temo_Mobile_Store
         {
             // الكارتين دول واقفين فوق بعض عموديًا، فبنمدّهم عرضًا بس (Top|Left|Right) من غير Bottom عشان محدش يغطي التاني
             AnchorStyles widenAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlLogCard = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 385), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlLogCard = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(1100, 385), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblLogTitle = new Label() { Text = "🔒 سجل الأيام المُقفلة بالتفصيل", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvClosuresLog = new DataGridView() { Location = new Point(20, 50), Size = new Size(1060, 320), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, ReadOnly = true, AllowUserToAddRows = false };
@@ -195,7 +195,7 @@ namespace Temo_Mobile_Store
             StyleDataGridView(dgvClosuresLog);
             pnlLogCard.Controls.AddRange(new Control[] { lblLogTitle, dgvClosuresLog });
 
-            Guna2Panel pnlDetailsCard = new Guna2Panel() { Location = new Point(0, 400), Size = new Size(1100, 260), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlDetailsCard = new Guna2Panel() { Location = new Point(0, 400), Size = new Size(1100, 260), Anchor = widenAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblClosureDetailsTitle = new Label() { Text = "🧾 تفاصيل فئات الكاش الفعلي لليوم المحدد (دوس على أي صف فوق)", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvClosureDetails = new DataGridView() { Location = new Point(20, 50), Size = new Size(1060, 195), Anchor = widenAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, ReadOnly = true, AllowUserToAddRows = false };
@@ -277,7 +277,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildStatementsPanel()
         {
-            Guna2Panel gbFilter2 = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 250), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbFilter2 = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(280, 250), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblFilter2Title = new Label() { Text = "📋 اختيار الوسيلة والفترة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblMethod = new Label() { Text = "وسيلة الدفع:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -291,12 +291,12 @@ namespace Temo_Mobile_Store
             Label lblTo2 = new Label() { Text = "إلى تاريخ:", Location = new Point(20, 156), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             dtpStatementTo = new DateTimePicker() { Location = new Point(20, 176), Width = 240, Format = DateTimePickerFormat.Short, Value = DateTime.Now };
 
-            Guna2Button btnShowStatement = new Guna2Button() { Text = "عرض كشف الحساب 📋", Location = new Point(20, 208), Width = 240, Height = 32, FillColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnShowStatement = new Guna2Button() { Text = "عرض كشف الحساب 📋", Location = new Point(20, 208), Width = 240, Height = 32, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 9 };
             btnShowStatement.Click += (s, e) => ShowStatement(true);
 
             gbFilter2.Controls.AddRange(new Control[] { lblFilter2Title, lblMethod, cmbStatementMethod, lblFrom2, dtpStatementFrom, lblTo2, dtpStatementTo, btnShowStatement });
 
-            Guna2Panel gbSummary2 = new Guna2Panel() { Location = new Point(0, 265), Size = new Size(280, 250), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbSummary2 = new Guna2Panel() { Location = new Point(0, 265), Size = new Size(280, 250), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblSummary2Title = new Label() { Text = "📊 ملخص الفترة المعروضة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblIn = new Label() { Text = "إجمالي الوارد:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -313,11 +313,11 @@ namespace Temo_Mobile_Store
 
             gbSummary2.Controls.AddRange(new Control[] { lblSummary2Title, lblIn, lblStatementTotalInVal, lblOut, lblStatementTotalOutVal, lblNet, lblStatementNetVal, lblCurrentBalance, lblStatementCurrentBalanceVal });
 
-            Guna2Button btnShowAllStatement = new Guna2Button() { Text = "عرض كل الفترات 🔄", Location = new Point(0, 530), Width = 280, Height = 34, FillColor = ColorNeutral, ForeColor = ColorPrimary, BorderRadius = 9 };
+            Guna2Button btnShowAllStatement = new Guna2Button() { Text = "عرض كل الفترات 🔄", Location = new Point(0, 530), Width = 280, Height = 34, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
             btnShowAllStatement.Click += (s, e) => ShowStatement(false);
 
             AnchorStyles gridFillAnchor2 = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlStatementGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 700), Anchor = gridFillAnchor2, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlStatementGridCard = new Guna2Panel() { Location = new Point(300, 0), Size = new Size(800, 700), Anchor = gridFillAnchor2, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle2 = new Label() { Text = "📄 كشف الحساب بالتفصيل", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvStatement = new DataGridView() { Location = new Point(20, 50), Size = new Size(760, 635), Anchor = gridFillAnchor2, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, ReadOnly = true, AllowUserToAddRows = false };
@@ -778,8 +778,8 @@ namespace Temo_Mobile_Store
                 Label lbl = new Label() { Text = prompt, Location = new Point(15, 15), Size = new Size(300, 40) };
                 TextBox txt = new TextBox() { Text = defaultValue, Location = new Point(15, 60), Width = 300 };
 
-                Guna2Button btnOk = new Guna2Button() { Text = "موافق", Location = new Point(15, 95), Width = 140, Height = 32, FillColor = ColorSuccess };
-                Guna2Button btnCancelInput = new Guna2Button() { Text = "إلغاء", Location = new Point(175, 95), Width = 140, Height = 32, FillColor = ColorNeutral, ForeColor = ColorPrimary };
+                Guna2Button btnOk = new Guna2Button() { Text = "موافق", Location = new Point(15, 95), Width = 140, Height = 32, FillColor = UIHelpers.ColorGreen };
+                Guna2Button btnCancelInput = new Guna2Button() { Text = "إلغاء", Location = new Point(175, 95), Width = 140, Height = 32, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
 
                 string resultValue = null;
                 btnOk.Click += (s, e) => { resultValue = txt.Text; inputForm.DialogResult = DialogResult.OK; inputForm.Close(); };

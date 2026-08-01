@@ -53,7 +53,7 @@ namespace Temo_Mobile_Store
 
         private void BuildUI()
         {
-            Guna2Panel gbReceive = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(300, 405), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbReceive = new Guna2Panel() { Location = new Point(20, 20), Size = new Size(300, 405), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblReceiveTitle = new Label() { Text = "🔧 استلام جهاز جديد للصيانة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblMCName = new Label() { Text = "اسم العميل:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -71,17 +71,17 @@ namespace Temo_Mobile_Store
             Label lblMEst = new Label() { Text = "التكلفة التقديرية:", Location = new Point(20, 308), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtMaintEstimatedCost = new Guna2TextBox() { Location = new Point(20, 328), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
 
-            Guna2Button btnReceiveDevice = new Guna2Button() { Text = "استلام الجهاز ✅", Location = new Point(20, 365), Width = 260, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
+            Guna2Button btnReceiveDevice = new Guna2Button() { Text = "استلام الجهاز ✅", Location = new Point(20, 365), Width = 260, Height = 36, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnReceiveDevice.Click += BtnReceiveDevice_Click;
 
             gbReceive.Controls.AddRange(new Control[] { lblReceiveTitle, lblMCName, txtMaintCustomerName, lblMCPhone, txtMaintCustomerPhone, lblMDevice, txtMaintDeviceInfo, lblMIssue, txtMaintIssueDescription, lblMEst, txtMaintEstimatedCost, btnReceiveDevice });
 
-            Guna2Panel gbUpdate = new Guna2Panel() { Location = new Point(20, 440), Size = new Size(300, 185), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbUpdate = new Guna2Panel() { Location = new Point(20, 440), Size = new Size(300, 185), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblUpdateTitle = new Label() { Text = "🔄 تحديث حالة التذكرة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             cmbMaintStatusUpdate = new Guna2ComboBox() { Location = new Point(20, 50), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbMaintStatusUpdate.Items.AddRange(MaintenanceStatuses);
 
-            btnSaveStatus = new Guna2Button() { Text = "حفظ الحالة 💾", Location = new Point(20, 92), Width = 260, Height = 34, FillColor = ColorPrimary, BorderRadius = 9 };
+            btnSaveStatus = new Guna2Button() { Text = "حفظ الحالة 💾", Location = new Point(20, 92), Width = 260, Height = 34, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
             btnSaveStatus.Click += BtnSaveMaintenanceStatus_Click;
 
             Guna2Button btnNotifyWhatsApp = new Guna2Button() { Text = "إشعار العميل واتساب 📱", Location = new Point(20, 134), Width = 260, Height = 34, FillColor = Color.FromArgb(37, 211, 102), BorderRadius = 9 };
@@ -89,7 +89,7 @@ namespace Temo_Mobile_Store
 
             gbUpdate.Controls.AddRange(new Control[] { lblUpdateTitle, cmbMaintStatusUpdate, btnSaveStatus, btnNotifyWhatsApp });
 
-            Guna2Panel gbDeliver = new Guna2Panel() { Location = new Point(20, 640), Size = new Size(300, 210), FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel gbDeliver = new Guna2Panel() { Location = new Point(20, 640), Size = new Size(300, 210), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblDeliverTitle = new Label() { Text = "💵 تسليم الجهاز وتحصيل الأجرة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
             Label lblActualCost = new Label() { Text = "الأجرة الفعلية المطلوبة:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
             txtMaintActualCost = new Guna2TextBox() { Location = new Point(20, 70), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
@@ -98,12 +98,12 @@ namespace Temo_Mobile_Store
             cmbMaintPaymentMethod = new Guna2ComboBox() { Location = new Point(20, 128), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbMaintPaymentMethod.Items.AddRange(UIHelpers.PaymentMethods);
 
-            btnDeliverDevice = new Guna2Button() { Text = "تسليم وتحصيل الأجرة ✅", Location = new Point(20, 165), Width = 260, Height = 36, FillColor = ColorSuccess, BorderRadius = 10 };
+            btnDeliverDevice = new Guna2Button() { Text = "تسليم وتحصيل الأجرة ✅", Location = new Point(20, 165), Width = 260, Height = 36, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnDeliverDevice.Click += BtnDeliverMaintenanceDevice_Click;
             gbDeliver.Controls.AddRange(new Control[] { lblDeliverTitle, lblActualCost, txtMaintActualCost, lblMaintMethod, cmbMaintPaymentMethod, btnDeliverDevice });
 
             AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 785), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = 14, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
+            Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(340, 20), Size = new Size(780, 785), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
             Label lblGridTitle = new Label() { Text = "📋 تذاكر الصيانة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblFilterTitle = new Label() { Text = "فلترة حسب الحالة:", Location = new Point(300, 20), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
