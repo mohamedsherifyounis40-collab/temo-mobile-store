@@ -33,31 +33,22 @@ namespace Temo_Mobile_Store
         // الكومبايلر يوريه لينا خطأ فورًا بدل ما نكتشفه وقت التشغيل بس.
         public static class PageKeys
         {
+            // ملحوظة: "Home" لسه بتاعة الداشبورد القديم عمدًا (راجع تعليق navItems) - كل باقي
+            // الشاشات القديمة اتشالت خالص والمفاتيح الجديدة (Blazor) بقت هي الأساسية.
             public const string Home = "Home";
-            public const string HomeBlazor = "HomeBlazor"; // تجربة شاشة رئيسية جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string Sales = "Sales";
-            public const string SalesBlazor = "SalesBlazor"; // تجربة شاشة مبيعات جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string Inventory = "Inventory";
-            public const string InventoryBlazor = "InventoryBlazor"; // تجربة شاشة مخزون جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string InventoryCount = "InventoryCount";
-            public const string InventoryCountBlazor = "InventoryCountBlazor"; // تجربة شاشة جرد مخزن جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string Maintenance = "Maintenance";
-            public const string MaintenanceBlazor = "MaintenanceBlazor"; // تجربة شاشة صيانة جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string Customers = "Customers";
-            public const string CustomersBlazor = "CustomersBlazor"; // تجربة شاشة عملاء جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string Suppliers = "Suppliers";
-            public const string SuppliersBlazor = "SuppliersBlazor"; // تجربة شاشة موردين جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string PurchasesBlazor = "PurchasesBlazor"; // تجربة شاشة مشتريات جديدة (Blazor Hybrid) - مفيش شاشة قديمة مستقلة ليها، فاتورة الشراء كانت جوه شاشة الموردين بس
-            public const string Treasury = "Treasury";
-            public const string TreasuryBlazor = "TreasuryBlazor"; // تجربة شاشة خزينة جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string Reports = "Reports";
-            public const string ReportsBlazor = "ReportsBlazor"; // تجربة شاشة التقارير الجديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string Accounts = "Accounts";
-            public const string AccountsBlazor = "AccountsBlazor"; // تجربة شاشة حسابات جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string Attendance = "Attendance";
-            public const string AttendanceBlazor = "AttendanceBlazor"; // تجربة شاشة الحضور والمرتبات الجديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
-            public const string Settings = "Settings";
-            public const string SettingsBlazor = "SettingsBlazor"; // تجربة شاشة الإعدادات الجديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
+            public const string HomeBlazor = "HomeBlazor";
+            public const string SalesBlazor = "SalesBlazor";
+            public const string InventoryBlazor = "InventoryBlazor";
+            public const string InventoryCountBlazor = "InventoryCountBlazor";
+            public const string MaintenanceBlazor = "MaintenanceBlazor";
+            public const string CustomersBlazor = "CustomersBlazor";
+            public const string SuppliersBlazor = "SuppliersBlazor";
+            public const string PurchasesBlazor = "PurchasesBlazor";
+            public const string TreasuryBlazor = "TreasuryBlazor";
+            public const string ReportsBlazor = "ReportsBlazor";
+            public const string AccountsBlazor = "AccountsBlazor";
+            public const string AttendanceBlazor = "AttendanceBlazor";
+            public const string SettingsBlazor = "SettingsBlazor";
         }
 
         // نفس الـ Connection String المستخدم في Form1.cs بالظبط عشان نقرأ من نفس قاعدة البيانات
@@ -118,31 +109,23 @@ namespace Temo_Mobile_Store
         // ملحوظة: ده مجرد تعريف مؤقت للتجربة. في خطوة 4 هنربط كل مفتاح بالـ UserControl الحقيقي بتاعه.
         private readonly (string Key, string Text, string Icon)[] navItems = new (string, string, string)[]
         {
+            // ملحوظة: "الرئيسية" لسه بتاعة الداشبورد القديم عمدًا (مش Blazor) - هو الوحيد
+            // اللي معماريته مختلفة عن باقي الشاشات (مبني جوه pnlContent نفسه وبيتحدّث كل دقيقة
+            // تلقائيًا بدل ما يبقى نافذة منفصلة زي الباقي)، فسيبناه لحد ما يتراجع بعناية في مرحلة تانية.
             (PageKeys.Home,           "الرئيسية",   "🏠"),
             (PageKeys.HomeBlazor,     "الرئيسية (تجربة) 🧪", "🧪"),
-            (PageKeys.Sales,          "المبيعات",   "🛒"),
-            (PageKeys.SalesBlazor,    "المبيعات (تجربة) 🧪", "🧪"),
-            (PageKeys.Inventory,      "المخزون",    "🗄️"),
-            (PageKeys.InventoryBlazor,"المخزون (تجربة) 🧪", "🧪"),
-            (PageKeys.InventoryCount, "جرد المخزن", "📋"),
-            (PageKeys.InventoryCountBlazor, "جرد المخزن (تجربة) 🧪", "🧪"),
-            (PageKeys.Maintenance,    "الصيانة",    "🔧"),
-            (PageKeys.MaintenanceBlazor,"الصيانة (تجربة) 🧪", "🧪"),
-            (PageKeys.Customers,      "العملاء",    "👥"),
-            (PageKeys.CustomersBlazor,"العملاء (تجربة) 🧪", "🧪"),
-            (PageKeys.Suppliers,      "الموردين",   "🚚"),
-            (PageKeys.SuppliersBlazor,"الموردين (تجربة) 🧪", "🧪"),
-            (PageKeys.PurchasesBlazor,"المشتريات (تجربة) 🧪", "🧪"),
-            (PageKeys.Treasury,       "الخزينة",    "🏦"),
-            (PageKeys.TreasuryBlazor, "الخزينة (تجربة) 🧪", "🧪"),
-            (PageKeys.Reports,        "التقارير",   "📊"),
-            (PageKeys.ReportsBlazor,  "التقارير (تجربة) 🧪", "🧪"),
-            (PageKeys.Accounts,       "الحسابات",   "📒"),
-            (PageKeys.AccountsBlazor, "الحسابات (تجربة) 🧪", "🧪"),
-            (PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
-            (PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة) 🧪", "🧪"),
-            (PageKeys.Settings,       "الإعدادات",  "⚙️"),
-            (PageKeys.SettingsBlazor, "الإعدادات (تجربة) 🧪", "🧪"),
+            (PageKeys.SalesBlazor,    "المبيعات",   "🛒"),
+            (PageKeys.InventoryBlazor,"المخزون",    "🗄️"),
+            (PageKeys.InventoryCountBlazor, "جرد المخزن", "📋"),
+            (PageKeys.MaintenanceBlazor,"الصيانة",    "🔧"),
+            (PageKeys.CustomersBlazor,"العملاء",   "👥"),
+            (PageKeys.SuppliersBlazor,"الموردين",   "🚚"),
+            (PageKeys.PurchasesBlazor,"المشتريات", "🧾"),
+            (PageKeys.TreasuryBlazor, "الخزينة",    "🏦"),
+            (PageKeys.ReportsBlazor,  "التقارير",   "📊"),
+            (PageKeys.AccountsBlazor, "الحسابات",   "📒"),
+            (PageKeys.AttendanceBlazor,"الحضور والمرتبات", "🧑‍💼"),
+            (PageKeys.SettingsBlazor, "الإعدادات",  "⚙️"),
         };
 
         // ==========================================================================
@@ -263,7 +246,7 @@ namespace Temo_Mobile_Store
             };
 
             // العناصر المخصصة للأدمن بس - نفس القائمة بالظبط اللي في Form1.cs (ApplyEmployeeRestrictions)
-            var adminOnlyKeys = new HashSet<string> { PageKeys.Customers, PageKeys.Suppliers, PageKeys.Reports, PageKeys.ReportsBlazor, PageKeys.Accounts, PageKeys.AccountsBlazor, PageKeys.Settings, PageKeys.SettingsBlazor, PageKeys.InventoryCount, PageKeys.InventoryCountBlazor, PageKeys.Attendance, PageKeys.AttendanceBlazor };
+            var adminOnlyKeys = new HashSet<string> { PageKeys.CustomersBlazor, PageKeys.SuppliersBlazor, PageKeys.PurchasesBlazor, PageKeys.ReportsBlazor, PageKeys.AccountsBlazor, PageKeys.SettingsBlazor, PageKeys.InventoryCountBlazor, PageKeys.AttendanceBlazor };
             var visibleNavItems = AuthManager.IsAdmin
                 ? navItems
                 : navItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
@@ -688,7 +671,7 @@ namespace Temo_Mobile_Store
                 {
                     popup.Close();
                     txtHeaderSearch.Clear();
-                    NavigateToPageKey(PageKeys.Inventory, highlightKey: barcode);
+                    NavigateToPageKey(PageKeys.InventoryBlazor, highlightKey: barcode);
                 }));
             }
             foreach (var c in customers)
@@ -698,7 +681,7 @@ namespace Temo_Mobile_Store
                 {
                     popup.Close();
                     txtHeaderSearch.Clear();
-                    NavigateToPageKey(PageKeys.Customers, highlightKey: customerId.ToString());
+                    NavigateToPageKey(PageKeys.CustomersBlazor, highlightKey: customerId.ToString());
                 }));
             }
 
@@ -958,52 +941,30 @@ namespace Temo_Mobile_Store
                 BuildHomeDashboardPage();
             else if (pageKey == PageKeys.HomeBlazor)
                 BuildHomeBlazorPage();
-            else if (pageKey == PageKeys.Sales)
-                BuildSalesPage(highlightKey, landingMode);
             else if (pageKey == PageKeys.SalesBlazor)
                 BuildSalesBlazorPage();
             else if (pageKey == PageKeys.InventoryBlazor)
                 BuildInventoryBlazorPage();
-            else if (pageKey == PageKeys.Inventory)
-                BuildInventoryPage(highlightKey, landingMode);
             else if (pageKey == PageKeys.InventoryCountBlazor)
                 BuildInventoryCountBlazorPage();
-            else if (pageKey == PageKeys.InventoryCount)
-                BuildInventoryCountPage();
             else if (pageKey == PageKeys.CustomersBlazor)
                 BuildCustomersBlazorPage();
-            else if (pageKey == PageKeys.Customers)
-                BuildCustomersPage(highlightKey, landingMode);
             else if (pageKey == PageKeys.MaintenanceBlazor)
                 BuildMaintenanceBlazorPage();
-            else if (pageKey == PageKeys.Maintenance)
-                BuildMaintenancePage(highlightKey);
             else if (pageKey == PageKeys.TreasuryBlazor)
                 BuildTreasuryBlazorPage();
-            else if (pageKey == PageKeys.Treasury)
-                BuildTreasuryPage(presetMovementType);
             else if (pageKey == PageKeys.SuppliersBlazor)
                 BuildSuppliersBlazorPage();
-            else if (pageKey == PageKeys.Suppliers)
-                BuildSuppliersPage(highlightKey, landingMode);
             else if (pageKey == PageKeys.PurchasesBlazor)
                 BuildPurchasesBlazorPage();
             else if (pageKey == PageKeys.ReportsBlazor)
                 BuildReportsBlazorPage();
-            else if (pageKey == PageKeys.Reports)
-                BuildReportsPage();
             else if (pageKey == PageKeys.AccountsBlazor)
                 BuildAccountsBlazorPage();
-            else if (pageKey == PageKeys.Accounts)
-                BuildAccountsPage();
             else if (pageKey == PageKeys.AttendanceBlazor)
                 BuildAttendanceBlazorPage();
-            else if (pageKey == PageKeys.Attendance)
-                BuildAttendancePage();
             else if (pageKey == PageKeys.SettingsBlazor)
                 BuildSettingsBlazorPage();
-            else if (pageKey == PageKeys.Settings)
-                BuildSettingsPage();
             else
                 ShowPlaceholderPage(matchedItem.Text, matchedItem.Icon);
         }
@@ -1052,42 +1013,18 @@ namespace Temo_Mobile_Store
         }
 
         // ==========================================================================
-        // بناء صفحة "الإعدادات" - بتستخدم إعدادات المحل + النسخ الاحتياطي + المستخدمين (SettingsPageControl)
-        // ==========================================================================
-        private void BuildSettingsPage()
-        {
-            OpenPageWindow(PageKeys.Settings, "الإعدادات", () => new SettingsPageControl());
-        }
-
-        // ==========================================================================
         // بناء صفحة "الإعدادات" التجريبية (Blazor Hybrid) - SettingsPageBlazorHost
         // ==========================================================================
         private void BuildSettingsBlazorPage()
         {
-            OpenPageWindow(PageKeys.SettingsBlazor, "الإعدادات (تجربة)", () => new SettingsPageBlazorHost());
-        }
-
-        // ==========================================================================
-        // بناء صفحة "الحسابات" - بتستخدم شجرة الحسابات وقائمة الدخل وميزان المراجعة (AccountsPageControl)
-        // ==========================================================================
-        private void BuildAccountsPage()
-        {
-            OpenPageWindow(PageKeys.Accounts, "الحسابات", () => new AccountsPageControl());
+            OpenPageWindow(PageKeys.SettingsBlazor, "الإعدادات", () => new SettingsPageBlazorHost());
         }
 
         // تجربة شاشة حسابات جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
         // الحسابات الأصلية، بنفس نمط InventoryBlazor بالظبط (أدمن بس زي الأصلية)
         private void BuildAccountsBlazorPage()
         {
-            OpenPageWindow(PageKeys.AccountsBlazor, "الحسابات (تجربة)", () => new AccountsPageBlazorHost());
-        }
-
-        // ==========================================================================
-        // بناء صفحة "الحضور والمرتبات" - أدمن فقط (AttendancePageControl)
-        // ==========================================================================
-        private void BuildAttendancePage()
-        {
-            OpenPageWindow(PageKeys.Attendance, "الحضور والمرتبات", () => new AttendancePageControl());
+            OpenPageWindow(PageKeys.AccountsBlazor, "الحسابات", () => new AccountsPageBlazorHost());
         }
 
         // ==========================================================================
@@ -1095,15 +1032,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildAttendanceBlazorPage()
         {
-            OpenPageWindow(PageKeys.AttendanceBlazor, "الحضور والمرتبات (تجربة)", () => new AttendancePageBlazorHost());
-        }
-
-        // ==========================================================================
-        // بناء صفحة "التقارير" - بتستخدم شاشة التقارير وإقفال اليوم الحقيقية (ReportsPageControl)
-        // ==========================================================================
-        private void BuildReportsPage()
-        {
-            OpenPageWindow(PageKeys.Reports, "التقارير", () => new ReportsPageControl());
+            OpenPageWindow(PageKeys.AttendanceBlazor, "الحضور والمرتبات", () => new AttendancePageBlazorHost());
         }
 
         // ==========================================================================
@@ -1111,93 +1040,14 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildReportsBlazorPage()
         {
-            OpenPageWindow(PageKeys.ReportsBlazor, "التقارير (تجربة)", () => new ReportsPageBlazorHost());
-        }
-
-        // ==========================================================================
-        // بناء صفحة "الموردين" - بتستخدم شاشة الموردين والمشتريات الحقيقية (SuppliersPageControl)
-        // ==========================================================================
-        private void BuildSuppliersPage(string highlightKey = null, bool landingMode = false)
-        {
-            Form form = OpenPageWindow(PageKeys.Suppliers, "الموردين", () => new SuppliersPageControl());
-            if (highlightKey != null)
-                form.Controls.OfType<SuppliersPageControl>().FirstOrDefault()?.HighlightSupplier(highlightKey);
-            if (landingMode)
-                form.Controls.OfType<SuppliersPageControl>().FirstOrDefault()?.FocusNewPurchaseEntry();
-        }
-
-        // ==========================================================================
-        // بناء صفحة "الخزينة" - بتستخدم شاشة المصروفات وحركة القبض/الصرف (TreasuryPageControl)
-        // ==========================================================================
-        private void BuildTreasuryPage(string presetMovementType = null)
-        {
-            Form form = OpenPageWindow(PageKeys.Treasury, "الخزينة", () => new TreasuryPageControl());
-            if (presetMovementType != null)
-            {
-                TreasuryPageControl treasuryPage = form.Controls.OfType<TreasuryPageControl>().FirstOrDefault();
-                treasuryPage?.ShowMovementEntry(presetMovementType);
-            }
-        }
-
-        // ==========================================================================
-        // بناء صفحة "الصيانة" - بتستخدم شاشة الصيانة الحقيقية (MaintenancePageControl)
-        // ==========================================================================
-        private void BuildMaintenancePage(string highlightKey = null)
-        {
-            Form form = OpenPageWindow(PageKeys.Maintenance, "الصيانة", () => new MaintenancePageControl());
-            if (highlightKey != null)
-                form.Controls.OfType<MaintenancePageControl>().FirstOrDefault()?.HighlightTicket(highlightKey);
-        }
-
-        // ==========================================================================
-        // بناء صفحة "العملاء" - بتستخدم شاشة العملاء الحقيقية (CustomersPageControl)
-        // ==========================================================================
-        private void BuildCustomersPage(string highlightKey = null, bool landingMode = false)
-        {
-            Form form = OpenPageWindow(PageKeys.Customers, "العملاء", () => new CustomersPageControl());
-            if (highlightKey != null)
-                form.Controls.OfType<CustomersPageControl>().FirstOrDefault()?.HighlightCustomer(highlightKey);
-            if (landingMode)
-                form.Controls.OfType<CustomersPageControl>().FirstOrDefault()?.FocusAddCustomerEntry();
-        }
-
-        // ==========================================================================
-        // بناء صفحة "المخزون" - بتستخدم شاشة إدارة المخزن الحقيقية (InventoryPageControl)
-        // ==========================================================================
-        private void BuildInventoryPage(string highlightKey = null, bool landingMode = false)
-        {
-            Form form = OpenPageWindow(PageKeys.Inventory, "المخزون", () => new InventoryPageControl());
-            if (highlightKey != null)
-                form.Controls.OfType<InventoryPageControl>().FirstOrDefault()?.HighlightProduct(highlightKey);
-            if (landingMode)
-                form.Controls.OfType<InventoryPageControl>().FirstOrDefault()?.FocusAddProductEntry();
-        }
-
-        // ==========================================================================
-        // بناء صفحة "جرد المخزن" - بتستخدم شاشة الجرد الحقيقية (InventoryCountPageControl)
-        // ==========================================================================
-        private void BuildInventoryCountPage()
-        {
-            OpenPageWindow(PageKeys.InventoryCount, "جرد المخزن", () => new InventoryCountPageControl());
+            OpenPageWindow(PageKeys.ReportsBlazor, "التقارير", () => new ReportsPageBlazorHost());
         }
 
         // تجربة شاشة جرد مخزن جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
         // جرد المخزن الأصلية، بنفس نمط InventoryBlazor بالظبط (أدمن بس زي الأصلية)
         private void BuildInventoryCountBlazorPage()
         {
-            OpenPageWindow(PageKeys.InventoryCountBlazor, "جرد المخزن (تجربة)", () => new InventoryCountPageBlazorHost());
-        }
-
-        // ==========================================================================
-        // بناء صفحة "المبيعات" - بتستخدم شاشة نقطة البيع الحقيقية (SalesPageControl)
-        // ==========================================================================
-        private void BuildSalesPage(string highlightKey = null, bool landingMode = false)
-        {
-            Form form = OpenPageWindow(PageKeys.Sales, "المبيعات", () => new SalesPageControl());
-            if (highlightKey != null)
-                form.Controls.OfType<SalesPageControl>().FirstOrDefault()?.HighlightSale(highlightKey);
-            if (landingMode)
-                form.Controls.OfType<SalesPageControl>().FirstOrDefault()?.FocusBarcodeEntry();
+            OpenPageWindow(PageKeys.InventoryCountBlazor, "جرد المخزن", () => new InventoryCountPageBlazorHost());
         }
 
         // تجربة شاشة مبيعات جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
@@ -1372,19 +1222,19 @@ namespace Temo_Mobile_Store
             };
 
             flow.Controls.Add(CreateKpiCard("📊", UIHelpers.ColorGreen, "المبيعات اليوم", todaySales.ToString("N2") + " ج.م",
-                () => NavigateToPageKey(PageKeys.Sales), sparklineValues: salesTrend.Values, counterTarget: (double)todaySales,
+                () => NavigateToPageKey(PageKeys.SalesBlazor), sparklineValues: salesTrend.Values, counterTarget: (double)todaySales,
                 changeText: TrendText(salesPct), changeColor: TrendColor(salesPct)));
             flow.Controls.Add(CreateKpiCard("💵", UIHelpers.ColorAccentPrimary, "إجمالي الأرباح", todayProfit.ToString("N2") + " ج.م",
-                () => NavigateToPageKey(PageKeys.Reports), counterTarget: (double)todayProfit,
+                () => NavigateToPageKey(PageKeys.ReportsBlazor), counterTarget: (double)todayProfit,
                 changeText: TrendText(profitPct), changeColor: TrendColor(profitPct)));
             flow.Controls.Add(CreateKpiCard("📄", UIHelpers.ColorPurple, "عدد الفواتير", invoiceCount.ToString(),
-                () => NavigateToPageKey(PageKeys.Sales), counterTarget: invoiceCount, isCurrency: false,
+                () => NavigateToPageKey(PageKeys.SalesBlazor), counterTarget: invoiceCount, isCurrency: false,
                 changeText: TrendText(invoicePct), changeColor: TrendColor(invoicePct)));
             flow.Controls.Add(CreateKpiCard("👥", UIHelpers.ColorOrange, "العملاء الجدد", newCustomersToday.ToString(),
-                () => NavigateToPageKey(PageKeys.Customers), counterTarget: newCustomersToday, isCurrency: false,
+                () => NavigateToPageKey(PageKeys.CustomersBlazor), counterTarget: newCustomersToday, isCurrency: false,
                 changeText: (newCustomersDiff >= 0 ? "+" : "") + newCustomersDiff + " عن أمس", changeColor: TrendColor(newCustomersDiff)));
             flow.Controls.Add(CreateKpiCard("⚠️", UIHelpers.ColorRed, "المخزون المنخفض", lowStockCount + " منتجات",
-                () => NavigateToPageKey(PageKeys.Inventory), counterTarget: lowStockCount, isCurrency: false,
+                () => NavigateToPageKey(PageKeys.InventoryBlazor), counterTarget: lowStockCount, isCurrency: false,
                 changeText: "⚠ تنبيه", changeColor: UIHelpers.ColorRed));
 
             // ---------- شريط الإجراءات السريعة + زرار طباعة ملخص اليوم ----------
@@ -1781,7 +1631,7 @@ namespace Temo_Mobile_Store
                 row.Controls.Add(badge);
 
                 int saleId = inv.RepresentativeSaleId;
-                EventHandler onClick = (s, e) => NavigateToPageKey(PageKeys.Sales, highlightKey: saleId.ToString());
+                EventHandler onClick = (s, e) => NavigateToPageKey(PageKeys.SalesBlazor, highlightKey: saleId.ToString());
                 row.Click += onClick;
                 foreach (Control c in row.Controls) { c.Cursor = Cursors.Hand; c.Click += onClick; }
 
@@ -1918,14 +1768,14 @@ namespace Temo_Mobile_Store
             };
 
             flow.Controls.Add(CreateKpiCard("🏦", UIHelpers.ColorAccentPrimary, "الإجمالي", totalBalance.ToString("N2") + " ج.م",
-                () => NavigateToPageKey(PageKeys.Treasury), counterTarget: (double)totalBalance));
+                () => NavigateToPageKey(PageKeys.TreasuryBlazor), counterTarget: (double)totalBalance));
 
             foreach (var mb in methodBalances)
             {
                 string ic = methodIcons.TryGetValue(mb.Method, out string i) ? i : "💳";
                 Color accent = methodColors.TryGetValue(mb.Method, out Color c) ? c : UIHelpers.ColorAccentPrimary;
                 flow.Controls.Add(CreateKpiCard(ic, accent, mb.Method, mb.Balance.ToString("N2") + " ج.م",
-                    () => NavigateToPageKey(PageKeys.Treasury), counterTarget: (double)mb.Balance));
+                    () => NavigateToPageKey(PageKeys.TreasuryBlazor), counterTarget: (double)mb.Balance));
             }
 
             return flow;
@@ -1935,12 +1785,12 @@ namespace Temo_Mobile_Store
         {
             var actions = new (string Icon, string Text, Action OnClick)[]
             {
-                ("➕", "فاتورة جديدة", () => NavigateToPageKey(PageKeys.Sales, landingMode: true)),
-                ("📦", "إضافة منتج", () => NavigateToPageKey(PageKeys.Inventory, landingMode: true)),
-                ("👤", "عميل جديد", () => NavigateToPageKey(PageKeys.Customers, landingMode: true)),
-                ("🛒", "فاتورة شراء", () => NavigateToPageKey(PageKeys.Suppliers, landingMode: true)),
-                ("💳", "إضافة مصروف", () => NavigateToPageKey(PageKeys.Treasury, "مصروف")),
-                ("📶", "مسح باركود", () => NavigateToPageKey(PageKeys.Sales, landingMode: true)),
+                ("➕", "فاتورة جديدة", () => NavigateToPageKey(PageKeys.SalesBlazor, landingMode: true)),
+                ("📦", "إضافة منتج", () => NavigateToPageKey(PageKeys.InventoryBlazor, landingMode: true)),
+                ("👤", "عميل جديد", () => NavigateToPageKey(PageKeys.CustomersBlazor, landingMode: true)),
+                ("🛒", "فاتورة شراء", () => NavigateToPageKey(PageKeys.PurchasesBlazor)),
+                ("💳", "إضافة مصروف", () => NavigateToPageKey(PageKeys.TreasuryBlazor, "مصروف")),
+                ("📶", "مسح باركود", () => NavigateToPageKey(PageKeys.SalesBlazor, landingMode: true)),
             };
 
             // بانل خارجي بارتفاع ثابت (صف واحد بس) - زرار الطباعة بينضاف من BuildHomeDashboardPage
@@ -2386,27 +2236,27 @@ namespace Temo_Mobile_Store
             }
             else if (e.KeyCode == Keys.F2)
             {
-                NavigateToPageKey(PageKeys.Sales);
+                NavigateToPageKey(PageKeys.SalesBlazor);
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.F3)
             {
-                NavigateToPageKey(PageKeys.Suppliers);
+                NavigateToPageKey(PageKeys.PurchasesBlazor);
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.F4)
             {
-                NavigateToPageKey(PageKeys.Treasury, "قبض");
+                NavigateToPageKey(PageKeys.TreasuryBlazor, "قبض");
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.F5)
             {
-                NavigateToPageKey(PageKeys.Treasury, "صرف");
+                NavigateToPageKey(PageKeys.TreasuryBlazor, "صرف");
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.F6)
             {
-                NavigateToPageKey(PageKeys.Reports);
+                NavigateToPageKey(PageKeys.ReportsBlazor);
                 e.Handled = true;
             }
         }

@@ -101,22 +101,22 @@
             <div class="card quick-actions-card">
                 <div class="card-title">إجراءات سريعة</div>
                 <div class="quick-actions-row">
-                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Sales)'>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.SalesBlazor)'>
                         <span>➕</span><span>فاتورة جديدة</span>
                     </button>
-                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Inventory)'>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.InventoryBlazor)'>
                         <span>📦</span><span>إضافة منتج</span>
                     </button>
-                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Customers)'>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.CustomersBlazor)'>
                         <span>👤</span><span>عميل جديد</span>
                     </button>
-                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Suppliers)'>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.PurchasesBlazor)'>
                         <span>🛒</span><span>فاتورة شراء</span>
                     </button>
-                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Treasury)'>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.TreasuryBlazor)'>
                         <span>💳</span><span>إضافة مصروف</span>
                     </button>
-                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Sales)'>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.SalesBlazor)'>
                         <span>📶</span><span>مسح باركود</span>
                     </button>
                 </div>
@@ -177,7 +177,7 @@
                             <tbody>
                                 @foreach (var inv in latestInvoices)
                                 {
-                                    <tr class="clickable-row" @onclick="() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Sales)">
+                                    <tr class="clickable-row" @onclick="() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.SalesBlazor)">
                                         <td>@inv.CustomerName</td>
                                         <td class="num">@inv.Total.ToString("N0") ج.م</td>
                                         <td>@(inv.PaymentType == "Cash" ? "كاش" : "آجل")</td>
@@ -269,22 +269,20 @@
 
     private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
     {
-        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
-        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
-        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
-        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
-        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
-        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
-        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
-        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
-        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
-        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
-        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
-        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
-        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
-        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
-        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
-        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Home,           "Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©",   "ðŸ "),
+        (MainShell.PageKeys.HomeBlazor,     "Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ© (ØªØ¬Ø±Ø¨Ø©)", "ðŸ§ª"),
+        (MainShell.PageKeys.SalesBlazor,    "Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª",   "ðŸ›’"),
+        (MainShell.PageKeys.InventoryBlazor,"Ø§Ù„Ù…Ø®Ø²ÙˆÙ†",    "ðŸ—„ï¸"),
+        (MainShell.PageKeys.InventoryCountBlazor, "Ø¬Ø±Ø¯ Ø§Ù„Ù…Ø®Ø²Ù†", "ðŸ“‹"),
+        (MainShell.PageKeys.MaintenanceBlazor,"Ø§Ù„ØµÙŠØ§Ù†Ø©",    "ðŸ”§"),
+        (MainShell.PageKeys.CustomersBlazor,"Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡",   "ðŸ‘¥"),
+        (MainShell.PageKeys.SuppliersBlazor,"Ø§Ù„Ù…ÙˆØ±Ø¯ÙŠÙ†",   "ðŸšš"),
+        (MainShell.PageKeys.PurchasesBlazor,"Ø§Ù„Ù…Ø´ØªØ±ÙŠØ§Øª", "ðŸ§¾"),
+        (MainShell.PageKeys.TreasuryBlazor, "Ø§Ù„Ø®Ø²ÙŠÙ†Ø©",    "ðŸ¦"),
+        (MainShell.PageKeys.ReportsBlazor,  "Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±",   "ðŸ“Š"),
+        (MainShell.PageKeys.AccountsBlazor, "Ø§Ù„Ø­Ø³Ø§Ø¨Ø§Øª",   "ðŸ“’"),
+        (MainShell.PageKeys.AttendanceBlazor,"Ø§Ù„Ø­Ø¶ÙˆØ± ÙˆØ§Ù„Ù…Ø±ØªØ¨Ø§Øª", "ðŸ§‘â€ðŸ’¼"),
+        (MainShell.PageKeys.SettingsBlazor, "Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª",  "âš™ï¸"),
     };
 
     private (string Key, string Text, string Icon)[] NavItems
@@ -292,8 +290,8 @@
         get
         {
             var adminOnlyKeys = new HashSet<string> {
-                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
-                MainShell.PageKeys.Accounts, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCount, MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+                MainShell.PageKeys.CustomersBlazor, MainShell.PageKeys.SuppliersBlazor, MainShell.PageKeys.PurchasesBlazor, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCountBlazor, MainShell.PageKeys.AttendanceBlazor
             };
             return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
         }
