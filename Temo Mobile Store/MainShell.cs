@@ -52,49 +52,20 @@ namespace Temo_Mobile_Store
 
         // نفس الـ Connection String المستخدم في Form1.cs بالظبط عشان نقرأ من نفس قاعدة البيانات
         // ---------- ألوان الهيكل العام (مسحوبة من UIHelpers المركزية عشان تفضل موحدة مع باقي الشاشات) ----------
-        private static readonly Color ColorSidebarBg = UIHelpers.ColorSidebar;           // كحلي غامق جدًا - خلفية الـ Sidebar
-        private static readonly Color ColorSidebarActive = UIHelpers.ColorAccentPrimary; // أزرق - العنصر المفعّل حاليًا
-        private static readonly Color ColorSidebarHover = Color.FromArgb(28, 42, 68);    // درجة أفتح شوية من خلفية الـ Sidebar - تفاعل الماوس (Hover)
-        private static readonly Color ColorSidebarText = Color.FromArgb(190, 200, 218);  // رمادي فاتح - نص العناصر غير المفعّلة
-        private static readonly Color ColorTopBarBg = Color.White;
         private static readonly Color ColorContentBg = UIHelpers.ColorBackgroundApp;
         private static readonly Color ColorTitleText = UIHelpers.ColorPrimary;
 
-        // ---------- حالة طي/فرد الـ Sidebar ----------
-        private const int SidebarExpandedWidth = 220;
-        private const int SidebarCollapsedWidth = 68;
-        private bool sidebarCollapsed = false;
-        private System.Windows.Forms.Timer sidebarAnimTimer;
-        private Guna2Button btnSidebarToggle;
-        private Label lblSidebarLogo;
-        private readonly Dictionary<Guna2Button, string> sidebarButtonFullText = new Dictionary<Guna2Button, string>();
-        private readonly ToolTip sidebarToolTip = new ToolTip();
-        private Panel pnlSidebarFooter;
-        private Label lblFooterName, lblFooterRole;
-        private Guna2Button btnLogout;
-
-        // ---------- بحث سريع في الهيدر ----------
-        private Guna2TextBox txtHeaderSearch;
-        private System.Windows.Forms.Timer headerSearchDebounceTimer;
-        private Form headerSearchPopup;
-
-        // ---------- تايمرات عدّاد كروت الـ KPI - لازم توقف وتتشال قبل كل إعادة بناء للداشبورد ----------
+        // ---------- تايمرات عدّاد كروت الـ KPI - لازم توقف وتتشال قبل كل إعادة بناء للداشبورد (كود قديم ميت، راجع BuildHomeDashboardPageOld) ----------
         private readonly List<System.Windows.Forms.Timer> activeKpiCounterTimers = new List<System.Windows.Forms.Timer>();
 
         private static readonly string[] AllPaymentMethods = UIHelpers.PaymentMethods;
 
         // ---------- عناصر الهيكل الرئيسية ----------
-        private Panel pnlSidebar;
-        private Panel pnlTopBar;
+        // السايدبار/التوب بار الأصليين (WinForms) اتشالوا خالص - كل شاشة (بما فيها
+        // الرئيسية) بقت بتوفر سايدبار/توب بار خاص بيها Blazor. pnlContent بقت تاخد
+        // نافذة MainShell كلها وتستضيف شاشة "الرئيسية" بس (المضمّنة، راجع BuildHomeDashboardPage).
         private Panel pnlContent;
         private HomePageBlazorHost homeDashboardHost;
-        private Label lblPageTitle;
-        private Label lblDate;
-        private Label lblBell;
-        private Label lblBellBadge;
-
-        private readonly List<Guna2Button> sidebarButtons = new List<Guna2Button>();
-        private Guna2Button activeSidebarButton;
         private string currentPageKey = null;
 
         // نافذة مستقلة لكل صفحة (غير الرئيسية) بتتفتح لما تُضغط من السايدبار.
@@ -125,6 +96,14 @@ namespace Temo_Mobile_Store
             (PageKeys.AccountsBlazor, "الحسابات",   "📒"),
             (PageKeys.AttendanceBlazor,"الحضور والمرتبات", "🧑‍💼"),
             (PageKeys.SettingsBlazor, "الإعدادات",  "⚙️"),
+        };
+
+        // نفس قايمة adminOnlyKeys اللي كل شاشة Blazor بترشّح بيها القائمة الجانبية بتاعتها
+        // بالظبط - هنا بتستخدمها NavigateToPageKey كفحص صلاحيات حقيقي قبل فتح أي صفحة
+        private static readonly HashSet<string> AdminOnlyPageKeys = new HashSet<string>
+        {
+            PageKeys.CustomersBlazor, PageKeys.SuppliersBlazor, PageKeys.PurchasesBlazor, PageKeys.ReportsBlazor,
+            PageKeys.AccountsBlazor, PageKeys.SettingsBlazor, PageKeys.InventoryCountBlazor, PageKeys.AttendanceBlazor
         };
 
         // ==========================================================================
@@ -182,13 +161,8 @@ namespace Temo_Mobile_Store
             this.KeyPreview = true;
             this.KeyDown += MainShell_KeyDown;
 
-            BuildContentArea(); // هنضيفه الأول عشان ياخد الفراغ المتبقي صح (Dock.Fill)
-            BuildTopBar();
-            BuildSidebar();
-
-            // ترتيب الإضافة لـ Controls بالشكل ده يضمن إن الداشبورد الرئيسي يتفتح افتراضيًا صح
-            if (sidebarButtons.Count > 0)
-                SidebarButton_Click(sidebarButtons[0], EventArgs.Empty);
+            BuildContentArea(); // بتاخد نافذة MainShell كلها دلوقتي (مفيش سايدبار/توب بار أصلي حواليها)
+            NavigateToPageKey(PageKeys.Home); // الصفحة الافتراضية عند فتح البرنامج
 
             StartAutoRefreshTimer();
         }
@@ -201,8 +175,8 @@ namespace Temo_Mobile_Store
             autoRefreshTimer = new System.Windows.Forms.Timer { Interval = 60000 }; // كل 60 ثانية
             autoRefreshTimer.Tick += (s, e) =>
             {
-                RefreshNotificationBadge();
-                // الداشبورد بقى دايمًا هو محتوى الشاشة الرئيسية تحت النوافذ التانية، فبيتحدّث كل تيك بغض النظر عن آخر تاب اتضغط
+                // BuildHomeDashboardPage بقت idempotent (بترجع فورًا لو الكونترول موجود بالفعل) - التحديث
+                // الفعلي للبيانات بقى مسؤولية HomePage.razor الداخلية (تايمرها بتاعها كل 30 ثانية)
                 BuildHomeDashboardPage();
             };
             autoRefreshTimer.Start();
@@ -222,154 +196,6 @@ namespace Temo_Mobile_Store
             };
         }
 
-        // ==========================================================================
-        // بناء القائمة الجانبية (Sidebar)
-        // ==========================================================================
-        private void BuildSidebar()
-        {
-            pnlSidebar = new Panel
-            {
-                Dock = DockStyle.Left,
-                Width = SidebarExpandedWidth,
-                BackColor = ColorSidebarBg
-            };
-
-            // شعار المتجر أعلى الـ Sidebar
-            lblSidebarLogo = new Label
-            {
-                Text = "📱 TEMO\nMOBILE STORE",
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Top,
-                Height = 90
-            };
-
-            // العناصر المخصصة للأدمن بس - نفس القائمة بالظبط اللي في Form1.cs (ApplyEmployeeRestrictions)
-            var adminOnlyKeys = new HashSet<string> { PageKeys.CustomersBlazor, PageKeys.SuppliersBlazor, PageKeys.PurchasesBlazor, PageKeys.ReportsBlazor, PageKeys.AccountsBlazor, PageKeys.SettingsBlazor, PageKeys.InventoryCountBlazor, PageKeys.AttendanceBlazor };
-            var visibleNavItems = AuthManager.IsAdmin
-                ? navItems
-                : navItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
-
-            // حاوية أزرار التنقل
-            Panel pnlNavButtons = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = visibleNavItems.Length * 46,
-                AutoScroll = false
-            };
-
-            // بنضيف الأزرار بترتيب عكسي عشان الـ Dock.Top يرصّهم من فوق لتحت بالترتيب الصحيح
-            for (int i = visibleNavItems.Length - 1; i >= 0; i--)
-            {
-                var item = visibleNavItems[i];
-                string fullText = "      " + item.Icon + "   " + item.Text;
-                Guna2Button btn = new Guna2Button
-                {
-                    Text = fullText,
-                    Dock = DockStyle.Top,
-                    Height = 46,
-                    TextAlign = HorizontalAlignment.Left,
-                    Font = new Font("Segoe UI", 10.5F),
-                    ForeColor = ColorSidebarText,
-                    FillColor = ColorSidebarBg,
-                    BorderRadius = 0,
-                    Tag = item.Key
-                };
-                btn.Click += SidebarButton_Click;
-                btn.MouseEnter += (s, e) => { if (btn != activeSidebarButton) btn.FillColor = ColorSidebarHover; };
-                btn.MouseLeave += (s, e) => { if (btn != activeSidebarButton) btn.FillColor = ColorSidebarBg; };
-                sidebarToolTip.SetToolTip(btn, item.Text);
-                sidebarButtonFullText[btn] = fullText;
-                sidebarButtons.Insert(0, btn);
-                pnlNavButtons.Controls.Add(btn);
-            }
-
-            pnlSidebarFooter = BuildSidebarFooter();
-
-            // ترتيب الإضافة هنا مهم: اللوجو Dock.Top الأول، بعدين الأزرار تحته مباشرة، والفوتر Dock.Bottom
-            pnlSidebar.Controls.Add(pnlNavButtons);
-            pnlSidebar.Controls.Add(pnlSidebarFooter);
-            pnlSidebar.Controls.Add(lblSidebarLogo);
-
-            this.Controls.Add(pnlSidebar);
-        }
-
-        // ==========================================================================
-        // فوتر الـ Sidebar: صورة/حروف المستخدم + اسمه + رتبته + زرار تسجيل الخروج
-        // ==========================================================================
-        private Panel BuildSidebarFooter()
-        {
-            Panel footer = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 112,
-                BackColor = ColorSidebarHover
-            };
-
-            string username = AuthManager.CurrentUsername ?? "مستخدم";
-            string initials = username.Length >= 2 ? username.Substring(0, 2) : username.Substring(0, Math.Min(1, username.Length));
-
-            Guna2Panel avatar = new Guna2Panel
-            {
-                Size = new Size(36, 36),
-                Location = new Point(16, 14),
-                BorderRadius = 18,
-                FillColor = UIHelpers.ColorAccentPrimary
-            };
-            Label lblAvatarText = new Label
-            {
-                Text = initials.ToUpper(),
-                Dock = DockStyle.Fill,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                TextAlign = ContentAlignment.MiddleCenter,
-                BackColor = Color.Transparent
-            };
-            avatar.Controls.Add(lblAvatarText);
-
-            lblFooterName = new Label
-            {
-                Text = username,
-                Location = new Point(62, 14),
-                Size = new Size(140, 18),
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold)
-            };
-            lblFooterRole = new Label
-            {
-                Text = AuthManager.IsAdmin ? "مدير" : "موظف",
-                Location = new Point(62, 33),
-                Size = new Size(140, 16),
-                ForeColor = ColorSidebarText,
-                Font = new Font("Segoe UI", 8F)
-            };
-
-            btnLogout = new Guna2Button
-            {
-                Text = "🚪  تسجيل خروج",
-                Location = new Point(16, 62),
-                Size = new Size(188, 34),
-                TextAlign = HorizontalAlignment.Center,
-                Font = new Font("Segoe UI", 9F),
-                ForeColor = ColorSidebarText,
-                FillColor = ColorSidebarBg,
-                BorderColor = Color.FromArgb(60, 72, 96),
-                BorderThickness = 1,
-                BorderRadius = 8
-            };
-            sidebarButtonFullText[btnLogout] = btnLogout.Text;
-            btnLogout.Click += BtnLogout_Click;
-
-            footer.Controls.Add(avatar);
-            footer.Controls.Add(lblFooterName);
-            footer.Controls.Add(lblFooterRole);
-            footer.Controls.Add(btnLogout);
-            return footer;
-        }
-
-        private void BtnLogout_Click(object sender, EventArgs e) => RequestLogout();
-
         // نفس منطق زرار تسجيل الخروج بالظبط - متاحة عامة عشان أي شاشة Blazor تقدر
         // تنادي عليها (MainShell.Instance?.RequestLogout()) من غير ما تكرر المنطق
         public void RequestLogout()
@@ -380,390 +206,6 @@ namespace Temo_Mobile_Store
             LogoutRequested = true;
             this.Close();
         }
-
-        // ==========================================================================
-        // طي/فرد الـ Sidebar - تحريك العرض بتايمر بسيط (مفيش محرك أنيميشن حقيقي في WinForms)
-        // بس النصوص بتتلخص لأيقونة بس لما يقفل، وترجع تاني لما يفتح
-        // ==========================================================================
-        private void ToggleSidebar()
-        {
-            sidebarCollapsed = !sidebarCollapsed;
-            btnSidebarToggle.Text = sidebarCollapsed ? "»" : "«";
-
-            // تبديل النصوص فورًا (مش هي اللي بتتحرك، بس عرض البانل)
-            lblSidebarLogo.Text = sidebarCollapsed ? "📱" : "📱 TEMO\nMOBILE STORE";
-            foreach (var btn in sidebarButtons)
-            {
-                if (sidebarCollapsed)
-                {
-                    string key = btn.Tag?.ToString() ?? "";
-                    var navItem = Array.Find(navItems, x => x.Key == key);
-                    btn.Text = navItem.Icon ?? "";
-                }
-                else
-                {
-                    btn.Text = sidebarButtonFullText[btn];
-                }
-                btn.TextAlign = sidebarCollapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
-            }
-            lblFooterName.Visible = !sidebarCollapsed;
-            lblFooterRole.Visible = !sidebarCollapsed;
-            btnLogout.Text = sidebarCollapsed ? "🚪" : sidebarButtonFullText[btnLogout];
-            btnLogout.Size = sidebarCollapsed ? new Size(36, 34) : new Size(188, 34);
-
-            int targetWidth = sidebarCollapsed ? SidebarCollapsedWidth : SidebarExpandedWidth;
-
-            sidebarAnimTimer?.Stop();
-            sidebarAnimTimer = new System.Windows.Forms.Timer { Interval = 15 };
-            sidebarAnimTimer.Tick += (s, e) =>
-            {
-                int current = pnlSidebar.Width;
-                int diff = targetWidth - current;
-                if (Math.Abs(diff) <= 4)
-                {
-                    pnlSidebar.Width = targetWidth;
-                    sidebarAnimTimer.Stop();
-                    sidebarAnimTimer.Dispose();
-                    return;
-                }
-                pnlSidebar.Width = current + diff / 3;
-            };
-            sidebarAnimTimer.Start();
-        }
-
-        // ==========================================================================
-        // بناء الشريط العلوي (Top Bar)
-        // ==========================================================================
-        private void BuildTopBar()
-        {
-            pnlTopBar = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 60,
-                BackColor = ColorTopBarBg
-            };
-
-            lblPageTitle = new Label
-            {
-                Text = "الرئيسية",
-                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-                ForeColor = ColorTitleText,
-                AutoSize = true,
-                Location = new Point(20, 16),
-                Visible = false // مخفي عشان الهيدر يفضل نضيف زي التصميم المرجعي - اسم الصفحة أصلاً واضح من تظليل الـ Sidebar
-            };
-
-            // ---------- زرار طي/فرد الـ Sidebar (☰) - أقصى شمال الهيدر ----------
-            Panel pnlToggleHolder = new Panel { Dock = DockStyle.Left, Width = 52 };
-            btnSidebarToggle = new Guna2Button
-            {
-                Text = "☰",
-                Size = new Size(34, 34),
-                Location = new Point(9, 13),
-                Font = new Font("Segoe UI", 11F),
-                ForeColor = ColorTitleText,
-                FillColor = Color.FromArgb(245, 246, 250),
-                BorderRadius = 9
-            };
-            btnSidebarToggle.Click += (s, e) => ToggleSidebar();
-            pnlToggleHolder.Controls.Add(btnSidebarToggle);
-
-            string arabicDate;
-            try
-            {
-                CultureInfo arCulture = new CultureInfo("ar-EG");
-                arabicDate = DateTime.Now.ToString("dddd d MMMM yyyy", arCulture);
-            }
-            catch
-            {
-                arabicDate = DateTime.Now.ToString("yyyy-MM-dd");
-            }
-
-            // ---------- بحث سريع (منتجات وعملاء) - Dock.Left بعد زرار الـ ☰ مباشرة ----------
-            Panel pnlSearchHolder = new Panel { Dock = DockStyle.Left, Width = 330 };
-            txtHeaderSearch = new Guna2TextBox
-            {
-                Location = new Point(0, 13),
-                Size = new Size(310, 34),
-                PlaceholderText = "🔍 ابحث عن منتج، عميل، فاتورة...",
-                BorderRadius = 10,
-                FillColor = Color.FromArgb(245, 246, 250)
-            };
-            txtHeaderSearch.TextChanged += TxtHeaderSearch_TextChanged;
-            pnlSearchHolder.Controls.Add(txtHeaderSearch);
-
-            // ---------- تجمّع أقصى يمين الهيدر: صورة/اسم المستخدم (الحافة الحقيقية) ثم الجرس ثم التاريخ ثم بادچ الترخيص ----------
-            Panel pnlHeaderUser = new Panel { Dock = DockStyle.Right, Width = 190 };
-            string headerInitials = (AuthManager.CurrentUsername ?? "?").Length >= 1 ? (AuthManager.CurrentUsername ?? "?").Substring(0, 1) : "?";
-            Guna2Panel headerAvatar = new Guna2Panel { Size = new Size(38, 38), Location = new Point(12, 11), BorderRadius = 19, FillColor = UIHelpers.ColorAccentPrimary };
-            Label lblHeaderAvatarText = new Label { Text = headerInitials.ToUpper(), Dock = DockStyle.Fill, ForeColor = Color.White, Font = new Font("Segoe UI", 11F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, BackColor = Color.Transparent };
-            headerAvatar.Controls.Add(lblHeaderAvatarText);
-            Label lblHeaderUserName = new Label { Text = AuthManager.CurrentUsername ?? "مستخدم", Location = new Point(58, 12), Size = new Size(120, 18), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = ColorTitleText };
-            Label lblHeaderUserRole = new Label { Text = AuthManager.IsAdmin ? "مدير النظام" : "موظف", Location = new Point(58, 30), Size = new Size(120, 14), Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(120, 126, 138) };
-            pnlHeaderUser.Controls.Add(headerAvatar);
-            pnlHeaderUser.Controls.Add(lblHeaderUserName);
-            pnlHeaderUser.Controls.Add(lblHeaderUserRole);
-
-            // بانل الجرس
-            Panel pnlBellHolder = new Panel { Dock = DockStyle.Right, Width = 55 };
-            lblBell = new Label
-            {
-                Text = "🔔",
-                Font = new Font("Segoe UI", 13F),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Fill,
-                Cursor = Cursors.Hand
-            };
-            lblBell.Click += LblBell_Click;
-            pnlBellHolder.Controls.Add(lblBell);
-
-            lblBellBadge = new Label
-            {
-                Text = "0",
-                Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
-                ForeColor = Color.White,
-                BackColor = Color.FromArgb(231, 76, 60),
-                TextAlign = ContentAlignment.MiddleCenter,
-                Size = new Size(16, 16),
-                Location = new Point(6, 8),
-                Visible = false
-            };
-            pnlBellHolder.Controls.Add(lblBellBadge);
-            lblBellBadge.BringToFront();
-
-            // بانل التاريخ
-            Panel pnlDateHolder = new Panel { Dock = DockStyle.Right, Width = 205 };
-            lblDate = new Label
-            {
-                Text = "📅 " + arabicDate,
-                Font = new Font("Segoe UI", 9.5F),
-                ForeColor = Color.FromArgb(85, 92, 102),
-                TextAlign = ContentAlignment.MiddleRight,
-                Dock = DockStyle.Fill
-            };
-            pnlDateHolder.Controls.Add(lblDate);
-
-            Panel pnlLicenseHolder = BuildLicenseBadge();
-
-            pnlTopBar.Controls.Add(lblPageTitle);
-            pnlTopBar.Controls.Add(pnlHeaderUser);
-            pnlTopBar.Controls.Add(pnlBellHolder);
-            pnlTopBar.Controls.Add(pnlDateHolder);
-            pnlTopBar.Controls.Add(pnlLicenseHolder);
-            pnlTopBar.Controls.Add(pnlToggleHolder);
-            pnlTopBar.Controls.Add(pnlSearchHolder);
-            this.Controls.Add(pnlTopBar);
-
-            RefreshNotificationBadge();
-        }
-
-        // ==========================================================================
-        // بحث سريع في الهيدر - منتجات وعملاء بس (Debounce بسيط عشان منعملش استعلام على كل ضغطة زرار)
-        // ==========================================================================
-        private void TxtHeaderSearch_TextChanged(object sender, EventArgs e)
-        {
-            headerSearchDebounceTimer?.Stop();
-            headerSearchDebounceTimer?.Dispose();
-
-            string term = txtHeaderSearch.Text.Trim();
-            headerSearchPopup?.Close();
-
-            if (term.Length < 2) return;
-
-            headerSearchDebounceTimer = new System.Windows.Forms.Timer { Interval = 250 };
-            headerSearchDebounceTimer.Tick += (s, e2) =>
-            {
-                headerSearchDebounceTimer.Stop();
-                RunHeaderQuickSearch(term);
-            };
-            headerSearchDebounceTimer.Start();
-        }
-
-        private void RunHeaderQuickSearch(string term)
-        {
-            var products = new List<(string Barcode, string Name)>();
-            var customers = new List<(int Id, string Name, string Phone)>();
-
-            try
-            {
-                using (SqliteConnection conn = OpenConnection())
-                {
-                    using (SqliteCommand cmd = new SqliteCommand(
-                        "SELECT Barcode, ProductName FROM Products WHERE ProductName LIKE @q OR Barcode LIKE @q LIMIT 6", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@q", "%" + term + "%");
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                products.Add((reader["Barcode"].ToString(), reader["ProductName"].ToString()));
-                        }
-                    }
-
-                    using (SqliteCommand cmd = new SqliteCommand(
-                        "SELECT CustomerId, CustomerName, Phone FROM Customers WHERE CustomerName LIKE @q OR Phone LIKE @q LIMIT 6", conn))
-                    {
-                        cmd.Parameters.AddWithValue("@q", "%" + term + "%");
-                        using (SqliteDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                                customers.Add((Convert.ToInt32(reader["CustomerId"]), reader["CustomerName"].ToString(), reader["Phone"] == DBNull.Value ? "" : reader["Phone"].ToString()));
-                        }
-                    }
-                }
-            }
-            catch { return; }
-
-            ShowHeaderSearchPopup(products, customers);
-        }
-
-        private void ShowHeaderSearchPopup(List<(string Barcode, string Name)> products, List<(int Id, string Name, string Phone)> customers)
-        {
-            headerSearchPopup?.Close();
-
-            if (products.Count == 0 && customers.Count == 0) return;
-
-            Point screenPoint = txtHeaderSearch.PointToScreen(new Point(0, txtHeaderSearch.Height + 2));
-
-            Form popup = new Form
-            {
-                FormBorderStyle = FormBorderStyle.None,
-                StartPosition = FormStartPosition.Manual,
-                Location = screenPoint,
-                Size = new Size(300, 40),
-                BackColor = Color.White,
-                RightToLeft = RightToLeft.Yes,
-                ShowInTaskbar = false
-            };
-            popup.Deactivate += (s, e) => popup.Close();
-            headerSearchPopup = popup;
-
-            Guna2Panel border = new Guna2Panel { Dock = DockStyle.Fill, FillColor = Color.White, BorderRadius = 10, BorderColor = Color.FromArgb(220, 222, 228), BorderThickness = 1 };
-            popup.Controls.Add(border);
-
-            FlowLayoutPanel flow = new FlowLayoutPanel
-            {
-                Location = new Point(6, 6),
-                Size = new Size(288, 20),
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                AutoScroll = true
-            };
-
-            Label MakeRow(string icon, string text, EventHandler onClick)
-            {
-                Label lbl = new Label
-                {
-                    Text = icon + "  " + text,
-                    Width = 270,
-                    Height = 32,
-                    Font = new Font("Segoe UI", 9F),
-                    ForeColor = ColorTitleText,
-                    TextAlign = ContentAlignment.MiddleRight,
-                    Padding = new Padding(6, 0, 6, 0),
-                    Cursor = Cursors.Hand
-                };
-                lbl.Click += onClick;
-                lbl.MouseEnter += (s, e) => lbl.BackColor = Color.FromArgb(245, 246, 250);
-                lbl.MouseLeave += (s, e) => lbl.BackColor = Color.White;
-                return lbl;
-            }
-
-            foreach (var p in products)
-            {
-                string barcode = p.Barcode;
-                flow.Controls.Add(MakeRow("📦", p.Name, (s, e) =>
-                {
-                    popup.Close();
-                    txtHeaderSearch.Clear();
-                    NavigateToPageKey(PageKeys.InventoryBlazor, highlightKey: barcode);
-                }));
-            }
-            foreach (var c in customers)
-            {
-                int customerId = c.Id;
-                flow.Controls.Add(MakeRow("👤", c.Name + (string.IsNullOrEmpty(c.Phone) ? "" : " - " + c.Phone), (s, e) =>
-                {
-                    popup.Close();
-                    txtHeaderSearch.Clear();
-                    NavigateToPageKey(PageKeys.CustomersBlazor, highlightKey: customerId.ToString());
-                }));
-            }
-
-            border.Controls.Add(flow);
-
-            int rowCount = products.Count + customers.Count;
-            popup.Height = Math.Min(rowCount * 32 + 12, 300);
-            flow.Size = new Size(288, popup.Height - 12);
-
-            popup.Show(this);
-        }
-
-        // ==========================================================================
-        // بادچ مدة انتهاء الترخيص في الشريط العلوي - لونه بيتغيّر حسب قرب الانتهاء
-        // (البرنامج أصلاً مبيوصلش لـ MainShell غير لو الترخيص سليم وقت التشغيل،
-        // فده مجرد عرض تذكيري بيبقى شكله شيك، مش بوابة فحص تانية)
-        // ==========================================================================
-        private Panel BuildLicenseBadge()
-        {
-            Panel holder = new Panel { Dock = DockStyle.Right, Width = 190 };
-
-            if (!LicenseManager.CheckSavedLicense(out DateTime? expiration, out _) || !expiration.HasValue)
-                return holder;
-
-            int daysLeft = (expiration.Value.Date - DateTime.Now.Date).Days;
-            Color accent;
-            string icon, text;
-
-            if (daysLeft < 0)
-            {
-                accent = Color.FromArgb(231, 76, 60);
-                icon = "⛔";
-                text = "الترخيص منتهي";
-            }
-            else if (daysLeft <= 7)
-            {
-                accent = Color.FromArgb(231, 76, 60);
-                icon = "⚠️";
-                text = $"باقي {daysLeft} يوم على الترخيص";
-            }
-            else if (daysLeft <= 30)
-            {
-                accent = Color.FromArgb(243, 156, 18);
-                icon = "⏳";
-                text = $"باقي {daysLeft} يوم على الترخيص";
-            }
-            else
-            {
-                accent = Color.FromArgb(39, 174, 96);
-                icon = "✅";
-                text = "الترخيص ساري";
-            }
-
-            Guna2Panel pill = new Guna2Panel
-            {
-                Size = new Size(175, 34),
-                Location = new Point(8, 13),
-                BorderRadius = 17,
-                FillColor = LightTint(accent, 0.88f),
-                BorderColor = accent,
-                BorderThickness = 1
-            };
-            Label lblBadge = new Label
-            {
-                Text = $"{icon} {text}",
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                ForeColor = accent,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Fill
-            };
-            var tip = new ToolTip();
-            tip.SetToolTip(lblBadge, "تاريخ انتهاء الترخيص: " + expiration.Value.ToString("yyyy-MM-dd"));
-
-            pill.Controls.Add(lblBadge);
-            holder.Controls.Add(pill);
-            return holder;
-        }
-
         // ==========================================================================
         // الإشعارات: أصناف قاربت تخلص، صيانة جاهزة للتسليم من فترة، عملاء عليهم مديونية
         // ==========================================================================
@@ -820,79 +262,6 @@ namespace Temo_Mobile_Store
             return items;
         }
 
-        private void RefreshNotificationBadge()
-        {
-            int count = GetNotificationItems().Count;
-            lblBellBadge.Text = count > 9 ? "9+" : count.ToString();
-            lblBellBadge.Visible = count > 0;
-        }
-
-        private void LblBell_Click(object sender, EventArgs e)
-        {
-            var items = GetNotificationItems();
-            RefreshNotificationBadge();
-
-            Point screenPoint = lblBell.PointToScreen(new Point(0, lblBell.Height));
-            ShowNotificationsPopup(items, screenPoint);
-        }
-
-        private void ShowNotificationsPopup(List<(string Icon, string Text)> items, Point screenLocation)
-        {
-            Form popup = new Form
-            {
-                FormBorderStyle = FormBorderStyle.None,
-                StartPosition = FormStartPosition.Manual,
-                Location = screenLocation,
-                Size = new Size(360, 420),
-                BackColor = Color.White,
-                RightToLeft = RightToLeft.Yes,
-                ShowInTaskbar = false
-            };
-            popup.Deactivate += (s, e) => popup.Close();
-
-            Guna2Panel border = new Guna2Panel { Dock = DockStyle.Fill, FillColor = Color.White, BorderRadius = 12, BorderColor = Color.FromArgb(220, 222, 228), BorderThickness = 1 };
-            popup.Controls.Add(border);
-
-            Label lblTitle = new Label { Text = "🔔 الإشعارات", Location = new Point(15, 12), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorTitleText };
-            border.Controls.Add(lblTitle);
-
-            if (items.Count == 0)
-            {
-                Label lblEmpty = new Label { Text = "مفيش إشعارات جديدة دلوقتي 👍", Location = new Point(15, 50), AutoSize = true, ForeColor = Color.FromArgb(85, 92, 102) };
-                border.Controls.Add(lblEmpty);
-                popup.Height = 100;
-            }
-            else
-            {
-                FlowLayoutPanel flow = new FlowLayoutPanel
-                {
-                    Location = new Point(10, 45),
-                    Size = new Size(340, 365),
-                    FlowDirection = FlowDirection.TopDown,
-                    WrapContents = false,
-                    AutoScroll = true
-                };
-                foreach (var item in items)
-                {
-                    Label lblItem = new Label
-                    {
-                        Text = item.Icon + "  " + item.Text,
-                        Width = 320,
-                        AutoSize = false,
-                        Height = 34,
-                        Font = new Font("Segoe UI", 9F),
-                        ForeColor = ColorTitleText,
-                        TextAlign = ContentAlignment.MiddleRight,
-                        Padding = new Padding(5, 0, 5, 0)
-                    };
-                    flow.Controls.Add(lblItem);
-                }
-                border.Controls.Add(flow);
-            }
-
-            popup.Show(this);
-        }
-
         // ==========================================================================
         // بناء منطقة المحتوى (اللي هتتغير محتوياتها حسب الصفحة المختارة)
         // ==========================================================================
@@ -910,35 +279,18 @@ namespace Temo_Mobile_Store
         }
 
         // ==========================================================================
-        // عند الضغط على أي زرار في القائمة الجانبية
-        // ==========================================================================
-        private void SidebarButton_Click(object sender, EventArgs e)
-        {
-            Guna2Button clickedButton = sender as Guna2Button;
-            if (clickedButton == null) return;
-            string pageKey = clickedButton.Tag?.ToString() ?? "";
-            NavigateToPageKey(pageKey);
-        }
-
-        // ==========================================================================
         // الملاحة الموحّدة - بتُستخدم من ضغطة السايدبار وكمان من الاختصارات السريعة (F2/F4/F5/F6)
         // ==========================================================================
         private void NavigateToPageKey(string pageKey, string presetMovementType = null, string highlightKey = null, bool landingMode = false)
         {
-            Guna2Button targetButton = sidebarButtons.FirstOrDefault(b => (b.Tag?.ToString() ?? "") == pageKey);
-            if (targetButton == null) return; // الصفحة مش متاحة (مخفية عن الموظف مثلاً)
-
-            if (activeSidebarButton != null)
-            {
-                activeSidebarButton.FillColor = ColorSidebarBg;
-                activeSidebarButton.ForeColor = ColorSidebarText;
-            }
-            targetButton.FillColor = ColorSidebarActive;
-            targetButton.ForeColor = Color.White;
-            activeSidebarButton = targetButton;
-
             var matchedItem = Array.Find(navItems, x => x.Key == pageKey);
-            lblPageTitle.Text = matchedItem.Text;
+            if (matchedItem.Key == null) return; // مفتاح صفحة غير معروف
+
+            // نفس فحص الصلاحيات اللي كان بيتم عن طريق إخفاء زرار الـ Sidebar الأصلي بالظبط -
+            // دلوقتي كل شاشة بترسم Sidebar بتاعتها Blazor فمحتاجين نفحص هنا مباشرة بدل الاعتماد
+            // على وجود زرار WinForms حقيقي
+            if (AdminOnlyPageKeys.Contains(pageKey) && !AuthManager.IsAdmin) return;
+
             currentPageKey = pageKey;
 
             if (pageKey == PageKeys.Home)

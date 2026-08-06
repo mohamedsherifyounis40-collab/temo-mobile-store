@@ -172,11 +172,11 @@ namespace Temo_Mobile_Store
             var result = currentResults[idx];
             switch (result.Kind)
             {
-                case SearchResultKind.Product: SelectedPageKey = "Inventory"; break;
-                case SearchResultKind.Customer: SelectedPageKey = "Customers"; break;
-                case SearchResultKind.Supplier: SelectedPageKey = "Suppliers"; break;
-                case SearchResultKind.Maintenance: SelectedPageKey = "Maintenance"; break;
-                case SearchResultKind.Sale: SelectedPageKey = "Sales"; break;
+                case SearchResultKind.Product: SelectedPageKey = MainShell.PageKeys.InventoryBlazor; break;
+                case SearchResultKind.Customer: SelectedPageKey = MainShell.PageKeys.CustomersBlazor; break;
+                case SearchResultKind.Supplier: SelectedPageKey = MainShell.PageKeys.SuppliersBlazor; break;
+                case SearchResultKind.Maintenance: SelectedPageKey = MainShell.PageKeys.MaintenanceBlazor; break;
+                case SearchResultKind.Sale: SelectedPageKey = MainShell.PageKeys.SalesBlazor; break;
                 default: SelectedPageKey = null; break;
             }
             SelectedItemKey = result.ItemKey;
