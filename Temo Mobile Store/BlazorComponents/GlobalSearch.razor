@@ -1,0 +1,81 @@
+@implements IDisposable
+
+<div class="global-search-wrap">
+    <input class="topbar-search" placeholder="🔍 ابحث عن منتج، عميل، فاتورة..." value="@term" @oninput="OnInput" @onblur="OnBlur" />
+
+    @if (showResults && (products.Count > 0 || customers.Count > 0))
+    {
+        <div class="notif-dropdown search-results-dropdown">
+            @foreach (var p in products)
+            {
+                <div class="notif-row search-result-row" @onmousedown="() => GoToProduct(p.Barcode)">
+                    <span>📦</span><span>@p.ProductName</span>
+                </div>
+            }
+            @foreach (var c in customers)
+            {
+                <div class="notif-row search-result-row" @onmousedown="() => GoToCustomer(c.CustomerId)">
+                    <span>👤</span><span>@c.CustomerName @(string.IsNullOrEmpty(c.Phone) ? "" : " - " + c.Phone)</span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    // نفس منطق TxtHeaderSearch_TextChanged/RunHeaderQuickSearch/ShowHeaderSearchPopup
+    // القديمة بالظبط (البحث السريع الشامل في الهيدر) - عن طريق GlobalSearchRepository المشتركة.
+    private string term = "";
+    private bool showResults;
+    private List<GlobalSearchProductResult> products = new();
+    private List<GlobalSearchCustomerResult> customers = new();
+    private System.Timers.Timer? debounceTimer;
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        term = e.Value?.ToString() ?? "";
+        debounceTimer?.Stop();
+        debounceTimer?.Dispose();
+
+        if (term.Trim().Length < 2)
+        {
+            showResults = false;
+            return;
+        }
+
+        debounceTimer = new System.Timers.Timer(300) { AutoReset = false };
+        debounceTimer.Elapsed += (s, e2) => InvokeAsync(() => { RunSearch(term.Trim()); StateHasChanged(); });
+        debounceTimer.Start();
+    }
+
+    private void RunSearch(string q)
+    {
+        try
+        {
+            var result = GlobalSearchRepository.Search(q);
+            products = result.Products;
+            customers = result.Customers;
+            showResults = true;
+        }
+        catch { }
+    }
+
+    // onmousedown (مش onclick) عشان يتنفذ قبل onblur بتاع الـ input ويقفل نتائج البحث قبل ما نقدر نضغط عليها
+    private void GoToProduct(string barcode)
+    {
+        showResults = false;
+        term = "";
+        MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.InventoryBlazor, barcode);
+    }
+
+    private void GoToCustomer(int customerId)
+    {
+        showResults = false;
+        term = "";
+        MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.CustomersBlazor, customerId.ToString());
+    }
+
+    private void OnBlur() => showResults = false;
+
+    public void Dispose() => debounceTimer?.Dispose();
+}

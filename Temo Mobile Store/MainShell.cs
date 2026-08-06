@@ -145,6 +145,7 @@ namespace Temo_Mobile_Store
         // بتفتح/تفعّل صفحة تانية بمفتاحها (نفس اللي بيحصل لو دُست على بند القائمة الجانبية
         // الأصلي بالظبط) - مستخدمة من القائمة الجانبية المكرّرة جوه نافذة المبيعات المستقلة.
         public void OpenPageByKey(string pageKey) => NavigateToPageKey(pageKey);
+        public void OpenPageByKey(string pageKey, string highlightKey) => NavigateToPageKey(pageKey, highlightKey: highlightKey);
 
         // ==========================================================================
         // دالة مساعدة موحّدة لفتح اتصال بقاعدة البيانات - بدل ما نكرر
@@ -367,7 +368,11 @@ namespace Temo_Mobile_Store
             return footer;
         }
 
-        private void BtnLogout_Click(object sender, EventArgs e)
+        private void BtnLogout_Click(object sender, EventArgs e) => RequestLogout();
+
+        // نفس منطق زرار تسجيل الخروج بالظبط - متاحة عامة عشان أي شاشة Blazor تقدر
+        // تنادي عليها (MainShell.Instance?.RequestLogout()) من غير ما تكرر المنطق
+        public void RequestLogout()
         {
             if (MessageBox.Show("هل تريد تسجيل الخروج من البرنامج؟", "تأكيد تسجيل الخروج", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;

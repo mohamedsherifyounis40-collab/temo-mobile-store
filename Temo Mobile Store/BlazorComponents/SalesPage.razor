@@ -23,13 +23,15 @@
     <div class="main-area">
 
         <header class="topbar">
-            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <GlobalSearch />
             <div class="topbar-right">
                 <div class="topbar-datetime">
                     <span>@nowText</span>
                 </div>
-                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <LicenseBadge />
+                    <NotificationBell />
                 <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                    <button class="icon-btn" title="تسجيل خروج" @onclick="() => MainShell.Instance?.RequestLogout()">🚪</button>
                 <div class="topbar-user">
                     <div class="avatar">@userInitial</div>
                     <div>

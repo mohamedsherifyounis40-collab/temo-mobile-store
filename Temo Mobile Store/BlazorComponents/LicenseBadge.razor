@@ -1,0 +1,47 @@
+@* نفس منطق MainShell.BuildLicenseBadge بالظبط - عرض تذكيري بس (البرنامج أصلاً مبيوصلش
+   هنا غير لو الترخيص سليم وقت التشغيل) *@
+
+@if (expiration.HasValue)
+{
+    <div class="license-badge" style="--badge-color:@accentColor">@icon @text</div>
+}
+
+@code {
+    private DateTime? expiration;
+    private string icon = "";
+    private string text = "";
+    private string accentColor = "";
+
+    protected override void OnInitialized()
+    {
+        if (!LicenseManager.CheckSavedLicense(out expiration, out _) || !expiration.HasValue)
+            return;
+
+        int daysLeft = (expiration.Value.Date - DateTime.Now.Date).Days;
+
+        if (daysLeft < 0)
+        {
+            accentColor = "#E74C3C";
+            icon = "⛔";
+            text = "الترخيص منتهي";
+        }
+        else if (daysLeft <= 7)
+        {
+            accentColor = "#E74C3C";
+            icon = "⚠️";
+            text = $"باقي {daysLeft} يوم على الترخيص";
+        }
+        else if (daysLeft <= 30)
+        {
+            accentColor = "#F39C12";
+            icon = "⏳";
+            text = $"باقي {daysLeft} يوم على الترخيص";
+        }
+        else
+        {
+            accentColor = "#27AE60";
+            icon = "✅";
+            text = "الترخيص ساري";
+        }
+    }
+}
