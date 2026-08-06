@@ -1,0 +1,100 @@
+@using System.Windows.Forms
+
+<div class="login-page">
+    <div class="login-card">
+        <img src="images/logo.png" class="login-logo" alt="Temo Mobile Store" />
+        <div class="login-title">مرحباً بك في نظام إدارة المحل</div>
+        <div class="login-subtitle">يرجى تسجيل الدخول للمتابعة</div>
+
+        <form @onsubmit="HandleLogin" @onsubmit:preventDefault="true">
+            <label class="field-label">اسم المستخدم</label>
+            <input class="field-input" value="@username" @oninput="e => username = e.Value?.ToString() ?? string.Empty"
+                   placeholder="أدخل اسم المستخدم" disabled="@isSubmitting" />
+
+            <label class="field-label">كلمة المرور</label>
+            <input class="field-input" type="password" value="@password" @oninput="e => password = e.Value?.ToString() ?? string.Empty"
+                   placeholder="أدخل كلمة المرور" disabled="@isSubmitting" />
+
+            <label class="login-remember">
+                <input type="checkbox" checked="@rememberMe" @oninput="e => rememberMe = (bool)(e.Value ?? false)" />
+                تذكرني
+            </label>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error" style="margin-top:12px;">@errorMessage</div>
+            }
+
+            <button type="submit" class="btn btn-primary login-submit-btn" disabled="@isSubmitting">
+                🔒 تسجيل الدخول
+            </button>
+        </form>
+
+        <div class="login-divider"><span>أو</span></div>
+
+        <div class="login-trust-row">
+            <div class="login-trust-item">
+                <div class="login-trust-title">🛡️ آمن وسريع</div>
+                <div class="login-trust-sub">بياناتك محمية بالكامل</div>
+            </div>
+            <div class="login-trust-item login-trust-item-end" @onclick="OpenSupport">
+                <div class="login-trust-title">🎧 تحتاج مساعدة؟</div>
+                <div class="login-trust-sub">تواصل مع الدعم الفني</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="login-footer">Temo Mobile Store © 2026</div>
+</div>
+
+@code {
+    private string username = "";
+    private string password = "";
+    private bool rememberMe = false;
+    private string errorMessage = "";
+    private bool isSubmitting = false;
+
+    private void HandleLogin()
+    {
+        errorMessage = "";
+
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "من فضلك أدخل اسم المستخدم وكلمة المرور.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        bool isDefaultAdminLogin = AuthManager.IsDefaultAdminLogin(username, password);
+        string role = AuthManager.TryLogin(username, password);
+        if (role == null)
+        {
+            errorMessage = "اسم المستخدم أو كلمة المرور غلط.";
+            password = "";
+            isSubmitting = false;
+            return;
+        }
+
+        if (isDefaultAdminLogin)
+        {
+            using (var changeForm = new ForceChangePasswordForm(AuthManager.CurrentUsername))
+            {
+                if (changeForm.ShowDialog(LoginPageBlazorHost.Instance) != DialogResult.OK)
+                {
+                    errorMessage = "لازم تغيّر كلمة المرور الافتراضية قبل ما تكمل.";
+                    password = "";
+                    isSubmitting = false;
+                    return;
+                }
+            }
+        }
+
+        LoginPageBlazorHost.Instance?.CompleteLogin();
+    }
+
+    private void OpenSupport()
+    {
+        WhatsAppHelper.SendMessage("01147114296", "مرحبًا، محتاج مساعدة في برنامج Temo Mobile Store", LoginPageBlazorHost.Instance);
+    }
+}

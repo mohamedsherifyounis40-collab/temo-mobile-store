@@ -43,7 +43,7 @@ namespace Temo_Mobile_Store
             bool keepRunning = true;
             while (keepRunning)
             {
-                using (LoginForm loginForm = new LoginForm())
+                using (LoginPageBlazorHost loginForm = new LoginPageBlazorHost())
                 {
                     if (loginForm.ShowDialog() != DialogResult.OK)
                     {

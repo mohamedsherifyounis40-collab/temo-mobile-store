@@ -448,6 +448,14 @@
             todayExpenses = GetSumScalar(conn, "SELECT SUM(Amount) FROM Expenses WHERE ExpenseDate LIKE @D", today);
             newCustomersToday = GetNewCustomersCount(conn, today);
 
+            // لازم نصفّر كل الليستات هنا لأن LoadDashboard بتتنادى كل 30 ثانية من التايمر
+            // (راجع OnInitialized) وهي فيلدز على مستوى الكلاس - من غير التصفير كانت بتتراكم
+            // نسخ مكررة من نفس البيانات في كل تحديث بدل ما تتحدّث بس.
+            methodBalances.Clear();
+            totalBalance = 0;
+            latestInvoices.Clear();
+            lowStockProducts.Clear();
+
             foreach (string method in UIHelpers.PaymentMethods)
             {
                 using var cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn);
@@ -563,6 +571,7 @@
 
     private void LoadNotifications(SqliteConnection conn)
     {
+        notificationRows.Clear();
         var bellItems = new List<(string Icon, string Text)>();
 
         using (var cmd = new SqliteCommand("SELECT ProductName, Quantity FROM Products WHERE Quantity <= 3 ORDER BY Quantity ASC LIMIT 8", conn))
@@ -623,6 +632,7 @@
 
     private void LoadRecentActivity(SqliteConnection conn)
     {
+        recentActivity.Clear();
         using (var cmd = new SqliteCommand("SELECT ProductName, Total, SaleDate FROM Sales ORDER BY SaleID DESC LIMIT 8", conn))
         using (var r = cmd.ExecuteReader())
         {

@@ -177,8 +177,12 @@ namespace Temo_Mobile_Store
             autoRefreshTimer.Tick += (s, e) =>
             {
                 // BuildHomeDashboardPage بقت idempotent (بترجع فورًا لو الكونترول موجود بالفعل) - التحديث
-                // الفعلي للبيانات بقى مسؤولية HomePage.razor الداخلية (تايمرها بتاعها كل 30 ثانية)
-                BuildHomeDashboardPage();
+                // الفعلي للبيانات بقى مسؤولية HomePage.razor الداخلية (تايمرها بتاعها كل 30 ثانية،
+                // شغال حتى لو الكونترول مخفي). لازم نتأكد إن المستخدم واقف في شاشة الرئيسية فعلاً قبل
+                // ما ننادي عليها، لأن ShowPageInline بتظهرها وتخفي أي شاشة تانية مفتوحة - من غير الشرط
+                // ده كان التايمر بيرجّع المستخدم لشاشة الرئيسية بالقوة كل دقيقة حتى لو واقف في شاشة تانية.
+                if (currentPageKey == PageKeys.Home)
+                    BuildHomeDashboardPage();
             };
             autoRefreshTimer.Start();
 
