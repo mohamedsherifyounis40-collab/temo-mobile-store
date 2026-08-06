@@ -470,7 +470,7 @@ namespace Temo_Mobile_Store
                 return;
 
             pnlContent.Controls.Clear();
-            homeDashboardHost = new HomePageBlazorHost(embedded: true);
+            homeDashboardHost = new HomePageBlazorHost();
             pnlContent.Controls.Add(homeDashboardHost);
         }
 
