@@ -36,7 +36,6 @@ namespace Temo_Mobile_Store
             // ملحوظة: "Home" لسه بتاعة الداشبورد القديم عمدًا (راجع تعليق navItems) - كل باقي
             // الشاشات القديمة اتشالت خالص والمفاتيح الجديدة (Blazor) بقت هي الأساسية.
             public const string Home = "Home";
-            public const string HomeBlazor = "HomeBlazor";
             public const string SalesBlazor = "SalesBlazor";
             public const string InventoryBlazor = "InventoryBlazor";
             public const string InventoryCountBlazor = "InventoryCountBlazor";
@@ -88,6 +87,7 @@ namespace Temo_Mobile_Store
         private Panel pnlSidebar;
         private Panel pnlTopBar;
         private Panel pnlContent;
+        private HomePageBlazorHost homeDashboardHost;
         private Label lblPageTitle;
         private Label lblDate;
         private Label lblBell;
@@ -109,11 +109,10 @@ namespace Temo_Mobile_Store
         // ملحوظة: ده مجرد تعريف مؤقت للتجربة. في خطوة 4 هنربط كل مفتاح بالـ UserControl الحقيقي بتاعه.
         private readonly (string Key, string Text, string Icon)[] navItems = new (string, string, string)[]
         {
-            // ملحوظة: "الرئيسية" لسه بتاعة الداشبورد القديم عمدًا (مش Blazor) - هو الوحيد
-            // اللي معماريته مختلفة عن باقي الشاشات (مبني جوه pnlContent نفسه وبيتحدّث كل دقيقة
-            // تلقائيًا بدل ما يبقى نافذة منفصلة زي الباقي)، فسيبناه لحد ما يتراجع بعناية في مرحلة تانية.
+            // ملحوظة: "الرئيسية" بقت Blazor Hybrid زي الباقي، بس لسه استثناء معماري -
+            // مبنية جوه pnlContent نفسه (مش نافذة منفصلة زي كل شاشة تانية) عشان تفضل
+            // المحتوى الدائم تحت أي نافذة تانية مفتوحة (راجع BuildHomeDashboardPage).
             (PageKeys.Home,           "الرئيسية",   "🏠"),
-            (PageKeys.HomeBlazor,     "الرئيسية (تجربة) 🧪", "🧪"),
             (PageKeys.SalesBlazor,    "المبيعات",   "🛒"),
             (PageKeys.InventoryBlazor,"المخزون",    "🗄️"),
             (PageKeys.InventoryCountBlazor, "جرد المخزن", "📋"),
@@ -898,7 +897,7 @@ namespace Temo_Mobile_Store
             {
                 Dock = DockStyle.Fill,
                 BackColor = ColorContentBg,
-                Padding = new Padding(16),
+                Padding = Padding.Empty,
                 AutoScroll = true
             };
 
@@ -939,8 +938,6 @@ namespace Temo_Mobile_Store
 
             if (pageKey == PageKeys.Home)
                 BuildHomeDashboardPage();
-            else if (pageKey == PageKeys.HomeBlazor)
-                BuildHomeBlazorPage();
             else if (pageKey == PageKeys.SalesBlazor)
                 BuildSalesBlazorPage();
             else if (pageKey == PageKeys.InventoryBlazor)
@@ -1057,13 +1054,6 @@ namespace Temo_Mobile_Store
             OpenPageWindow(PageKeys.SalesBlazor, "المبيعات (تجربة)", () => new SalesPageBlazorHost());
         }
 
-        // تجربة شاشة رئيسية جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن داشبورد
-        // الرئيسية الأصلي (اللي بيتبني جوه pnlContent نفسه)، بنفس نمط SalesBlazor بالظبط
-        private void BuildHomeBlazorPage()
-        {
-            OpenPageWindow(PageKeys.HomeBlazor, "الرئيسية (تجربة)", () => new HomePageBlazorHost());
-        }
-
         // تجربة شاشة مخزون جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
         // المخزون الأصلية، بنفس نمط SalesBlazor/HomeBlazor بالظبط
         private void BuildInventoryBlazorPage()
@@ -1109,7 +1099,25 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         // بناء صفحة "الرئيسية" بكروت الـ KPI - بيانات حقيقية من قاعدة البيانات (لليوم الحالي)
         // ==========================================================================
+        // ==========================================================================
+        // بناء صفحة "الرئيسية" - بقت Blazor Hybrid (HomePageBlazorHost) زي كل الشاشات
+        // التانية دلوقتي، لكن لسه استثناء معماري واحد: بتتبني مرة واحدة بس جوه pnlContent
+        // نفسه (مش نافذة منفصلة زي الباقي) عشان تفضل هي المحتوى الدائم تحت أي نافذة تانية
+        // مفتوحة. التايمر العام (StartAutoRefreshTimer) بينادي الدالة دي كل دقيقة زي الأول
+        // بالظبط، لكن دلوقتي بترجع فورًا لو الكونترول موجود بالفعل - تحديث البيانات نفسه
+        // بقى مسؤولية HomePage.razor الداخلية (نفس تايمر الساعة بتاعها، كل 30 ثانية).
+        // ==========================================================================
         private void BuildHomeDashboardPage()
+        {
+            if (homeDashboardHost != null && !homeDashboardHost.IsDisposed && pnlContent.Controls.Contains(homeDashboardHost))
+                return;
+
+            pnlContent.Controls.Clear();
+            homeDashboardHost = new HomePageBlazorHost(embedded: true);
+            pnlContent.Controls.Add(homeDashboardHost);
+        }
+
+        private void BuildHomeDashboardPageOld()
         {
             // لازم نوقف ونشيل تايمرات عدّاد الكروت القديمة قبل ما نمسح الكونترولز - التايمرات
             // مش Control فمش بتتشال تلقائيًا مع Controls.Clear()، ولو سبناها شغالة هتفضل تحاول

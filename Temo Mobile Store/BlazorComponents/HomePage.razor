@@ -5,36 +5,42 @@
 
 <div class="app-shell">
 
-    <aside class="sidebar">
-        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
-        <nav class="sidebar-nav">
-            @foreach (var item in NavItems)
-            {
-                bool isCurrent = item.Key == MainShell.PageKeys.HomeBlazor;
-                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
-                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
-                </button>
-            }
-        </nav>
-    </aside>
+    @if (!Embedded)
+    {
+        <aside class="sidebar">
+            <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+            <nav class="sidebar-nav">
+                @foreach (var item in NavItems)
+                {
+                    bool isCurrent = item.Key == MainShell.PageKeys.Home;
+                    <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                        <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                    </button>
+                }
+            </nav>
+        </aside>
+    }
 
     <div class="main-area">
 
-        <header class="topbar">
-            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
-            <div class="topbar-right">
-                <div class="topbar-datetime"><span>@nowText</span></div>
-                <button class="icon-btn" disabled title="قريبًا">🔔</button>
-                <button class="icon-btn" disabled title="قريبًا">🌙</button>
-                <div class="topbar-user">
-                    <div class="avatar">@userInitial</div>
-                    <div>
-                        <div class="user-name">@userName</div>
-                        <div class="user-role">@userRole</div>
+        @if (!Embedded)
+        {
+            <header class="topbar">
+                <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+                <div class="topbar-right">
+                    <div class="topbar-datetime"><span>@nowText</span></div>
+                    <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                    <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                    <div class="topbar-user">
+                        <div class="avatar">@userInitial</div>
+                        <div>
+                            <div class="user-name">@userName</div>
+                            <div class="user-role">@userRole</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </header>
+            </header>
+        }
 
         <div class="page-body">
 
@@ -265,12 +271,16 @@
 </div>
 
 @code {
+    // لو الشاشة مُضمّنة جوه MainShell نفسها (الرئيسية الحقيقية) بنشيل السايدبار/التوب بار
+    // الخاصين بيها لأن MainShell أصلاً معاه سايدبار حقيقي دايم - نفس الفكرة بالظبط
+    // بتتفعّل بس لما تتفتح كنافذة منفصلة (BuildHomeBlazorPage التجريبية)
+    [Parameter] public bool Embedded { get; set; }
+
     private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
 
     private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
     {
         (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
-        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
         (MainShell.PageKeys.SalesBlazor,    "المبيعات",   "🛒"),
         (MainShell.PageKeys.InventoryBlazor,"المخزون",    "🗄️"),
         (MainShell.PageKeys.InventoryCountBlazor, "جرد المخزن", "📋"),
@@ -340,7 +350,10 @@
 
         RefreshNow();
         clockTimer = new System.Timers.Timer(30000);
-        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        // بيحدّث الوقت وبيانات الداشبورد مع بعض كل 30 ثانية - الداشبورد ده بقى المحتوى
+        // الدائم لشاشة "الرئيسية" (مبني مرة واحدة بس جوه MainShell)، فمحتاج يجدد بياناته
+        // بنفسه لوحده بدل ما MainShell يعيد بناء الكونترول كله زي ما كان بيعمل قديمًا
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); LoadDashboard(); StateHasChanged(); });
         clockTimer.Start();
 
         LoadDashboard();
