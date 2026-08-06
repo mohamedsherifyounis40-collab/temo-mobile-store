@@ -65,12 +65,13 @@ namespace Temo_Mobile_Store
         // الرئيسية) بقت بتوفر سايدبار/توب بار خاص بيها Blazor. pnlContent بقت تاخد
         // نافذة MainShell كلها وتستضيف شاشة "الرئيسية" بس (المضمّنة، راجع BuildHomeDashboardPage).
         private Panel pnlContent;
-        private HomePageBlazorHost homeDashboardHost;
         private string currentPageKey = null;
 
-        // نافذة مستقلة لكل صفحة (غير الرئيسية) بتتفتح لما تُضغط من السايدبار.
-        // مفتاح الصفحة → الفورم المفتوح ليها حاليًا، عشان لو اتضغطت تاني وهي مفتوحة نجيبها لقدام بدل ما نفتح نسخة جديدة.
-        private readonly Dictionary<string, Form> openPageWindows = new Dictionary<string, Form>();
+        // كل شاشات البرنامج بقت بتتعرض جوه pnlContent نفسها (مش نوافذ منفصلة) - الكونترول
+        // بتاع كل شاشة بيتبني مرة واحدة بس أول ما تُفتح، وبعد كده بيفضل موجود في الذاكرة
+        // (مخفي بس، مش متشال/متقفل) عشان أي بيانات مؤقتة (سلة بيع لسه مش متأكدة، فورم
+        // نص مكتوب) تفضل محفوظة لما المستخدم يرجع للشاشة دي تاني
+        private readonly Dictionary<string, Control> pageControls = new Dictionary<string, Control>();
 
         // تايمر التحديث التلقائي: بيحدّث جرس الإشعارات، وكمان يعيد بناء صفحة الداشبورد
         // لو هي المفتوحة دلوقتي، عشان الأرقام تفضل حديثة من غير ما المستخدم يغيّر الصفحة يدويًا
@@ -108,9 +109,9 @@ namespace Temo_Mobile_Store
 
         // ==========================================================================
         // MainShell عمليًا Singleton - نسخة واحدة بس حية في كل لحظة (راجع حلقة تسجيل
-        // الدخول/الخروج في Program.cs). ده مرجع ثابت ليها عشان أي نافذة صفحة تانية (زي
-        // نافذة المبيعات المستقلة) تقدر تفتح صفحة تانية بنفس منطق الـ Sidebar الأصلي
-        // (OpenPageWindow/openPageWindows) من غير ما نكرر المنطق ده في كل شاشة.
+        // الدخول/الخروج في Program.cs). ده مرجع ثابت ليها عشان أي شاشة Blazor (من
+        // السايدبار بتاعها) تقدر تنادي OpenPageByKey → NavigateToPageKey → ShowPageInline
+        // وتغيّر محتوى نفس نافذة MainShell من غير ما تكرر منطق التنقل في كل شاشة.
         // ==========================================================================
         public static MainShell Instance { get; private set; }
 
@@ -324,46 +325,25 @@ namespace Temo_Mobile_Store
         }
 
         // ==========================================================================
-        // بيفتح صفحة تاب السايدبار (غير الرئيسية) في نافذة مستقلة بدل ما تستبدل محتوى الشاشة الرئيسية.
-        // لو الصفحة دي مفتوحة بالفعل في نافذة، بيجيبها لقدام (Activate/BringToFront) بدل ما يفتح نسخة جديدة.
+        // بيعرض شاشة بمفتاحها جوه pnlContent نفسها (بدل نافذة منفصلة) - أول مرة بيتبني
+        // فيها الكونترول ويتضاف؛ بعد كده بيفضل موجود في pnlContent.Controls بس مخفي
+        // (Visible = false) لما يتحول لشاشة تانية، عشان حالته (سلة بيع، فورم نص مكتوب)
+        // تفضل محفوظة لحد ما المستخدم يرجعلها تاني - مش بيتعمله Dispose خالص.
         // ==========================================================================
-        private Form OpenPageWindow(string pageKey, string title, Func<Control> createControl)
+        private void ShowPageInline(string pageKey, Func<Control> createControl)
         {
-            if (openPageWindows.TryGetValue(pageKey, out Form existing) && !existing.IsDisposed)
+            if (!pageControls.TryGetValue(pageKey, out Control control) || control.IsDisposed)
             {
-                if (existing.WindowState == FormWindowState.Minimized)
-                    existing.WindowState = FormWindowState.Normal;
-                existing.Activate();
-                existing.BringToFront();
-                return existing;
+                control = createControl();
+                control.Dock = DockStyle.Fill;
+                pageControls[pageKey] = control;
+                pnlContent.Controls.Add(control);
             }
 
-            Form pageForm = new Form
-            {
-                Text = title,
-                StartPosition = FormStartPosition.Manual,
-                RightToLeft = RightToLeft.Yes,
-                RightToLeftLayout = true,
-                Font = this.Font, // لازم نفس فونت MainShell بالظبط، وإلا الـ AutoScale بتاع الفورم بيلخبط كل الإحداثيات الثابتة جوه الصفحة (تراكب اللابلز، وأعمدة الجدول بتختفي)
-                Owner = this, // عشان تتقفل تلقائيًا لو البرنامج الرئيسي اتقفل
-                KeyPreview = true, // عشان اختصارات F2/F4/F5/F6 وCtrl+F (البحث الشامل) تشتغل من جوه النافذة دي كمان، مش بس من MainShell نفسه
-            };
-            pageForm.KeyDown += MainShell_KeyDown;
-            try { pageForm.Icon = this.Icon; } catch { }
+            foreach (Control c in pnlContent.Controls)
+                c.Visible = (c == control);
 
-            // بنحط الأبعاد يدويًا على مساحة الشاشة الفعلية (WorkingArea، يعني من غير الـ Taskbar)
-            // بدل الاعتماد على WindowState.Maximized قبل ما الفورم يتعرض، عشان ده بيسبب أحيانًا
-            // مقاسات غلط (خصوصًا مع الفورم المالكة Owner) بدل ما ياخد المساحة كاملة فعلًا
-            pageForm.Bounds = Screen.FromControl(this).WorkingArea;
-
-            Control pageControl = createControl();
-            pageControl.Dock = DockStyle.Fill;
-            pageForm.Controls.Add(pageControl);
-
-            pageForm.FormClosed += (s, e) => openPageWindows.Remove(pageKey);
-            openPageWindows[pageKey] = pageForm;
-            pageForm.Show();
-            return pageForm;
+            control.BringToFront();
         }
 
         // ==========================================================================
@@ -371,14 +351,14 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildSettingsBlazorPage()
         {
-            OpenPageWindow(PageKeys.SettingsBlazor, "الإعدادات", () => new SettingsPageBlazorHost());
+            ShowPageInline(PageKeys.SettingsBlazor, () => new SettingsPageBlazorHost());
         }
 
-        // تجربة شاشة حسابات جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // تجربة شاشة حسابات جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة
         // الحسابات الأصلية، بنفس نمط InventoryBlazor بالظبط (أدمن بس زي الأصلية)
         private void BuildAccountsBlazorPage()
         {
-            OpenPageWindow(PageKeys.AccountsBlazor, "الحسابات", () => new AccountsPageBlazorHost());
+            ShowPageInline(PageKeys.AccountsBlazor, () => new AccountsPageBlazorHost());
         }
 
         // ==========================================================================
@@ -386,7 +366,7 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildAttendanceBlazorPage()
         {
-            OpenPageWindow(PageKeys.AttendanceBlazor, "الحضور والمرتبات", () => new AttendancePageBlazorHost());
+            ShowPageInline(PageKeys.AttendanceBlazor, () => new AttendancePageBlazorHost());
         }
 
         // ==========================================================================
@@ -394,85 +374,75 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildReportsBlazorPage()
         {
-            OpenPageWindow(PageKeys.ReportsBlazor, "التقارير", () => new ReportsPageBlazorHost());
+            ShowPageInline(PageKeys.ReportsBlazor, () => new ReportsPageBlazorHost());
         }
 
-        // تجربة شاشة جرد مخزن جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // تجربة شاشة جرد مخزن جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة
         // جرد المخزن الأصلية، بنفس نمط InventoryBlazor بالظبط (أدمن بس زي الأصلية)
         private void BuildInventoryCountBlazorPage()
         {
-            OpenPageWindow(PageKeys.InventoryCountBlazor, "جرد المخزن", () => new InventoryCountPageBlazorHost());
+            ShowPageInline(PageKeys.InventoryCountBlazor, () => new InventoryCountPageBlazorHost());
         }
 
-        // تجربة شاشة مبيعات جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // تجربة شاشة مبيعات جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة
         // المبيعات الأصلية، بنفس نمط فتح أي صفحة تانية بالظبط (OpenPageWindow)
         private void BuildSalesBlazorPage()
         {
-            OpenPageWindow(PageKeys.SalesBlazor, "المبيعات (تجربة)", () => new SalesPageBlazorHost());
+            ShowPageInline(PageKeys.SalesBlazor, () => new SalesPageBlazorHost());
         }
 
-        // تجربة شاشة مخزون جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // تجربة شاشة مخزون جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة
         // المخزون الأصلية، بنفس نمط SalesBlazor/HomeBlazor بالظبط
         private void BuildInventoryBlazorPage()
         {
-            OpenPageWindow(PageKeys.InventoryBlazor, "المخزون (تجربة)", () => new InventoryPageBlazorHost());
+            ShowPageInline(PageKeys.InventoryBlazor, () => new InventoryPageBlazorHost());
         }
 
-        // تجربة شاشة عملاء جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // تجربة شاشة عملاء جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة
         // العملاء الأصلية، بنفس نمط SalesBlazor/HomeBlazor/InventoryBlazor بالظبط
         private void BuildCustomersBlazorPage()
         {
-            OpenPageWindow(PageKeys.CustomersBlazor, "العملاء (تجربة)", () => new CustomersPageBlazorHost());
+            ShowPageInline(PageKeys.CustomersBlazor, () => new CustomersPageBlazorHost());
         }
 
-        // تجربة شاشة موردين جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // تجربة شاشة موردين جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة
         // الموردين الأصلية، بنفس نمط SalesBlazor/HomeBlazor/InventoryBlazor/CustomersBlazor بالظبط
         private void BuildSuppliersBlazorPage()
         {
-            OpenPageWindow(PageKeys.SuppliersBlazor, "الموردين (تجربة)", () => new SuppliersPageBlazorHost());
+            ShowPageInline(PageKeys.SuppliersBlazor, () => new SuppliersPageBlazorHost());
         }
 
         // تجربة شاشة مشتريات جديدة (Blazor Hybrid) - مفيش شاشة قديمة مستقلة تتقارن بيها
         // (فاتورة الشراء كانت جوه شاشة الموردين بس)، بنفس نمط SalesBlazor بالظبط
         private void BuildPurchasesBlazorPage()
         {
-            OpenPageWindow(PageKeys.PurchasesBlazor, "المشتريات (تجربة)", () => new PurchasesPageBlazorHost());
+            ShowPageInline(PageKeys.PurchasesBlazor, () => new PurchasesPageBlazorHost());
         }
 
-        // تجربة شاشة صيانة جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // تجربة شاشة صيانة جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة
         // الصيانة الأصلية، بنفس نمط InventoryBlazor بالظبط
         private void BuildMaintenanceBlazorPage()
         {
-            OpenPageWindow(PageKeys.MaintenanceBlazor, "الصيانة (تجربة)", () => new MaintenancePageBlazorHost());
+            ShowPageInline(PageKeys.MaintenanceBlazor, () => new MaintenancePageBlazorHost());
         }
 
-        // تجربة شاشة خزينة جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // تجربة شاشة خزينة جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة
         // الخزينة الأصلية، بنفس نمط InventoryBlazor بالظبط
         private void BuildTreasuryBlazorPage()
         {
-            OpenPageWindow(PageKeys.TreasuryBlazor, "الخزينة (تجربة)", () => new TreasuryPageBlazorHost());
+            ShowPageInline(PageKeys.TreasuryBlazor, () => new TreasuryPageBlazorHost());
         }
 
         // ==========================================================================
         // بناء صفحة "الرئيسية" بكروت الـ KPI - بيانات حقيقية من قاعدة البيانات (لليوم الحالي)
         // ==========================================================================
         // ==========================================================================
-        // بناء صفحة "الرئيسية" - بقت Blazor Hybrid (HomePageBlazorHost) زي كل الشاشات
-        // التانية دلوقتي، لكن لسه استثناء معماري واحد: بتتبني مرة واحدة بس جوه pnlContent
-        // نفسه (مش نافذة منفصلة زي الباقي) عشان تفضل هي المحتوى الدائم تحت أي نافذة تانية
-        // مفتوحة. التايمر العام (StartAutoRefreshTimer) بينادي الدالة دي كل دقيقة زي الأول
-        // بالظبط، لكن دلوقتي بترجع فورًا لو الكونترول موجود بالفعل - تحديث البيانات نفسه
-        // بقى مسؤولية HomePage.razor الداخلية (نفس تايمر الساعة بتاعها، كل 30 ثانية).
+        // بناء صفحة "الرئيسية" - Blazor Hybrid (HomePageBlazorHost) زي كل الشاشات التانية
+        // بالظبط دلوقتي (نفس آلية ShowPageInline). التايمر العام (StartAutoRefreshTimer)
+        // بينادي الدالة دي كل دقيقة زي الأول، لكن ShowPageInline بترجع فورًا لو الكونترول
+        // موجود بالفعل - تحديث البيانات نفسه بقى مسؤولية HomePage.razor الداخلية (تايمرها كل 30 ثانية).
         // ==========================================================================
-        private void BuildHomeDashboardPage()
-        {
-            if (homeDashboardHost != null && !homeDashboardHost.IsDisposed && pnlContent.Controls.Contains(homeDashboardHost))
-                return;
-
-            pnlContent.Controls.Clear();
-            homeDashboardHost = new HomePageBlazorHost();
-            pnlContent.Controls.Add(homeDashboardHost);
-        }
+        private void BuildHomeDashboardPage() => ShowPageInline(PageKeys.Home, () => new HomePageBlazorHost());
 
         private void BuildHomeDashboardPageOld()
         {
