@@ -1,0 +1,23 @@
+/* شاشة الخزينة الجديدة (Blazor Hybrid) - تخصيصات خاصة بالشاشة دي بس، فوق list-template.css */
+
+.balances-card { margin-bottom: 16px; }
+.balances-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.balance-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-app);
+    flex: 1;
+    min-width: 130px;
+}
+.balance-icon { font-size: 18px; }
+.balance-value { font-size: 13px; font-weight: bold; color: var(--color-text); }
+.balance-label { font-size: 11px; color: var(--color-text-muted); }
+.balance-total { background: var(--color-accent); border-color: var(--color-accent); }
+.balance-total .balance-value, .balance-total .balance-label { color: #fff; }
+
+.grid-mid-treasury { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 900px) { .grid-mid-treasury { grid-template-columns: 1fr; } }

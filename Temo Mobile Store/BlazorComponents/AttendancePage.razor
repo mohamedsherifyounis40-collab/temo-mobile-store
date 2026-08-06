@@ -1,0 +1,847 @@
+@using System.Data
+@using System.Globalization
+@using TemoStore.Core.Commands
+@using TemoStore.Core.Exceptions
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.AttendanceBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>🧑‍💼 الحضور والمرتبات</h1>
+                    <div class="breadcrumb">الحضور والمرتبات &gt; تسجيل الحضور، الرواتب، وإدارة الموظفين</div>
+                </div>
+            </div>
+
+            @if (!AuthManager.IsAdmin)
+            {
+                <div class="alert alert-error">⚠️ الشاشة دي للمدير بس - مش عندك صلاحية الوصول ليها.</div>
+            }
+            else
+            {
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-error">⚠️ @errorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="alert alert-success">✅ @successMessage</div>
+                }
+
+                <div class="list-tabs">
+                    <button class="list-tab @(activeTab == "Attendance" ? "active" : "")" @onclick='() => SwitchTab("Attendance")'>📅 تسجيل الحضور اليومي</button>
+                    <button class="list-tab @(activeTab == "Payroll" ? "active" : "")" @onclick='() => SwitchTab("Payroll")'>💰 كشف الرواتب</button>
+                    <button class="list-tab @(activeTab == "Statement" ? "active" : "")" @onclick='() => SwitchTab("Statement")'>📋 كشف حساب موظف</button>
+                    <button class="list-tab @(activeTab == "Employees" ? "active" : "")" @onclick='() => SwitchTab("Employees")'>👥 إدارة الموظفين</button>
+                </div>
+
+                @if (activeTab == "Attendance")
+                {
+                    <div class="card">
+                        <div class="list-toolbar">
+                            <div>
+                                <label class="field-label">التاريخ</label>
+                                <input class="field-input" type="date" value="@attendanceDate.ToString("yyyy-MM-dd")"
+                                       @onchange="e => { attendanceDate = DateTime.Parse(e.Value!.ToString()!); LoadAttendance(); }" />
+                            </div>
+                            <button class="btn btn-primary" @onclick="SaveAttendance">💾 حفظ الحضور</button>
+                        </div>
+
+                        <div class="data-table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th>الاسم</th><th>الحالة</th><th>ساعات إضافية</th></tr></thead>
+                                <tbody>
+                                    @foreach (var row in attendanceRows)
+                                    {
+                                        <tr>
+                                            <td>@row.Name</td>
+                                            <td>
+                                                <select class="field-input" @bind="row.Status">
+                                                    <option value="">-- اختر --</option>
+                                                    <option value="@AttendanceRepository.StatusPresent">@AttendanceRepository.StatusPresent</option>
+                                                    <option value="@AttendanceRepository.StatusAbsent">@AttendanceRepository.StatusAbsent</option>
+                                                    <option value="@AttendanceRepository.StatusLeave">@AttendanceRepository.StatusLeave</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input class="field-input" style="max-width:100px" value="@row.OvertimeHours"
+                                                       @oninput='e => row.OvertimeHours = e.Value?.ToString() ?? "0"' />
+                                            </td>
+                                        </tr>
+                                    }
+                                    @if (attendanceRows.Count == 0)
+                                    {
+                                        <tr><td colspan="3" class="empty-row">مفيش موظفين مسجّلين</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else if (activeTab == "Payroll")
+                {
+                    <div class="card">
+                        <div class="list-toolbar">
+                            <div>
+                                <label class="field-label">الشهر</label>
+                                <input class="field-input" type="month" value="@($"{payrollYear:0000}-{payrollMonth:00}")" @onchange="OnPayrollMonthChanged" />
+                            </div>
+                            <div class="employee-form-actions">
+                                <button class="btn btn-danger-outline" @onclick="ClosePayrollMonth">🔒 قفل الشهر لكل الموظفين</button>
+                                <button class="btn btn-outline" @onclick="ReopenPayrollMonth">🔓 إلغاء قفل الشهر</button>
+                            </div>
+                        </div>
+
+                        <div class="data-table-wrap">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>الاسم</th><th>المرتب الشهري</th><th>قيمة اليوم</th><th>قيمة الساعة</th>
+                                        <th>أيام الحضور</th><th>أيام الغياب</th><th>أيام الإجازة</th>
+                                        <th>ساعات إضافية</th><th>قيمة الإضافي</th><th>الراتب الصافي</th><th>الحالة</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in payrollRows)
+                                    {
+                                        <tr>
+                                            <td>@r.Name</td><td>@r.MonthlySalary</td><td>@r.DayValue</td><td>@r.HourValue</td>
+                                            <td>@r.PresentDays</td><td>@r.AbsentDays</td><td>@r.LeaveDays</td>
+                                            <td>@r.OvertimeHours</td><td>@r.OvertimeAmount</td><td>@r.NetSalary</td>
+                                            <td>@(r.IsClosed ? "مقفول 🔒" : "مفتوح")</td>
+                                        </tr>
+                                    }
+                                    @if (payrollRows.Count == 0)
+                                    {
+                                        <tr><td colspan="11" class="empty-row">مفيش بيانات لهذا الشهر</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="payroll-totals">
+                            💰 إجمالي صافي الرواتب لشهر @(new DateTime(payrollYear, payrollMonth, 1).ToString("MMMM yyyy", arCulture)): @payrollTotalNet.ToString("N2") ج.م
+                            (منها @payrollTotalOvertime.ToString("N2") ج.م ساعات إضافية)
+                        </div>
+                    </div>
+                }
+                else if (activeTab == "Statement")
+                {
+                    <div class="grid-mid-attendance">
+                        <div class="card">
+                            <div class="card-title">👤 اختر الموظف</div>
+                            <select class="field-input" value="@(selectedEmployeeId?.ToString() ?? "")" @onchange="OnStatementEmployeeChanged">
+                                <option value="">-- اختر موظف --</option>
+                                @foreach (var e in employeeOptions)
+                                {
+                                    <option value="@e.Id">@e.Name</option>
+                                }
+                            </select>
+                            <button class="btn btn-outline" style="margin-top:10px; width:100%" @onclick="ToggleAdvances">📋 عرض كل السلف الحالية</button>
+
+                            @if (employeeBalance != null)
+                            {
+                                <div class="balance-card">
+                                    <div class="balance-card-value @(employeeBalance < 0 ? "negative" : "positive")">
+                                        الرصيد المستحق: @employeeBalance.Value.ToString("N2") ج.م
+                                    </div>
+                                </div>
+                            }
+
+                            @if (showAdvances)
+                            {
+                                <div class="data-table-wrap">
+                                    <table class="data-table">
+                                        <thead><tr><th>الاسم</th><th>السلفة المستحقة عليه</th></tr></thead>
+                                        <tbody>
+                                            @foreach (var a in advanceRows)
+                                            {
+                                                <tr><td>@a.Name</td><td>@a.Amount</td></tr>
+                                            }
+                                            @if (advanceRows.Count == 0)
+                                            {
+                                                <tr><td colspan="2" class="empty-row">مفيش سلف مستحقة حاليًا</td></tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+
+                            <div class="form-panel-title" style="margin-top:16px">💸 صرف مرتب / سلفة</div>
+                            <div class="form-grid">
+                                <div>
+                                    <label class="field-label">وسيلة الصرف</label>
+                                    <select class="field-input" value="@payMethod" @onchange="e => payMethod = e.Value?.ToString() ?? string.Empty">
+                                        <option value="">اختر وسيلة</option>
+                                        @foreach (var m in UIHelpers.PaymentMethods)
+                                        {
+                                            <option value="@m">@m</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="field-label">نوع الصرف</label>
+                                    <select class="field-input" @bind="payType">
+                                        <option value="دفعة من المستحق">دفعة من المستحق ✅</option>
+                                        <option value="سلفة">سلفة 💵</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="field-label">المبلغ</label>
+                                    <input class="field-input" type="number" value="@payAmount" @oninput="e => payAmount = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">بيان (اختياري)</label>
+                                    <input class="field-input" value="@payDescription" @oninput="e => payDescription = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-primary" @onclick="PayEmployee">✅ صرف المبلغ</button>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-title">📋 كشف الحساب (بالترتيب الزمني)</div>
+                            <div class="data-table-wrap">
+                                <table class="data-table">
+                                    <thead><tr><th>التاريخ</th><th>البيان</th><th>مستحق</th><th>مسحوب</th><th>الرصيد</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var s in statementRows)
+                                        {
+                                            <tr>
+                                                <td class="muted">@s.Date</td><td>@s.Description</td><td>@s.Credit</td><td>@s.Debit</td><td>@s.Balance</td>
+                                            </tr>
+                                        }
+                                        @if (statementRows.Count == 0)
+                                        {
+                                            <tr><td colspan="5" class="empty-row">اختر موظف لعرض كشف حسابه</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="grid-mid-attendance">
+                        <div class="card">
+                            <div class="card-title">🧑‍💼 @(editingEmployeeId == null ? "إضافة موظف جديد" : "تعديل بيانات موظف")</div>
+                            <div class="form-grid">
+                                <div>
+                                    <label class="field-label">الاسم</label>
+                                    <input class="field-input" value="@empName" @oninput="e => empName = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">رقم التليفون</label>
+                                    <input class="field-input" value="@empPhone" @oninput="e => empPhone = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">المرتب الشهري</label>
+                                    <input class="field-input" type="number" value="@empSalary" @oninput="e => empSalary = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">ساعات العمل باليوم</label>
+                                    <input class="field-input" type="number" value="@empHours" @oninput="e => empHours = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">تاريخ التعيين</label>
+                                    <input class="field-input" type="date" value="@empHireDate.ToString("yyyy-MM-dd")" @onchange="e => empHireDate = DateTime.Parse(e.Value!.ToString()!)" />
+                                </div>
+                            </div>
+                            <div class="employee-form-actions">
+                                <button class="btn btn-primary" @onclick="SaveEmployee">💾 @(editingEmployeeId == null ? "إضافة موظف جديد" : "حفظ التعديل")</button>
+                                @if (editingEmployeeId != null)
+                                {
+                                    <button class="btn btn-outline" @onclick="OpenNewEmployeeForm">إلغاء</button>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-title">👥 الموظفين</div>
+                            <div class="data-table-wrap">
+                                <table class="data-table">
+                                    <thead><tr><th></th><th>الاسم</th><th>الهاتف</th><th>المرتب الشهري</th><th>ساعات العمل باليوم</th><th>تاريخ التعيين</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var emp in employees)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="row-actions">
+                                                        <button class="row-action-btn edit" title="تعديل" @onclick="() => OpenEditEmployeeForm(emp)">✏️</button>
+                                                        <button class="row-action-btn delete" title="حذف" @onclick="() => DeleteEmployee(emp)">🗑</button>
+                                                    </div>
+                                                </td>
+                                                <td>@emp.Name</td>
+                                                <td class="muted">@emp.Phone</td>
+                                                <td>@emp.Salary</td>
+                                                <td>@emp.Hours</td>
+                                                <td class="muted">@emp.HireDate</td>
+                                            </tr>
+                                        }
+                                        @if (employees.Count == 0)
+                                        {
+                                            <tr><td colspan="6" class="empty-row">مفيش موظفين مسجّلين</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون (تجربة)", "🧪"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.InventoryCountBlazor, "جرد المخزن (تجربة)", "🧪"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.MaintenanceBlazor,"الصيانة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.CustomersBlazor,"العملاء (تجربة)", "🧪"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.SuppliersBlazor,"الموردين (تجربة)", "🧪"),
+        (MainShell.PageKeys.PurchasesBlazor,"المشتريات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.TreasuryBlazor, "الخزينة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.AccountsBlazor, "الحسابات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor,
+                MainShell.PageKeys.InventoryCount, MainShell.PageKeys.InventoryCountBlazor,
+                MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private string? errorMessage;
+    private string? successMessage;
+    private string activeTab = "Attendance";
+
+    // ---------- تسجيل الحضور اليومي ----------
+    private class AttendanceRow { public int EmployeeId; public string Name = ""; public string Status = ""; public string OvertimeHours = "0"; }
+    private List<AttendanceRow> attendanceRows = new();
+    private DateTime attendanceDate = DateTime.Now.Date;
+
+    // ---------- كشف الرواتب ----------
+    private class PayrollViewRow
+    {
+        public string Name = ""; public string MonthlySalary = ""; public string DayValue = ""; public string HourValue = "";
+        public int PresentDays; public int AbsentDays; public int LeaveDays;
+        public string OvertimeHours = ""; public string OvertimeAmount = ""; public string NetSalary = "";
+        public bool IsClosed;
+    }
+    private List<PayrollViewRow> payrollRows = new();
+    private int payrollYear = DateTime.Now.Year;
+    private int payrollMonth = DateTime.Now.Month;
+    private decimal payrollTotalNet;
+    private decimal payrollTotalOvertime;
+
+    // ---------- كشف حساب موظف ----------
+    private class EmployeeOption { public int Id; public string Name = ""; }
+    private class StatementRow { public string Date = ""; public string Description = ""; public string Credit = ""; public string Debit = ""; public string Balance = ""; }
+    private class AdvanceRow { public string Name = ""; public string Amount = ""; }
+
+    private List<EmployeeOption> employeeOptions = new();
+    private int? selectedEmployeeId;
+    private decimal? employeeBalance;
+    private List<StatementRow> statementRows = new();
+    private bool showAdvances;
+    private List<AdvanceRow> advanceRows = new();
+
+    private string payMethod = "", payType = "دفعة من المستحق", payAmount = "", payDescription = "";
+
+    // ---------- إدارة الموظفين ----------
+    private class EmployeeRow { public int Id; public string Name = ""; public string Phone = ""; public string Salary = ""; public string Hours = ""; public string HireDate = ""; }
+    private List<EmployeeRow> employees = new();
+    private int? editingEmployeeId;
+    private string empName = "", empPhone = "", empSalary = "", empHours = "8";
+    private DateTime empHireDate = DateTime.Now.Date;
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        if (AuthManager.IsAdmin)
+            LoadAttendance();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private void SwitchTab(string tab)
+    {
+        activeTab = tab;
+        errorMessage = null;
+        successMessage = null;
+
+        if (tab == "Attendance") LoadAttendance();
+        else if (tab == "Payroll") LoadPayroll();
+        else if (tab == "Statement") { LoadEmployeeOptions(); LoadStatement(); }
+        else if (tab == "Employees") LoadEmployees();
+    }
+
+    // ==========================================================================
+    // تسجيل الحضور اليومي
+    // ==========================================================================
+    private void LoadAttendance()
+    {
+        attendanceRows.Clear();
+        var dt = AttendanceRepository.GetAttendanceForDate(attendanceDate);
+        foreach (DataRow r in dt.Rows)
+        {
+            attendanceRows.Add(new AttendanceRow
+            {
+                EmployeeId = Convert.ToInt32(r["EmployeeId"]),
+                Name = r["الاسم"].ToString() ?? "",
+                Status = r["الحالة"].ToString() ?? "",
+                OvertimeHours = r["ساعات إضافية"].ToString() ?? "0"
+            });
+        }
+    }
+
+    private void SaveAttendance()
+    {
+        errorMessage = null;
+        successMessage = null;
+        int savedCount = 0;
+
+        try
+        {
+            foreach (var row in attendanceRows)
+            {
+                if (string.IsNullOrEmpty(row.Status)) continue;
+                if (!decimal.TryParse(row.OvertimeHours, out var overtimeHours) || overtimeHours < 0)
+                    overtimeHours = 0;
+
+                AppServices.CoreEngine.Execute(new SetAttendanceStatusCommand
+                {
+                    EmployeeId = row.EmployeeId,
+                    Date = attendanceDate,
+                    Status = row.Status,
+                    OvertimeHours = overtimeHours,
+                    PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+                });
+                savedCount++;
+            }
+        }
+        catch (PayrollMonthClosedException ex)
+        {
+            errorMessage = ex.Message;
+            return;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حصل خطأ أثناء حفظ الحضور: " + ex.Message;
+            return;
+        }
+
+        if (savedCount == 0)
+        {
+            errorMessage = "من فضلك حدد حالة موظف واحد على الأقل قبل الحفظ.";
+            return;
+        }
+
+        successMessage = "تم حفظ الحضور بنجاح.";
+        LoadAttendance();
+    }
+
+    // ==========================================================================
+    // كشف الرواتب
+    // ==========================================================================
+    private void OnPayrollMonthChanged(ChangeEventArgs e)
+    {
+        var parts = (e.Value?.ToString() ?? "").Split('-');
+        if (parts.Length == 2 && int.TryParse(parts[0], out var y) && int.TryParse(parts[1], out var m))
+        {
+            payrollYear = y;
+            payrollMonth = m;
+            LoadPayroll();
+        }
+    }
+
+    private void LoadPayroll()
+    {
+        payrollRows.Clear();
+        payrollTotalNet = 0;
+        payrollTotalOvertime = 0;
+
+        var rows = AttendanceRepository.GetPayrollForMonth(payrollYear, payrollMonth);
+        foreach (var r in rows)
+        {
+            payrollRows.Add(new PayrollViewRow
+            {
+                Name = r.FullName,
+                MonthlySalary = r.MonthlySalary.ToString("N2"),
+                DayValue = r.DayValue.ToString("N2"),
+                HourValue = r.HourValue.ToString("N2"),
+                PresentDays = r.PresentDays,
+                AbsentDays = r.AbsentDays,
+                LeaveDays = r.LeaveDays,
+                OvertimeHours = r.OvertimeHours.ToString("N2"),
+                OvertimeAmount = r.OvertimeAmount.ToString("N2"),
+                NetSalary = r.NetSalary.ToString("N2"),
+                IsClosed = r.IsClosed
+            });
+            payrollTotalNet += r.NetSalary;
+            payrollTotalOvertime += r.OvertimeAmount;
+        }
+    }
+
+    private void ClosePayrollMonth()
+    {
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            int closedCount = AppServices.CoreEngine.Execute(new ClosePayrollMonthCommand
+            {
+                Year = payrollYear,
+                Month = payrollMonth,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = closedCount == 0
+                ? "كل الموظفين شهرهم مقفول بالفعل لهذا الشهر."
+                : $"تم قفل الشهر لـ {closedCount} موظف بنجاح.";
+            LoadPayroll();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حصل خطأ أثناء قفل الشهر: " + ex.Message;
+        }
+    }
+
+    private void ReopenPayrollMonth()
+    {
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            int reopenedCount = AppServices.CoreEngine.Execute(new ReopenPayrollMonthCommand
+            {
+                Year = payrollYear,
+                Month = payrollMonth,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = reopenedCount == 0
+                ? "مفيش أي موظف مقفول لهذا الشهر أصلًا."
+                : $"تم إلغاء قفل الشهر لـ {reopenedCount} موظف بنجاح.";
+            LoadPayroll();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حصل خطأ أثناء إلغاء قفل الشهر: " + ex.Message;
+        }
+    }
+
+    // ==========================================================================
+    // كشف حساب موظف
+    // ==========================================================================
+    private void LoadEmployeeOptions()
+    {
+        employeeOptions.Clear();
+        var dt = AttendanceRepository.GetEmployeesCombo();
+        foreach (DataRow r in dt.Rows)
+            employeeOptions.Add(new EmployeeOption { Id = Convert.ToInt32(r["EmployeeId"]), Name = r["FullName"].ToString() ?? "" });
+    }
+
+    private void OnStatementEmployeeChanged(ChangeEventArgs e)
+    {
+        selectedEmployeeId = int.TryParse(e.Value?.ToString(), out var id) ? id : (int?)null;
+        LoadStatement();
+    }
+
+    private void LoadStatement()
+    {
+        statementRows.Clear();
+        employeeBalance = null;
+        if (selectedEmployeeId == null) return;
+
+        var dt = AttendanceRepository.GetEmployeeStatement(selectedEmployeeId.Value);
+        foreach (DataRow r in dt.Rows)
+        {
+            statementRows.Add(new StatementRow
+            {
+                Date = r["التاريخ"].ToString() ?? "",
+                Description = r["البيان"].ToString() ?? "",
+                Credit = r["مستحق"].ToString() ?? "",
+                Debit = r["مسحوب"].ToString() ?? "",
+                Balance = r["الرصيد"].ToString() ?? ""
+            });
+        }
+        employeeBalance = AttendanceRepository.GetEmployeeBalance(selectedEmployeeId.Value);
+    }
+
+    private void ToggleAdvances()
+    {
+        showAdvances = !showAdvances;
+        if (!showAdvances) return;
+
+        advanceRows.Clear();
+        var dt = AttendanceRepository.GetOutstandingAdvances();
+        foreach (DataRow r in dt.Rows)
+            advanceRows.Add(new AdvanceRow { Name = r["الاسم"].ToString() ?? "", Amount = r["السلفة المستحقة عليه"].ToString() ?? "" });
+    }
+
+    private void PayEmployee()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (selectedEmployeeId == null || string.IsNullOrEmpty(payMethod) || !decimal.TryParse(payAmount, out var amount) || amount <= 0)
+        {
+            errorMessage = "من فضلك اختر الموظف ووسيلة الصرف وأدخل مبلغ صحيح.";
+            return;
+        }
+
+        string employeeName = employeeOptions.FirstOrDefault(x => x.Id == selectedEmployeeId.Value)?.Name ?? "";
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new PayEmployeeCommand
+            {
+                EmployeeId = selectedEmployeeId.Value,
+                EmployeeName = employeeName,
+                Method = payMethod,
+                Amount = amount,
+                Description = string.IsNullOrWhiteSpace(payDescription) ? null : payDescription.Trim(),
+                IsAdvance = payType == "سلفة",
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم صرف المبلغ بنجاح.";
+            payAmount = "";
+            payDescription = "";
+            LoadStatement();
+        }
+        catch (InsufficientEarnedBalanceException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (InsufficientBalanceException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حصل خطأ أثناء صرف المبلغ: " + ex.Message;
+        }
+    }
+
+    // ==========================================================================
+    // إدارة الموظفين
+    // ==========================================================================
+    private void LoadEmployees()
+    {
+        employees.Clear();
+        var dt = AttendanceRepository.GetEmployees();
+        foreach (DataRow r in dt.Rows)
+        {
+            employees.Add(new EmployeeRow
+            {
+                Id = Convert.ToInt32(r["EmployeeId"]),
+                Name = r["الاسم"].ToString() ?? "",
+                Phone = r["الهاتف"].ToString() ?? "",
+                Salary = r["المرتب الشهري"].ToString() ?? "",
+                Hours = r["ساعات العمل باليوم"].ToString() ?? "",
+                HireDate = r["تاريخ التعيين"].ToString() ?? ""
+            });
+        }
+    }
+
+    private void OpenNewEmployeeForm()
+    {
+        editingEmployeeId = null;
+        empName = "";
+        empPhone = "";
+        empSalary = "";
+        empHours = "8";
+        empHireDate = DateTime.Now.Date;
+        errorMessage = null;
+    }
+
+    private void OpenEditEmployeeForm(EmployeeRow r)
+    {
+        editingEmployeeId = r.Id;
+        empName = r.Name;
+        empPhone = r.Phone;
+        empSalary = r.Salary;
+        empHours = r.Hours;
+        empHireDate = DateTime.TryParse(r.HireDate, out var hireDate) ? hireDate : DateTime.Now.Date;
+        errorMessage = null;
+    }
+
+    private bool ValidateEmployeeForm(out decimal salary, out decimal hours)
+    {
+        salary = 0;
+        hours = 0;
+        if (string.IsNullOrWhiteSpace(empName))
+        {
+            errorMessage = "من فضلك أدخل اسم الموظف.";
+            return false;
+        }
+        if (!decimal.TryParse(empSalary, out salary) || salary < 0)
+        {
+            errorMessage = "من فضلك أدخل مرتب شهري صحيح.";
+            return false;
+        }
+        if (!decimal.TryParse(empHours, out hours) || hours <= 0)
+        {
+            errorMessage = "من فضلك أدخل عدد ساعات عمل قياسية في اليوم أكبر من صفر.";
+            return false;
+        }
+        return true;
+    }
+
+    private void SaveEmployee()
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (!ValidateEmployeeForm(out var salary, out var hours)) return;
+
+        try
+        {
+            if (editingEmployeeId == null)
+            {
+                AppServices.CoreEngine.Execute(new AddEmployeeCommand
+                {
+                    FullName = empName.Trim(),
+                    Phone = string.IsNullOrWhiteSpace(empPhone) ? null : empPhone.Trim(),
+                    MonthlySalary = salary,
+                    StandardHoursPerDay = hours,
+                    HireDate = empHireDate.Date,
+                    PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+                });
+                successMessage = "تم إضافة الموظف بنجاح.";
+            }
+            else
+            {
+                AppServices.CoreEngine.Execute(new UpdateEmployeeCommand
+                {
+                    EmployeeId = editingEmployeeId.Value,
+                    FullName = empName.Trim(),
+                    Phone = string.IsNullOrWhiteSpace(empPhone) ? null : empPhone.Trim(),
+                    MonthlySalary = salary,
+                    StandardHoursPerDay = hours,
+                    HireDate = empHireDate.Date,
+                    PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+                });
+                successMessage = "تم تعديل بيانات الموظف بنجاح.";
+            }
+
+            OpenNewEmployeeForm();
+            LoadEmployees();
+            LoadEmployeeOptions();
+            LoadAttendance();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void DeleteEmployee(EmployeeRow r)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (AttendanceRepository.HasPayrollHistory(r.Id))
+        {
+            errorMessage = "لا يمكن حذف هذا الموظف لأن له شهور رواتب مقفولة أو مبالغ مصروفة له بالفعل.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new DeleteEmployeeCommand { EmployeeId = r.Id, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            successMessage = "تم حذف الموظف بنجاح.";
+            if (editingEmployeeId == r.Id) OpenNewEmployeeForm();
+            LoadEmployees();
+            LoadEmployeeOptions();
+            LoadAttendance();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}

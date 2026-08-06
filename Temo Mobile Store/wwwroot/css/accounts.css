@@ -1,0 +1,3 @@
+/* شاشة الحسابات الجديدة (Blazor Hybrid) - تخصيصات خاصة بالشاشة دي بس، فوق list-template.css */
+
+.total-row td { border-top: 2px solid var(--color-border); background: var(--color-bg-app); }

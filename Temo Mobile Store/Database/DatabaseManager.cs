@@ -286,7 +286,9 @@ namespace Temo_Mobile_Store.Database
                     (1300, "عملاء (ذمم مدينة)"),
                     (1400, "سلف الموظفين"),
                     (2100, "موردون (ذمم دائنة)"),
+                    (2200, "ضريبة القيمة المضافة المستحقة"),
                     (4100, "إيراد المبيعات"),
+                    (4110, "خصومات مبيعات"),
                     (4200, "إيراد الصيانة"),
                     (5100, "مصروفات عمومية وإدارية"),
                     (5200, "إيجار"),
@@ -320,6 +322,9 @@ namespace Temo_Mobile_Store.Database
                 EnsureEmployeesStandardHoursPerDayColumn(conn);
                 EnsureAttendanceRecordsOvertimeHoursColumn(conn);
                 EnsurePayrollClosuresOvertimeColumns(conn);
+                EnsureProductsImageColumn(conn);
+                EnsureSalesDiscountColumn(conn);
+                EnsureSalesTaxAndPaymentColumns(conn);
 
                 BackfillHistoricalJournalEntries(conn);
             }
@@ -817,6 +822,86 @@ namespace Temo_Mobile_Store.Database
 
             if (!columnExists)
                 ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN PaymentMethod TEXT;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود ProductImage لجدول Products (كان ناقص من الأول) - صورة المنتج (BLOB)،
+        // نفس نمط StoreSettings.LogoImage بالظبط. المنتجات القديمة قيمتها NULL (بدون صورة)،
+        // والشاشات اللي بتعرض المنتج بترجع لأيقونة افتراضية في الحالة دي.
+        // ==========================================================================
+        private static void EnsureProductsImageColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(Products);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "ProductImage", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE Products ADD COLUMN ProductImage BLOB;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود Discount لجدول Sales (كان ناقص من الأول) - خصم حقيقي على مستوى الصنف
+        // (وقد يشمل حصة من خصم سريع على مستوى الفاتورة اتوزّعت عليه وقت التسجيل). Sales.Total
+        // يفضل زي ما هو بالظبط (السعر الإجمالي قبل الخصم) عشان أي تقرير قديم بيقرأ منه يفضل
+        // صحيح - الصافي المطلوب فعليًا = Total - Discount، بيتحسب وقت الترحيل المحاسبي بس.
+        // ==========================================================================
+        private static void EnsureSalesDiscountColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(Sales);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "Discount", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN Discount REAL NOT NULL DEFAULT 0;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمودي Tax وAmountPaid لجدول Sales - ضريبة حقيقية على مستوى الصنف (زي
+        // Discount بالظبط) + مبلغ "المدفوع" الفعلي على مستوى الفاتورة (لحساب الفكة في
+        // البيع الكاش). الفواتير القديمة قيمتها 0 افتراضيًا (بدون ضريبة، ومدفوع = صفر
+        // لحد ما يتسجل بيع جديد فعليًا بيها).
+        // ==========================================================================
+        private static void EnsureSalesTaxAndPaymentColumns(SqliteConnection conn)
+        {
+            bool taxExists = false;
+            bool amountPaidExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(Sales);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    string name = reader["name"].ToString() ?? "";
+                    if (string.Equals(name, "Tax", StringComparison.OrdinalIgnoreCase))
+                        taxExists = true;
+                    else if (string.Equals(name, "AmountPaid", StringComparison.OrdinalIgnoreCase))
+                        amountPaidExists = true;
+                }
+            }
+
+            if (!taxExists)
+                ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN Tax REAL NOT NULL DEFAULT 0;");
+            if (!amountPaidExists)
+                ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN AmountPaid REAL NOT NULL DEFAULT 0;");
         }
 
         // ==========================================================================

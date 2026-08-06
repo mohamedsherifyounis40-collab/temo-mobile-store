@@ -1,0 +1,14 @@
+/* شاشة جرد المخزن الجديدة (Blazor Hybrid) - تخصيصات خاصة بالشاشة دي بس، فوق list-template.css */
+
+.accent-blue { color: var(--color-accent); }
+.accent-orange { color: var(--color-orange); }
+.accent-purple { color: var(--color-purple); }
+.trend-up { color: var(--color-green); font-weight: bold; }
+
+.mini-input {
+    width: 80px;
+    padding: 5px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    text-align: center;
+}

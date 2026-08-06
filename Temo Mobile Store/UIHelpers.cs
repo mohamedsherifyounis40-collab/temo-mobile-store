@@ -18,7 +18,9 @@ namespace Temo_Mobile_Store
         public static readonly Color ColorDanger = Color.FromArgb(231, 76, 60);
         public static readonly Color ColorWarning = Color.FromArgb(243, 156, 18);
         public static readonly Color ColorNeutral = Color.FromArgb(236, 240, 241);
-        public static readonly Color ColorBackground = Color.FromArgb(245, 246, 250);
+        // كانت (245, 246, 250) - قريبة جدًا من أبيض الكروت فوقها، فالكارت كان بيبان مسطح
+        // وحدوده مش واضحة. غمّقناها شوية عشان يبقى في تباين واضح بين خلفية الصفحة والكروت البيضا.
+        public static readonly Color ColorBackground = Color.FromArgb(0xEC, 0xEF, 0xF5);
 
         // ---------- Home Dashboard Shell (Sidebar/Header/KPI) redesign palette ----------
         // شبه ألوان الشاشات التانية (ColorSuccess/Warning/Danger فوق) بس دي بالتحديد
@@ -44,6 +46,28 @@ namespace Temo_Mobile_Store
             int g = c.G + (int)((255 - c.G) * amount);
             int b = c.B + (int)((255 - c.B) * amount);
             return Color.FromArgb(r, g, b);
+        }
+
+        // أيقونة عنوان الكارت - من غير أي برواز/خلفية حواليها، بس الإيموچي لوحده بخط أكبر
+        // شوية عشان يبقى شكله شيك (زي عنوان مستند احترافي)، مش حاطط في صندوق.
+        public static Label CreateIconBadge(string icon, Color accentColor, Point location, int size = 34)
+        {
+            return new Label
+            {
+                Text = icon,
+                Location = location,
+                Size = new Size(size, size),
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = Color.Transparent,
+                Font = new Font("Segoe UI Emoji", size * 0.5F)
+            };
+        }
+
+        // بيحوّل زرار عادي (BorderRadius صغير) لشكل "Pill" مستدير بالكامل - نص القطر تبع ارتفاعه،
+        // زي أزرار الحفظ/الإلغاء في التصميم المرجعي.
+        public static void MakePill(Guna.UI2.WinForms.Guna2Button btn)
+        {
+            btn.BorderRadius = Math.Max(btn.Height / 2, 1);
         }
 
         public static void StyleDataGridView(DataGridView dgv)

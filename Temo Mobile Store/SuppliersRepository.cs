@@ -119,6 +119,26 @@ namespace Temo_Mobile_Store
             return dt;
         }
 
+        // قايمة كل فواتير الشراء (كل الموردين) - للشاشة الجديدة (سجل المشتريات)، قراءة بس
+        public static DataTable GetPurchases()
+        {
+            DataTable dt = new DataTable();
+            dt.Columns.AddRange(new DataColumn[] { new DataColumn("PurchaseId", typeof(int)), new DataColumn("SupplierId", typeof(int)), new DataColumn("المورد"), new DataColumn("التاريخ"), new DataColumn("الإجمالي", typeof(decimal)) });
+
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand(
+                    "SELECT p.PurchaseId, p.SupplierId, s.SupplierName, p.PurchaseDate, p.TotalAmount FROM Purchases p JOIN Suppliers s ON s.SupplierId = p.SupplierId ORDER BY p.PurchaseId DESC", conn))
+                using (SqliteDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                        dt.Rows.Add(Convert.ToInt32(reader["PurchaseId"]), Convert.ToInt32(reader["SupplierId"]), reader["SupplierName"], reader["PurchaseDate"], Convert.ToDecimal(reader["TotalAmount"]));
+                }
+            }
+            return dt;
+        }
+
         public static void AddSupplier(string name, string phone)
         {
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))

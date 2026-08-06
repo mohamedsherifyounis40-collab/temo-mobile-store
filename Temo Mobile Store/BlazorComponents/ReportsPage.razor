@@ -1,0 +1,738 @@
+@using System.Data
+@using System.Globalization
+@using TemoStore.Core.Commands
+@using TemoStore.Core.Exceptions
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.ReportsBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>📊 التقارير</h1>
+                    <div class="breadcrumb">التقارير &gt; الملخص المالي، إقفال اليوم، وكشوف الحسابات</div>
+                </div>
+            </div>
+
+            @if (!AuthManager.IsAdmin)
+            {
+                <div class="alert alert-error">⚠️ الشاشة دي للمدير بس - مش عندك صلاحية الوصول ليها.</div>
+            }
+            else
+            {
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-error">⚠️ @errorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="alert alert-success">✅ @successMessage</div>
+                }
+
+                <div class="list-tabs">
+                    <button class="list-tab @(activeTab == "Summary" ? "active" : "")" @onclick='() => SwitchTab("Summary")'>📊 الملخص المالي وإقفال اليوم</button>
+                    <button class="list-tab @(activeTab == "ClosuresLog" ? "active" : "")" @onclick='() => SwitchTab("ClosuresLog")'>🔒 سجل إقفال الأيام</button>
+                    <button class="list-tab @(activeTab == "Statement" ? "active" : "")" @onclick='() => SwitchTab("Statement")'>📋 كشف حساب الوسائل</button>
+                </div>
+
+                @if (activeTab == "Summary")
+                {
+                    <div class="metrics-row">
+                        <div class="card metric-card"><div class="metric-label">إجمالي المبيعات (الدرج)</div><div class="metric-value">@totalSalesText</div></div>
+                        <div class="card metric-card"><div class="metric-label">تكلفة البضاعة المباعة</div><div class="metric-value cost">@totalCostText</div></div>
+                        <div class="card metric-card"><div class="metric-label">إجمالي المصروفات العمومية</div><div class="metric-value expense">@totalExpensesText</div></div>
+                        <div class="card metric-card"><div class="metric-label">الصافي الفعلي في جيبك 💰</div><div class="metric-value profit">@netProfitText</div></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-title">🔍 فلترة السجل التفصيلي بفترة زمنية</div>
+                        <div class="list-toolbar">
+                            <div>
+                                <label class="field-label">من تاريخ</label>
+                                <input class="field-input" type="date" value="@filterFrom.ToString("yyyy-MM-dd")" @onchange="e => filterFrom = DateTime.Parse(e.Value!.ToString()!)" />
+                            </div>
+                            <div>
+                                <label class="field-label">إلى تاريخ</label>
+                                <input class="field-input" type="date" value="@filterTo.ToString("yyyy-MM-dd")" @onchange="e => filterTo = DateTime.Parse(e.Value!.ToString()!)" />
+                            </div>
+                            <button class="btn btn-primary" @onclick="FilterProfit">🔍 تطبيق الفلتر</button>
+                            <button class="btn btn-outline" @onclick="RefreshAll">🔄 عرض الكل وتحديث</button>
+                        </div>
+                        <div class="data-table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th>رقم الحركة</th><th>المنتج</th><th>سعر الشراء</th><th>سعر البيع</th><th>الكمية</th><th>الربح الصافي</th><th>التاريخ والوقت ⏰</th></tr></thead>
+                                <tbody>
+                                    @foreach (var r in profitRows)
+                                    {
+                                        <tr>
+                                            <td>@r.SaleId</td><td>@r.ProductName</td><td>@r.CostPrice</td><td>@r.Price</td><td>@r.Qty</td><td>@r.NetProfit</td><td class="muted">@r.SaleDate</td>
+                                        </tr>
+                                    }
+                                    @if (profitRows.Count == 0)
+                                    {
+                                        <tr><td colspan="7" class="empty-row">مفيش بيانات في الفترة دي</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="grid-mid-reports">
+                        <div class="card">
+                            <div class="card-title">🔒 إقفال اليوم</div>
+
+                            @if (isTodayClosed)
+                            {
+                                <div class="muted">تم إقفال اليوم بالفعل ✅</div>
+                            }
+                            else
+                            {
+                                <div class="muted">الرصيد الافتتاحي (نقدي): <b>@CashOpeningDisplay</b></div>
+                                <div class="muted">الرصيد النقدي المسجّل حاليًا: <b>@CashRecordedDisplay</b></div>
+                            }
+
+                            <div class="data-table-wrap" style="margin-top:10px">
+                                <table class="data-table">
+                                    <thead><tr><th></th><th>الوسيلة</th><th>افتتاحي</th><th>@(isTodayClosed ? "ختامي فعلي" : "الرصيد المسجّل")</th></tr></thead>
+                                    <tbody>
+                                        @if (isTodayClosed)
+                                        {
+                                            @foreach (var r in closedSummaryRows)
+                                            {
+                                                <tr><td></td><td>@r.Method</td><td>@r.Opening</td><td>@r.ActualClosing</td></tr>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            @foreach (var r in summaryRows)
+                                            {
+                                                <tr>
+                                                    <td>
+                                                        <button class="row-action-btn edit" title="تعديل الرصيد" @onclick="() => StartEditBalance(r.Method, r.Opening)">✏️</button>
+                                                    </td>
+                                                    <td>@r.Method</td>
+                                                    <td>@r.Opening.ToString("N2")</td>
+                                                    <td>@r.RecordedBalance.ToString("N2")</td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            @if (editingBalanceMethod != null)
+                            {
+                                <div class="closure-panel">
+                                    <div class="form-panel-title">الرصيد الافتتاحي الجديد لـ "@editingBalanceMethod"</div>
+                                    <input class="field-input" value="@editBalanceValue" @oninput="e => editBalanceValue = e.Value?.ToString() ?? string.Empty" />
+                                    <div class="form-actions" style="margin-top:10px">
+                                        <button class="btn btn-primary" @onclick="SaveBalanceEdit">موافق</button>
+                                        <button class="btn btn-outline" @onclick="CancelBalanceEdit">إلغاء</button>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="form-actions" style="margin-top:14px; flex-wrap:wrap">
+                                @if (!isTodayClosed)
+                                {
+                                    <button class="btn btn-danger-outline" @onclick="OpenCloseDayForm">🔒 إقفال اليوم</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-outline" @onclick="ReopenDay">🔓 فتح اليوم تاني</button>
+                                }
+                            </div>
+
+                            @if (showCloseDayForm)
+                            {
+                                <div class="closure-panel">
+                                    <div class="form-panel-title">أولاً: عد الكاش الفعلي (نقدي) 💵</div>
+                                    @foreach (var d in Denominations)
+                                    {
+                                        <div class="denom-row">
+                                            <span class="denom-label">@d.ToString("0.##") ج.م</span>
+                                            <input class="field-input" value="@GetDenomCount(d)" @oninput='e => SetDenomCount(d, e.Value?.ToString() ?? "0")' />
+                                            <span class="denom-total">@((d * GetDenomCountInt(d)).ToString("N2"))</span>
+                                        </div>
+                                    }
+                                    <div class="denom-grand-total">إجمالي النقدي: @CashCountedTotal.ToString("N2") ج.م</div>
+
+                                    <div class="form-panel-title" style="margin-top:16px">ثانيًا: أرصدة باقي الوسائل الإلكترونية 📱</div>
+                                    <div class="muted" style="font-size:12px; margin-bottom:8px">الأرقام دي متعبّية تلقائي بالرصيد المسجّل حاليًا، عدّلها لو الرصيد الفعلي مختلف.</div>
+                                    @foreach (var method in UIHelpers.PaymentMethods)
+                                    {
+                                        if (method != "نقدي")
+                                        {
+                                            <div class="denom-row">
+                                                <span class="denom-label">@method</span>
+                                                <input class="field-input" value="@GetOtherActual(method)" @oninput="e => SetOtherActual(method, e.Value?.ToString() ?? string.Empty)" />
+                                            </div>
+                                        }
+                                    }
+
+                                    <div class="form-actions" style="margin-top:14px">
+                                        <button class="btn btn-danger-outline" @onclick="ConfirmCloseDay">🔒 تأكيد إقفال اليوم لكل الوسائل</button>
+                                        <button class="btn btn-outline" @onclick="CancelCloseDayForm">إلغاء</button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="card">
+                            <div class="card-title">📈 سجل الأرباح التفصيلي (نفس جدول الفلترة أعلاه)</div>
+                            <div class="muted" style="font-size:12px">استخدم فلترة الفترة الزمنية فوق لعرض تفاصيل المبيعات والأرباح ليوم أو فترة معينة.</div>
+                        </div>
+                    </div>
+                }
+                else if (activeTab == "ClosuresLog")
+                {
+                    <div class="card">
+                        <div class="card-title">🔒 سجل الأيام المُقفلة بالتفصيل</div>
+                        <div class="data-table-wrap">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>التاريخ</th><th>الوسيلة</th><th>رصيد افتتاحي</th><th>إجمالي وارد</th><th>إجمالي منصرف</th>
+                                        <th>ختامي متوقع</th><th>ختامي فعلي</th><th>الفرق</th><th>وقت الإقفال</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in closuresLogRows)
+                                    {
+                                        <tr class="row-clickable @(selectedClosureId == r.Id ? "row-selected" : "")" @onclick="() => SelectClosure(r.Id)">
+                                            <td>@r.Date</td><td>@r.Method</td><td>@r.Opening</td><td>@r.TotalIn</td><td>@r.TotalOut</td>
+                                            <td>@r.ExpectedClosing</td><td>@r.ActualClosing</td><td>@r.Difference</td><td class="muted">@r.ClosedAt</td>
+                                        </tr>
+                                    }
+                                    @if (closuresLogRows.Count == 0)
+                                    {
+                                        <tr><td colspan="9" class="empty-row">مفيش أيام مقفولة بعد</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top:16px">
+                        <div class="card-title">🧾 تفاصيل فئات الكاش الفعلي لليوم المحدد (دوس على أي صف فوق)</div>
+                        <div class="data-table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th>الفئة</th><th>العدد</th><th>الإجمالي</th></tr></thead>
+                                <tbody>
+                                    @foreach (var d in denomDetailRows)
+                                    {
+                                        <tr><td>@d.Value ج.م</td><td>@d.Count</td><td>@d.Total</td></tr>
+                                    }
+                                    @if (denomDetailRows.Count == 0)
+                                    {
+                                        <tr><td colspan="3" class="empty-row">اختر يوم مقفول من الجدول فوق</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="grid-mid-reports">
+                        <div class="card">
+                            <div class="card-title">📋 اختيار الوسيلة والفترة</div>
+                            <label class="field-label">وسيلة الدفع</label>
+                            <select class="field-input" @bind="statementMethod">
+                                @foreach (var m in UIHelpers.PaymentMethods)
+                                {
+                                    <option value="@m">@m</option>
+                                }
+                            </select>
+                            <label class="field-label">من تاريخ</label>
+                            <input class="field-input" type="date" value="@statementFrom.ToString("yyyy-MM-dd")" @onchange="e => statementFrom = DateTime.Parse(e.Value!.ToString()!)" />
+                            <label class="field-label">إلى تاريخ</label>
+                            <input class="field-input" type="date" value="@statementTo.ToString("yyyy-MM-dd")" @onchange="e => statementTo = DateTime.Parse(e.Value!.ToString()!)" />
+                            <div class="form-actions" style="margin-top:12px">
+                                <button class="btn btn-primary" @onclick="() => ShowStatement(true)">📋 عرض كشف الحساب</button>
+                            </div>
+                            <button class="btn btn-outline" style="margin-top:8px; width:100%" @onclick="() => ShowStatement(false)">🔄 عرض كل الفترات</button>
+
+                            <div class="closure-panel" style="margin-top:16px">
+                                <div class="muted">إجمالي الوارد: <b style="color:var(--color-green)">@statementTotalIn</b></div>
+                                <div class="muted">إجمالي المنصرف: <b style="color:var(--color-red)">@statementTotalOut</b></div>
+                                <div class="muted">صافي حركة الفترة: <b>@statementNet</b></div>
+                                <div class="muted">الرصيد الحالي المسجل فعليًا: <b>@statementCurrentBalance</b></div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-title">📄 كشف الحساب بالتفصيل</div>
+                            <div class="data-table-wrap">
+                                <table class="data-table">
+                                    <thead><tr><th>التاريخ والوقت</th><th>نوع الحركة</th><th>البيان</th><th>وارد</th><th>منصرف</th><th>الرصيد بعد الحركة</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var r in statementRows)
+                                        {
+                                            <tr>
+                                                <td class="muted">@r.Date</td><td>@r.Type</td><td>@r.Details</td><td>@r.In</td><td>@r.Out</td><td>@r.Balance</td>
+                                            </tr>
+                                        }
+                                        @if (statementRows.Count == 0)
+                                        {
+                                            <tr><td colspan="6" class="empty-row">مفيش حركات في الفترة دي</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+    private static readonly decimal[] Denominations = { 200m, 100m, 50m, 20m, 10m, 5m, 1m };
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون (تجربة)", "🧪"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.InventoryCountBlazor, "جرد المخزن (تجربة)", "🧪"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.MaintenanceBlazor,"الصيانة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.CustomersBlazor,"العملاء (تجربة)", "🧪"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.SuppliersBlazor,"الموردين (تجربة)", "🧪"),
+        (MainShell.PageKeys.PurchasesBlazor,"المشتريات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.TreasuryBlazor, "الخزينة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.AccountsBlazor, "الحسابات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor,
+                MainShell.PageKeys.InventoryCount, MainShell.PageKeys.InventoryCountBlazor,
+                MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private string? errorMessage;
+    private string? successMessage;
+    private string activeTab = "Summary";
+
+    // ---------- الملخص المالي ----------
+    private string totalSalesText = "0.00 ج.م", totalCostText = "0.00 ج.م", totalExpensesText = "0.00 ج.م", netProfitText = "0.00 ج.م";
+    private DateTime filterFrom = DateTime.Now.AddMonths(-1);
+    private DateTime filterTo = DateTime.Now;
+    private class ProfitRow { public int SaleId; public string ProductName = ""; public string CostPrice = ""; public string Price = ""; public int Qty; public string NetProfit = ""; public string SaleDate = ""; }
+    private List<ProfitRow> profitRows = new();
+
+    // ---------- إقفال اليوم ----------
+    private bool isTodayClosed;
+    private class SummaryRow { public string Method = ""; public decimal Opening; public decimal RecordedBalance; }
+    private class ClosedRow { public string Method = ""; public string Opening = ""; public string ActualClosing = ""; }
+    private List<SummaryRow> summaryRows = new();
+    private List<ClosedRow> closedSummaryRows = new();
+    private Dictionary<string, (decimal Opening, decimal TotalIn, decimal TotalOut, decimal RecordedBalance)> methodSummaries = new();
+
+    private string CashOpeningDisplay => methodSummaries.TryGetValue("نقدي", out var s) ? s.Opening.ToString("N2") + " ج.م" : "--";
+    private string CashRecordedDisplay => methodSummaries.TryGetValue("نقدي", out var s) ? s.RecordedBalance.ToString("N2") + " ج.م" : "--";
+
+    private string? editingBalanceMethod;
+    private string editBalanceValue = "";
+
+    private bool showCloseDayForm;
+    private Dictionary<decimal, string> denominationCounts = Denominations.ToDictionary(d => d, d => "0");
+    private Dictionary<string, string> otherMethodsActual = new();
+
+    private string GetDenomCount(decimal d) => denominationCounts.TryGetValue(d, out var v) ? v : "0";
+    private void SetDenomCount(decimal d, string v) => denominationCounts[d] = v;
+    private int GetDenomCountInt(decimal d) => int.TryParse(GetDenomCount(d), out var c) && c >= 0 ? c : 0;
+    private decimal CashCountedTotal => Denominations.Sum(d => d * GetDenomCountInt(d));
+
+    private string GetOtherActual(string method) => otherMethodsActual.TryGetValue(method, out var v) ? v : "0";
+    private void SetOtherActual(string method, string v) => otherMethodsActual[method] = v;
+
+    // ---------- سجل إقفال الأيام ----------
+    private class ClosureLogRow { public int Id; public string Date = ""; public string Method = ""; public string Opening = ""; public string TotalIn = ""; public string TotalOut = ""; public string ExpectedClosing = ""; public string ActualClosing = ""; public string Difference = ""; public string ClosedAt = ""; }
+    private List<ClosureLogRow> closuresLogRows = new();
+    private int? selectedClosureId;
+    private class DenomDetailRow { public string Value = ""; public string Count = ""; public string Total = ""; }
+    private List<DenomDetailRow> denomDetailRows = new();
+
+    // ---------- كشف حساب الوسائل ----------
+    private string statementMethod = UIHelpers.PaymentMethods.FirstOrDefault() ?? "";
+    private DateTime statementFrom = DateTime.Now.AddMonths(-1);
+    private DateTime statementTo = DateTime.Now;
+    private class StatementRow { public string Date = ""; public string Type = ""; public string Details = ""; public string In = ""; public string Out = ""; public string Balance = ""; }
+    private List<StatementRow> statementRows = new();
+    private string statementTotalIn = "0.00 ج.م", statementTotalOut = "0.00 ج.م", statementNet = "0.00 ج.م", statementCurrentBalance = "0.00 ج.م";
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        if (AuthManager.IsAdmin)
+            RefreshAll();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private void SwitchTab(string tab)
+    {
+        activeTab = tab;
+        errorMessage = null;
+        successMessage = null;
+
+        if (tab == "Summary") RefreshAll();
+        else if (tab == "ClosuresLog") LoadClosuresLog();
+        else if (tab == "Statement") ShowStatement(false);
+    }
+
+    // ==========================================================================
+    // الملخص المالي وإقفال اليوم
+    // ==========================================================================
+    private void RefreshAll()
+    {
+        var (sales, cost, expenses, net) = ReportsRepository.CalculateBusinessMetrics();
+        totalSalesText = sales.ToString("N2") + " ج.م";
+        totalCostText = cost.ToString("N2") + " ج.م";
+        totalExpensesText = expenses.ToString("N2") + " ج.م";
+        netProfitText = net.ToString("N2") + " ج.م";
+        LoadClosureSummary();
+    }
+
+    private void LoadClosureSummary()
+    {
+        isTodayClosed = ReportsRepository.IsTodayClosed();
+        summaryRows.Clear();
+        closedSummaryRows.Clear();
+        methodSummaries.Clear();
+
+        if (isTodayClosed)
+        {
+            var dt = ReportsRepository.GetClosedTodaySummary();
+            foreach (DataRow r in dt.Rows)
+                closedSummaryRows.Add(new ClosedRow { Method = r["الوسيلة"].ToString() ?? "", Opening = r["افتتاحي"].ToString() ?? "", ActualClosing = r["ختامي فعلي"].ToString() ?? "" });
+        }
+        else
+        {
+            methodSummaries = ReportsRepository.GetAllMethodsClosureSummary(UIHelpers.PaymentMethods);
+            foreach (var method in UIHelpers.PaymentMethods)
+            {
+                var s = methodSummaries[method];
+                summaryRows.Add(new SummaryRow { Method = method, Opening = s.Opening, RecordedBalance = s.RecordedBalance });
+            }
+        }
+    }
+
+    private void FilterProfit()
+    {
+        var (rows, sales, cost, expenses, net) = ReportsRepository.GetDetailedProfit(filterFrom, filterTo);
+        profitRows = rows.Select(r => new ProfitRow
+        {
+            SaleId = r.SaleId,
+            ProductName = r.ProductName,
+            CostPrice = r.CostPrice.ToString("N2"),
+            Price = r.Price.ToString("N2"),
+            Qty = r.Quantity,
+            NetProfit = r.NetProfit.ToString("N2"),
+            SaleDate = r.SaleDate
+        }).ToList();
+
+        totalSalesText = sales.ToString("N2") + " ج.م";
+        totalCostText = cost.ToString("N2") + " ج.م";
+        totalExpensesText = expenses.ToString("N2") + " ج.م";
+        netProfitText = net.ToString("N2") + " ج.م";
+    }
+
+    private void StartEditBalance(string method, decimal currentOpening)
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (isTodayClosed)
+        {
+            errorMessage = "اليوم مقفول بالفعل. لو عايز تعدّل الأرصدة، افتح اليوم تاني الأول من زرار \"فتح اليوم تاني\".";
+            return;
+        }
+        editingBalanceMethod = method;
+        editBalanceValue = currentOpening.ToString("0.##");
+    }
+
+    private void CancelBalanceEdit() => editingBalanceMethod = null;
+
+    private void SaveBalanceEdit()
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (editingBalanceMethod == null) return;
+
+        if (!decimal.TryParse(editBalanceValue, out var newBalance) || newBalance < 0)
+        {
+            errorMessage = "من فضلك أدخل رصيد صحيح وموجب.";
+            return;
+        }
+
+        decimal currentBalance = ReportsRepository.GetCurrentMethodBalance(editingBalanceMethod);
+        decimal delta = newBalance - currentBalance;
+
+        if (delta != 0)
+        {
+            try
+            {
+                AppServices.CoreEngine.Execute(new AddMovementCommand
+                {
+                    Type = delta > 0 ? "قبض" : "صرف",
+                    Method = editingBalanceMethod,
+                    Amount = Math.Abs(delta),
+                    AccountCode = 5700,
+                    Description = $"تعديل يدوي لرصيد \"{editingBalanceMethod}\"",
+                    PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+                });
+            }
+            catch (InsufficientBalanceException ex)
+            {
+                errorMessage = ex.Message;
+                return;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = "حصل خطأ أثناء تحديث الرصيد: " + ex.Message;
+                return;
+            }
+        }
+
+        successMessage = $"تم تحديث رصيد \"{editingBalanceMethod}\" بنجاح.";
+        editingBalanceMethod = null;
+        LoadClosureSummary();
+    }
+
+    private void OpenCloseDayForm()
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (isTodayClosed)
+        {
+            errorMessage = "تم إقفال اليوم بالفعل.";
+            return;
+        }
+
+        foreach (var d in Denominations) denominationCounts[d] = "0";
+        otherMethodsActual.Clear();
+        foreach (var method in UIHelpers.PaymentMethods)
+        {
+            if (method == "نقدي") continue;
+            otherMethodsActual[method] = methodSummaries.TryGetValue(method, out var s) ? s.RecordedBalance.ToString("0.##") : "0";
+        }
+
+        showCloseDayForm = true;
+    }
+
+    private void CancelCloseDayForm() => showCloseDayForm = false;
+
+    private void ConfirmCloseDay()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        var denomCountsInt = new Dictionary<decimal, int>();
+        foreach (var d in Denominations)
+        {
+            if (!int.TryParse(GetDenomCount(d), out var c) || c < 0)
+            {
+                errorMessage = $"من فضلك أدخل عدد صحيح وموجب لفئة {d:0.##} ج.م";
+                return;
+            }
+            denomCountsInt[d] = c;
+        }
+
+        var methodActuals = new Dictionary<string, decimal> { ["نقدي"] = CashCountedTotal };
+        foreach (var method in UIHelpers.PaymentMethods)
+        {
+            if (method == "نقدي") continue;
+            if (!decimal.TryParse(GetOtherActual(method), out var bal) || bal < 0)
+            {
+                errorMessage = $"من فضلك أدخل رصيد صحيح وموجب لـ \"{method}\"";
+                return;
+            }
+            methodActuals[method] = bal;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new CloseDayCommand
+            {
+                MethodActualBalances = methodActuals,
+                CashDenominationCounts = denomCountsInt,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم إقفال اليوم بنجاح لكل الوسائل وتسجيله في السجل. 🔒";
+            showCloseDayForm = false;
+            LoadClosureSummary();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حدث خطأ أثناء الإقفال: " + ex.Message;
+        }
+    }
+
+    private void ReopenDay()
+    {
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            AppServices.CoreEngine.Execute(new ReopenDayCommand { PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            successMessage = "تم فتح اليوم تاني بنجاح لكل الوسائل. تقدر تضيف وتعدّل حركات النهاردة عادي دلوقتي.";
+            LoadClosureSummary();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حدث خطأ أثناء فتح اليوم: " + ex.Message;
+        }
+    }
+
+    // ==========================================================================
+    // سجل إقفال الأيام
+    // ==========================================================================
+    private void LoadClosuresLog()
+    {
+        closuresLogRows.Clear();
+        selectedClosureId = null;
+        denomDetailRows.Clear();
+
+        var dt = ReportsRepository.GetClosuresLog();
+        foreach (DataRow r in dt.Rows)
+        {
+            closuresLogRows.Add(new ClosureLogRow
+            {
+                Id = Convert.ToInt32(r["Id"]),
+                Date = r["التاريخ"].ToString() ?? "",
+                Method = r["الوسيلة"].ToString() ?? "",
+                Opening = Convert.ToDecimal(r["رصيد افتتاحي"]).ToString("N2"),
+                TotalIn = Convert.ToDecimal(r["إجمالي وارد"]).ToString("N2"),
+                TotalOut = Convert.ToDecimal(r["إجمالي منصرف"]).ToString("N2"),
+                ExpectedClosing = Convert.ToDecimal(r["ختامي متوقع"]).ToString("N2"),
+                ActualClosing = Convert.ToDecimal(r["ختامي فعلي"]).ToString("N2"),
+                Difference = Convert.ToDecimal(r["الفرق"]).ToString("N2"),
+                ClosedAt = r["وقت الإقفال"].ToString() ?? ""
+            });
+        }
+    }
+
+    private void SelectClosure(int id)
+    {
+        selectedClosureId = id;
+        denomDetailRows.Clear();
+        var dt = ReportsRepository.GetClosureDenominations(id);
+        foreach (DataRow r in dt.Rows)
+        {
+            denomDetailRows.Add(new DenomDetailRow
+            {
+                Value = Convert.ToDecimal(r["الفئة"]).ToString("0.##"),
+                Count = r["العدد"].ToString() ?? "",
+                Total = Convert.ToDecimal(r["الإجمالي"]).ToString("N2")
+            });
+        }
+    }
+
+    // ==========================================================================
+    // كشف حساب الوسائل
+    // ==========================================================================
+    private void ShowStatement(bool useDateFilter)
+    {
+        if (string.IsNullOrEmpty(statementMethod)) return;
+
+        var (dt, totalIn, totalOut, currentBalance) = ReportsRepository.GetStatement(statementMethod, statementFrom, statementTo, useDateFilter);
+        statementRows.Clear();
+        foreach (DataRow r in dt.Rows)
+        {
+            statementRows.Add(new StatementRow
+            {
+                Date = r["التاريخ والوقت"].ToString() ?? "",
+                Type = r["نوع الحركة"].ToString() ?? "",
+                Details = r["البيان"].ToString() ?? "",
+                In = r["وارد"].ToString() ?? "",
+                Out = r["منصرف"].ToString() ?? "",
+                Balance = r["الرصيد بعد الحركة"].ToString() ?? ""
+            });
+        }
+
+        statementTotalIn = totalIn.ToString("N2") + " ج.م";
+        statementTotalOut = totalOut.ToString("N2") + " ج.م";
+        statementNet = (totalIn - totalOut).ToString("N2") + " ج.م";
+        statementCurrentBalance = currentBalance.ToString("N2") + " ج.م";
+    }
+}

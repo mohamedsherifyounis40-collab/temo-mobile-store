@@ -104,6 +104,8 @@ namespace Temo_Mobile_Store
             services.AddSingleton<ICommandHandler<AddEmployeeCommand, bool>, AddEmployeeCommandHandler>();
             services.AddSingleton<ICommandHandler<UpdateEmployeeCommand, bool>, UpdateEmployeeCommandHandler>();
             services.AddSingleton<ICommandHandler<DeleteEmployeeCommand, bool>, DeleteEmployeeCommandHandler>();
+            services.AddSingleton<ICommandHandler<CloseDayCommand, int>, CloseDayCommandHandler>();
+            services.AddSingleton<ICommandHandler<ReopenDayCommand, int>, ReopenDayCommandHandler>();
 
             // CoreEngine نفسه - محتاج IServiceProvider عشان يلاقي الـ Handler المناسب
             // لأي Command وقت التشغيل (راجع CoreEngine.Execute)

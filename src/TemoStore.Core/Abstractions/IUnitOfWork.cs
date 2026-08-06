@@ -21,6 +21,7 @@ namespace TemoStore.Core.Abstractions
         IEmployeeRepository Employees { get; }
         IAttendanceRepository Attendance { get; }
         IAccountRepository Accounts { get; }
+        IClosureRepository Closures { get; }
 
         void Commit();
         void Rollback();
@@ -98,6 +99,7 @@ namespace TemoStore.Core.Abstractions
         void Delete(int saleId);
         int GetDailyInvoiceNumber(int invoiceId, string saleDate);
         void SetInvoiceId(int saleId, int invoiceId);
+        void SetAmountPaid(int invoiceId, decimal amountPaid);
         IReadOnlyList<SaleRecord> GetByInvoiceId(int invoiceId);
     }
 
@@ -171,6 +173,22 @@ namespace TemoStore.Core.Abstractions
     public interface IDateClosureRepository
     {
         bool IsClosed(DateTime date, string paymentMethod = "نقدي");
+    }
+
+    // إقفال اليوم الفعلي (DailyClosures/CashDenominations) - جزء من الـ UnitOfWork عشان
+    // كل عمليات الإقفال/الفتح تتم كوحدة واحدة زي أي عملية تانية في النظام
+    public interface IClosureRepository
+    {
+        decimal? GetLastActualClosingBalance(string paymentMethod);
+        // CashMovements.MovementDate = date (مطابقة نصية تامة "yyyy-MM-dd")
+        decimal GetTodayMovementsTotal(string paymentMethod, string movementType, DateTime date);
+        // Expenses.ExpenseDate فيه وقت كمان، فلازم LIKE مش مطابقة تامة
+        decimal GetTodayExpensesTotal(DateTime date);
+        int InsertClosure(DateTime date, string paymentMethod, decimal opening, decimal totalIn, decimal totalOut, decimal actual, DateTime closedAt);
+        void InsertDenominationLine(int closureId, decimal denominationValue, int count);
+        IReadOnlyList<ClosureRow> GetClosuresForDate(DateTime date);
+        void DeleteDenominationsForClosure(int closureId);
+        void DeleteClosuresForDate(DateTime date);
     }
 
     // بينسخ قاعدة البيانات كاملة لمسار معين (VACUUM INTO) - مستخدم من BackupEngine

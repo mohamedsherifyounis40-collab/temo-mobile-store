@@ -1,0 +1,38 @@
+/* شاشة المشتريات الجديدة (Blazor Hybrid) - نفس روح sales.css بس أبسط (مفيش تابات بحث/منتجات
+   شائعة لأنها مش موجودة في الشراء - بحث بالباركود بس). الهيكل العام في shell.css. */
+
+.grid-top { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; align-items: start; }
+@media (max-width: 900px) { .grid-top { grid-template-columns: 1fr; } }
+
+.meta-list { margin-top: 14px; border-top: 1px dashed var(--color-border); padding-top: 10px; }
+.meta-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 5px 0; }
+.meta-row span { color: var(--color-text-muted); }
+
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+
+.notes-input {
+    width: 100%;
+    min-height: 70px;
+    padding: 10px;
+    border-radius: 9px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-app);
+    resize: vertical;
+    font-size: 13px;
+}
+
+.cart-card { margin-bottom: 16px; }
+.cart-header { display: flex; justify-content: space-between; align-items: center; }
+.cart-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+.cart-table th {
+    background: var(--color-bg-app);
+    color: var(--color-text-muted);
+    font-weight: bold;
+    padding: 9px 8px;
+    text-align: center;
+}
+.cart-table td { padding: 8px; text-align: center; border-bottom: 1px solid var(--color-border); }
+.cart-table .num { font-weight: bold; }
+.empty-cart { color: var(--color-text-muted); padding: 24px !important; }
+.row-delete { background: none; border: none; color: var(--color-red); font-size: 15px; }
+.cart-footer { margin-top: 10px; font-size: 13px; color: var(--color-green); font-weight: bold; }

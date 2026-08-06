@@ -25,7 +25,10 @@ namespace TemoStore.Core.Entities
         public decimal CostPrice { get; set; }
         public decimal Price { get; set; }
         public int QuantitySold { get; set; }
-        public decimal Total { get; set; }
+        public decimal Total { get; set; }                // إجمالي الصنف قبل الخصم (Gross) - يفضل زي ما هو دايمًا
+        public decimal Discount { get; set; }              // مبلغ الخصم على الصنف ده (0 لو مفيش خصم) - الصافي = Total - Discount
+        public decimal Tax { get; set; }                    // مبلغ الضريبة على الصنف ده (0 لو مفيش ضريبة)
+        public decimal AmountPaid { get; set; }              // على مستوى الفاتورة كلها (مسجّل بس على أول صنف/السطر الأساسي) - المبلغ اللي فعليًا دفعه العميل (للبيع الكاش، لحساب الفكة)
         public int? CustomerId { get; set; }
         public string PaymentType { get; set; } = "";     // "Cash" | "Credit"
         public string? PaymentMethod { get; set; }        // نقدي/فوري/... - لو PaymentType == "Cash"
@@ -41,7 +44,9 @@ namespace TemoStore.Core.Entities
         public required string ProductName { get; set; }
         public required decimal UnitPrice { get; set; }
         public required int Quantity { get; set; }
-        public required decimal Total { get; set; }
+        public required decimal Total { get; set; }        // إجمالي الصنف قبل الخصم (Gross)
+        public decimal Discount { get; set; } = 0;          // مبلغ الخصم على الصنف ده (اختياري - افتراضي صفر)
+        public decimal Tax { get; set; } = 0;                // مبلغ الضريبة على الصنف ده (اختياري - افتراضي صفر)
         public string? Imei { get; set; }
     }
 
@@ -91,6 +96,14 @@ namespace TemoStore.Core.Entities
         public string FullName { get; set; } = "";
         public decimal MonthlySalary { get; set; }
         public decimal StandardHoursPerDay { get; set; }
+    }
+
+    public class ClosureRow
+    {
+        public int Id { get; set; }
+        public string PaymentMethod { get; set; } = "";
+        public decimal ExpectedClosingBalance { get; set; }
+        public int? AdjustmentMovementId { get; set; }
     }
 
     public class JournalLineRequest

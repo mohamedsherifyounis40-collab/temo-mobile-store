@@ -1,0 +1,732 @@
+@using System.Data
+@using System.Globalization
+@using System.IO
+@using System.Windows.Forms
+@using TemoStore.Core.Commands
+@using TemoStore.Core.Exceptions
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.InventoryBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>🗄️ المخزون</h1>
+                    <div class="breadcrumb">المخزون &gt; إكسسوارات وأجهزة</div>
+                </div>
+                <div class="toolbar">
+                    <button class="btn btn-outline" @onclick="DownloadExcelTemplate">📥 تحميل قالب إكسل</button>
+                    <label class="btn btn-outline" for="excelImportInput" style="cursor:pointer">📤 استيراد من إكسل</label>
+                    <InputFile id="excelImportInput" style="display:none" OnChange="OnExcelFileSelected" accept=".xlsx" />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error">⚠️ @errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">✅ @successMessage</div>
+            }
+
+            <div class="kpi-strip">
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-blue">📦</span>
+                    <div>
+                        <div class="kpi-chip-value">@accessories.Count</div>
+                        <div class="kpi-chip-label">عدد المنتجات</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-green">🧮</span>
+                    <div>
+                        <div class="kpi-chip-value">@accessories.Sum(a => a.Quantity)</div>
+                        <div class="kpi-chip-label">إجمالي الكمية</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-red">⚠️</span>
+                    <div>
+                        <div class="kpi-chip-value">@accessories.Count(a => a.Quantity <= 3)</div>
+                        <div class="kpi-chip-label">مخزون منخفض</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-purple">💰</span>
+                    <div>
+                        <div class="kpi-chip-value">@(AuthManager.IsAdmin ? accessories.Sum(a => a.CostPrice * a.Quantity).ToString("N0") + " ج.م" : "—")</div>
+                        <div class="kpi-chip-label">قيمة المخزون</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="list-tabs">
+                <button class="list-tab @(activeTab == "accessories" ? "active" : "")" @onclick='() => activeTab = "accessories"'>📦 إكسسوارات</button>
+                <button class="list-tab @(activeTab == "devices" ? "active" : "")" @onclick='() => activeTab = "devices"'>📱 الأجهزة (IMEI)</button>
+            </div>
+
+            @if (activeTab == "accessories")
+            {
+                <div class="card">
+                    <div class="list-toolbar">
+                        <input class="field-input" placeholder="بحث بالاسم أو الباركود..." value="@accessorySearch" @oninput="e => accessorySearch = e.Value?.ToString() ?? string.Empty" />
+                        <button class="btn btn-primary" disabled="@(!AuthManager.IsAdmin)" @onclick="OpenNewAccessoryForm">➕ إضافة منتج</button>
+                    </div>
+
+                    @if (showAccessoryForm)
+                    {
+                        <div class="form-panel">
+                            <div class="form-panel-title">@(editingBarcode == null ? "إضافة منتج جديد" : "تعديل المنتج")</div>
+                            <div class="form-grid">
+                                <div>
+                                    <label class="field-label">الباركود</label>
+                                    <input class="field-input" value="@accBarcode" disabled="@(editingBarcode != null)" @oninput="e => accBarcode = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">اسم المنتج</label>
+                                    <input class="field-input" value="@accName" @oninput="e => accName = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">سعر الشراء</label>
+                                    <input class="field-input" type="number" value="@accCost" @oninput="e => accCost = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">سعر البيع</label>
+                                    <input class="field-input" type="number" value="@accSale" @oninput="e => accSale = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">الكمية</label>
+                                    <input class="field-input" type="number" value="@accQty" @oninput="e => accQty = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">عدد نسخ ملصق الباركود</label>
+                                    <input class="field-input" type="number" min="1" value="@printCopies" @oninput="e => printCopies = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-primary" @onclick="SaveAccessory">💾 حفظ</button>
+                                <button class="btn btn-outline" @onclick="PrintAccessoryBarcode">🏷️ طباعة ملصق الباركود</button>
+                                <button class="btn btn-outline" @onclick="() => showAccessoryForm = false">إلغاء</button>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="data-table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>الكمية</th>
+                                    <th>سعر البيع</th>
+                                    @if (AuthManager.IsAdmin)
+                                    {
+                                        <th>سعر الشراء</th>
+                                    }
+                                    <th>اسم المنتج</th>
+                                    <th>الباركود</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in FilteredAccessories)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="row-actions">
+                                                <button class="row-action-btn edit" disabled="@(!AuthManager.IsAdmin)" title="تعديل" @onclick="() => OpenEditAccessoryForm(p)">✏️</button>
+                                                <button class="row-action-btn delete" disabled="@(!AuthManager.IsAdmin)" title="حذف" @onclick="() => DeleteAccessory(p.Barcode)">🗑</button>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @if (p.Quantity <= 0)
+                                            {
+                                                <span class="qty-out">نفدت</span>
+                                            }
+                                            else if (p.Quantity <= 3)
+                                            {
+                                                <span class="qty-low">@p.Quantity</span>
+                                            }
+                                            else
+                                            {
+                                                @p.Quantity
+                                            }
+                                        </td>
+                                        <td>@p.SalePrice.ToString("N2")</td>
+                                        @if (AuthManager.IsAdmin)
+                                        {
+                                            <td>@p.CostPrice.ToString("N2")</td>
+                                        }
+                                        <td>@p.ProductName</td>
+                                        <td class="muted">@p.Barcode</td>
+                                    </tr>
+                                }
+                                @if (FilteredAccessories.Count == 0)
+                                {
+                                    <tr><td colspan="6" class="empty-row">مفيش منتجات مطابقة</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card">
+                    <div class="list-toolbar">
+                        <input class="field-input" placeholder="بحث بالـ IMEI أو اسم المنتج..." value="@deviceSearch" @oninput="OnDeviceSearchChanged" />
+                        <select class="field-input" style="max-width:180px" value="@deviceStatusFilter" @onchange="OnDeviceStatusChanged">
+                            <option value="الكل">الكل</option>
+                            <option value="متاح في المخزون">متاح في المخزون</option>
+                            <option value="مباع">مباع</option>
+                        </select>
+                        <button class="btn btn-primary" disabled="@(!AuthManager.IsAdmin)" @onclick="OpenNewDeviceForm">➕ إضافة جهاز</button>
+                    </div>
+
+                    @if (showDeviceForm)
+                    {
+                        <div class="form-panel">
+                            <div class="form-panel-title">إضافة جهاز جديد (IMEI)</div>
+                            <div class="form-grid">
+                                <div>
+                                    <label class="field-label">الباركود</label>
+                                    <input class="field-input" value="@devBarcode" @oninput="e => devBarcode = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">اسم الموديل</label>
+                                    <input class="field-input" value="@devName" @oninput="e => devName = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">سعر الشراء</label>
+                                    <input class="field-input" type="number" value="@devCost" @oninput="e => devCost = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">سعر البيع</label>
+                                    <input class="field-input" type="number" value="@devSale" @oninput="e => devSale = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">رقم IMEI</label>
+                                    <input class="field-input" value="@devImei" @oninput="e => devImei = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-primary" @onclick="SaveDevice">💾 حفظ</button>
+                                <button class="btn btn-outline" @onclick="() => showDeviceForm = false">إلغاء</button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (editingModelBarcode != null)
+                    {
+                        <div class="form-panel">
+                            <div class="form-panel-title">تعديل سعر الموديل: @editingModelName</div>
+                            <div class="form-grid">
+                                <div>
+                                    <label class="field-label">سعر الشراء</label>
+                                    <input class="field-input" type="number" value="@devCost" @oninput="e => devCost = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">سعر البيع</label>
+                                    <input class="field-input" type="number" value="@devSale" @oninput="e => devSale = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-primary" @onclick="SaveModelPrice">💾 حفظ السعر</button>
+                                <button class="btn btn-outline" @onclick="() => editingModelBarcode = null">إلغاء</button>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="data-table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr><th></th><th>تاريخ الإضافة</th><th>الحالة</th><th>المنتج</th><th>الباركود</th><th>IMEI</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in devices)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="row-actions">
+                                                <button class="row-action-btn edit" disabled="@(!AuthManager.IsAdmin)" title="تعديل السعر" @onclick="() => OpenEditModelPriceForm(d)">✏️</button>
+                                            </div>
+                                        </td>
+                                        <td class="muted">@d.CreatedAt</td>
+                                        <td>@d.Status</td>
+                                        <td>@d.ProductName</td>
+                                        <td class="muted">@d.Barcode</td>
+                                        <td>@d.Imei</td>
+                                    </tr>
+                                }
+                                @if (devices.Count == 0)
+                                {
+                                    <tr><td colspan="6" class="empty-row">مفيش أجهزة مطابقة</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون (تجربة)", "🧪"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCount, MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private string activeTab = "accessories";
+    private string? errorMessage;
+    private string? successMessage;
+
+    // ---------- إكسسوارات ----------
+    private class AccessoryRow
+    {
+        public required string Barcode { get; set; }
+        public required string ProductName { get; set; }
+        public decimal CostPrice { get; set; }
+        public decimal SalePrice { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    private List<AccessoryRow> accessories = new();
+    private string accessorySearch = "";
+    private bool showAccessoryForm;
+    private string? editingBarcode;
+    private string accBarcode = "", accName = "", accCost = "", accSale = "", accQty = "";
+    private string printCopies = "1";
+
+    private List<AccessoryRow> FilteredAccessories =>
+        string.IsNullOrWhiteSpace(accessorySearch)
+            ? accessories
+            : accessories.Where(a => a.ProductName.Contains(accessorySearch, StringComparison.OrdinalIgnoreCase) || a.Barcode.Contains(accessorySearch, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    // ---------- أجهزة (IMEI) ----------
+    private class DeviceRow
+    {
+        public required string Imei { get; set; }
+        public required string Barcode { get; set; }
+        public required string ProductName { get; set; }
+        public required string Status { get; set; }
+        public required string CreatedAt { get; set; }
+    }
+
+    private List<DeviceRow> devices = new();
+    private string deviceSearch = "";
+    private string deviceStatusFilter = "الكل";
+    private bool showDeviceForm;
+    private string devBarcode = "", devName = "", devCost = "", devSale = "", devImei = "";
+    private string? editingModelBarcode;
+    private string editingModelName = "";
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        LoadAccessories();
+        LoadDevices();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private void LoadAccessories()
+    {
+        accessories.Clear();
+        var dt = InventoryRepository.GetAccessoryProducts();
+        foreach (DataRow row in dt.Rows)
+        {
+            accessories.Add(new AccessoryRow
+            {
+                Barcode = row["الباركود"].ToString() ?? "",
+                ProductName = row["اسم المنتج"].ToString() ?? "",
+                CostPrice = row["سعر الشراء"] == DBNull.Value ? 0 : Convert.ToDecimal(row["سعر الشراء"]),
+                SalePrice = row["سعر البيع"] == DBNull.Value ? 0 : Convert.ToDecimal(row["سعر البيع"]),
+                Quantity = row["الكمية"] == DBNull.Value ? 0 : Convert.ToInt32(row["الكمية"])
+            });
+        }
+    }
+
+    private void LoadDevices()
+    {
+        devices.Clear();
+        var dt = InventoryRepository.GetImeiUnits(deviceStatusFilter, deviceSearch);
+        foreach (DataRow row in dt.Rows)
+        {
+            devices.Add(new DeviceRow
+            {
+                Imei = row["IMEI"].ToString() ?? "",
+                Barcode = row["الباركود"].ToString() ?? "",
+                ProductName = row["المنتج"].ToString() ?? "",
+                Status = row["الحالة"].ToString() ?? "",
+                CreatedAt = row["تاريخ الإضافة"].ToString() ?? ""
+            });
+        }
+    }
+
+    private void OnDeviceSearchChanged(ChangeEventArgs e)
+    {
+        deviceSearch = e.Value?.ToString() ?? "";
+        LoadDevices();
+    }
+
+    private void OnDeviceStatusChanged(ChangeEventArgs e)
+    {
+        deviceStatusFilter = e.Value?.ToString() ?? "الكل";
+        LoadDevices();
+    }
+
+    // ---------- إكسسوارات: إضافة/تعديل/حذف ----------
+    private void OpenNewAccessoryForm()
+    {
+        editingBarcode = null;
+        accBarcode = accName = accCost = accSale = accQty = "";
+        printCopies = "1";
+        showAccessoryForm = true;
+        errorMessage = null;
+    }
+
+    private void OpenEditAccessoryForm(AccessoryRow p)
+    {
+        editingBarcode = p.Barcode;
+        accBarcode = p.Barcode;
+        accName = p.ProductName;
+        accCost = p.CostPrice.ToString(CultureInfo.InvariantCulture);
+        accSale = p.SalePrice.ToString(CultureInfo.InvariantCulture);
+        accQty = p.Quantity.ToString(CultureInfo.InvariantCulture);
+        printCopies = "1";
+        showAccessoryForm = true;
+        errorMessage = null;
+    }
+
+    // ---------- طباعة ملصق باركود - نفس BarcodeHelper.PrintBarcodeLabel المستخدمة في الشاشة القديمة بالظبط ----------
+    private void PrintAccessoryBarcode()
+    {
+        errorMessage = null;
+        if (string.IsNullOrWhiteSpace(accBarcode))
+        {
+            errorMessage = "مفيش باركود لهذا المنتج.";
+            return;
+        }
+        int.TryParse(printCopies, out var copies);
+        try
+        {
+            BarcodeHelper.PrintBarcodeLabel(accBarcode, accName, null, copies);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    // ---------- استيراد/تصدير إكسل - نفس ExcelImportHelper المستخدمة في الشاشة القديمة بالظبط ----------
+    private void DownloadExcelTemplate()
+    {
+        errorMessage = null;
+        successMessage = null;
+        using var dlg = new SaveFileDialog { Filter = "ملف إكسل (*.xlsx)|*.xlsx", FileName = "قالب_استيراد_منتجات.xlsx" };
+        if (dlg.ShowDialog() != DialogResult.OK) return;
+
+        try
+        {
+            ExcelImportHelper.GenerateProductTemplate(dlg.FileName);
+            successMessage = "تم إنشاء القالب بنجاح. املأ الأعمدة (باركود، اسم المنتج، سعر الشراء، سعر البيع، الكمية) وارجع استورد الملف.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task OnExcelFileSelected(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        successMessage = null;
+        string tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".xlsx");
+        try
+        {
+            var file = e.File;
+            using (var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024))
+            using (var fileStream = File.Create(tempPath))
+            {
+                await stream.CopyToAsync(fileStream);
+            }
+
+            var result = ExcelImportHelper.ImportProducts(tempPath, AuthManager.CurrentUsername ?? "unknown");
+            LoadAccessories();
+
+            string summary = $"تم استيراد {result.SuccessCount} منتج بنجاح.";
+            if (result.SkippedDuplicateBarcodes.Count > 0)
+                summary += $" اتخطّى {result.SkippedDuplicateBarcodes.Count} صف باركود موجود بالفعل.";
+            if (result.RowErrors.Count > 0)
+                summary += $" أخطاء ({result.RowErrors.Count}): {string.Join(" | ", result.RowErrors.Take(10))}";
+            successMessage = summary;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
+        }
+    }
+
+    private void SaveAccessory()
+    {
+        errorMessage = null;
+        if (string.IsNullOrWhiteSpace(accBarcode) || string.IsNullOrWhiteSpace(accName))
+        {
+            errorMessage = "الباركود واسم المنتج مطلوبين.";
+            return;
+        }
+        if (!decimal.TryParse(accCost, out var cost) || cost < 0)
+        {
+            errorMessage = "سعر الشراء غير صحيح.";
+            return;
+        }
+        if (!decimal.TryParse(accSale, out var sale) || sale < 0)
+        {
+            errorMessage = "سعر البيع غير صحيح.";
+            return;
+        }
+        if (!int.TryParse(accQty, out var qty) || qty < 0)
+        {
+            errorMessage = "الكمية غير صحيحة.";
+            return;
+        }
+
+        try
+        {
+            if (editingBarcode == null)
+            {
+                AppServices.CoreEngine.Execute(new AddAccessoryProductCommand
+                {
+                    Barcode = accBarcode.Trim(),
+                    ProductName = accName.Trim(),
+                    CostPrice = cost,
+                    SalePrice = sale,
+                    Quantity = qty,
+                    PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+                });
+                successMessage = "تم إضافة المنتج بنجاح.";
+            }
+            else
+            {
+                AppServices.CoreEngine.Execute(new UpdateAccessoryProductCommand
+                {
+                    Barcode = editingBarcode,
+                    ProductName = accName.Trim(),
+                    CostPrice = cost,
+                    SalePrice = sale,
+                    Quantity = qty,
+                    PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+                });
+                successMessage = "تم تعديل المنتج بنجاح.";
+            }
+            showAccessoryForm = false;
+            LoadAccessories();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void DeleteAccessory(string barcode)
+    {
+        errorMessage = null;
+        try
+        {
+            AppServices.CoreEngine.Execute(new DeleteProductCommand { Barcode = barcode, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            successMessage = "تم حذف المنتج.";
+            LoadAccessories();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    // ---------- أجهزة: إضافة/تعديل سعر الموديل ----------
+    private void OpenNewDeviceForm()
+    {
+        editingModelBarcode = null;
+        devBarcode = devName = devCost = devSale = devImei = "";
+        showDeviceForm = true;
+        errorMessage = null;
+    }
+
+    private void OpenEditModelPriceForm(DeviceRow d)
+    {
+        showDeviceForm = false;
+        editingModelBarcode = d.Barcode;
+        editingModelName = d.ProductName;
+        devCost = "";
+        devSale = "";
+        errorMessage = null;
+    }
+
+    private void SaveDevice()
+    {
+        errorMessage = null;
+        if (string.IsNullOrWhiteSpace(devBarcode) || string.IsNullOrWhiteSpace(devName) || string.IsNullOrWhiteSpace(devImei))
+        {
+            errorMessage = "الباركود والاسم ورقم IMEI مطلوبين.";
+            return;
+        }
+        if (!decimal.TryParse(devCost, out var cost) || cost < 0)
+        {
+            errorMessage = "سعر الشراء غير صحيح.";
+            return;
+        }
+        if (!decimal.TryParse(devSale, out var sale) || sale < 0)
+        {
+            errorMessage = "سعر البيع غير صحيح.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new AddDeviceCommand
+            {
+                Barcode = devBarcode.Trim(),
+                ProductName = devName.Trim(),
+                CostPrice = cost,
+                SalePrice = sale,
+                Imei = devImei.Trim(),
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم إضافة الجهاز بنجاح.";
+            showDeviceForm = false;
+            LoadDevices();
+        }
+        catch (DuplicateImeiException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void SaveModelPrice()
+    {
+        errorMessage = null;
+        if (editingModelBarcode == null) return;
+        if (!decimal.TryParse(devCost, out var cost) || cost < 0)
+        {
+            errorMessage = "سعر الشراء غير صحيح.";
+            return;
+        }
+        if (!decimal.TryParse(devSale, out var sale) || sale < 0)
+        {
+            errorMessage = "سعر البيع غير صحيح.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new UpdateModelPriceCommand
+            {
+                Barcode = editingModelBarcode,
+                ProductName = editingModelName,
+                CostPrice = cost,
+                SalePrice = sale,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم تعديل سعر الموديل بنجاح.";
+            editingModelBarcode = null;
+            LoadDevices();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}

@@ -13,6 +13,27 @@ namespace Temo_Mobile_Store
         public bool IsSerialized;
     }
 
+    // نتيجة بحث عن منتج (بالاسم أو الأكثر مبيعًا) - زي ProductForSale بس معاها الباركود
+    // نفسه، لازم نعرفه عشان نقدر نحمّل المنتج المختار في حقول البيع
+    public class ProductSearchResult
+    {
+        public string Barcode;
+        public string ProductName;
+        public decimal SalePrice;
+        public int Quantity;
+        public bool IsSerialized;
+        public byte[] Image;
+    }
+
+    // نتيجة بحث عن جهاز بالسيريال/IMEI - المنتج المرتبط بيه + IMEI نفسه محدد سلفًا
+    public class SerialSearchResult
+    {
+        public string IMEI;
+        public string Barcode;
+        public string ProductName;
+        public decimal SalePrice;
+    }
+
     // بيانات كاملة لآخر عملية بيع - مستخدمة في طباعة إيصال العميل (كل حقل مربوط ببيانات حقيقية)
     public class ReceiptData
     {
@@ -23,6 +44,7 @@ namespace Temo_Mobile_Store
         public decimal UnitPrice;
         public int Quantity;
         public decimal Total;
+        public decimal Discount;
         public string PaymentType;   // Cash / Credit
         public string PaymentMethod; // نقدي/فوري/... (لو كاش)
         public string SaleDate;
@@ -40,6 +62,7 @@ namespace Temo_Mobile_Store
         public decimal Price;
         public int QuantitySold;
         public decimal Total;
+        public decimal Discount;
         public string PaymentType;
         public string PaymentMethod;
         public string SaleDate;
@@ -136,7 +159,7 @@ namespace Temo_Mobile_Store
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, ProductName, Price, QuantitySold, Total, PaymentType, PaymentMethod, SaleDate, IMEI FROM Sales WHERE SaleID = @Id", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, ProductName, Price, QuantitySold, Total, Discount, PaymentType, PaymentMethod, SaleDate, IMEI FROM Sales WHERE SaleID = @Id", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", saleId);
                     using (SqliteDataReader reader = cmd.ExecuteReader())
@@ -150,6 +173,7 @@ namespace Temo_Mobile_Store
                             Price = Convert.ToDecimal(reader["Price"]),
                             QuantitySold = Convert.ToInt32(reader["QuantitySold"]),
                             Total = Convert.ToDecimal(reader["Total"]),
+                            Discount = reader["Discount"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["Discount"]),
                             PaymentType = reader["PaymentType"] == DBNull.Value ? null : reader["PaymentType"].ToString(),
                             PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
                             SaleDate = reader["SaleDate"].ToString(),
@@ -210,7 +234,7 @@ namespace Temo_Mobile_Store
 
                 var items = new System.Collections.Generic.List<ReceiptData>();
                 using (SqliteCommand cmd = new SqliteCommand(@"
-                    SELECT S.SaleID, S.Barcode, S.ProductName, S.Price, S.QuantitySold, S.Total,
+                    SELECT S.SaleID, S.Barcode, S.ProductName, S.Price, S.QuantitySold, S.Total, S.Discount,
                            S.PaymentType, S.PaymentMethod, S.SaleDate, S.IMEI, C.CustomerName, C.Phone,
                            (SELECT CreatedBy FROM JournalEntries WHERE SourceType = 'Sale' AND SourceId = @InvoiceId ORDER BY JournalEntryId LIMIT 1) AS CashierName
                     FROM Sales S
@@ -231,6 +255,7 @@ namespace Temo_Mobile_Store
                                 UnitPrice = Convert.ToDecimal(reader["Price"]),
                                 Quantity = Convert.ToInt32(reader["QuantitySold"]),
                                 Total = Convert.ToDecimal(reader["Total"]),
+                                Discount = reader["Discount"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["Discount"]),
                                 PaymentType = reader["PaymentType"] == DBNull.Value ? null : reader["PaymentType"].ToString(),
                                 PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
                                 SaleDate = reader["SaleDate"].ToString(),
@@ -250,6 +275,109 @@ namespace Temo_Mobile_Store
 
                 return items;
             }
+        }
+
+        // بحث عن منتج بالاسم أو الباركود (تاب "منتج" في شاشة البيع) - أول 20 نتيجة مطابقة بس
+        public static System.Collections.Generic.List<ProductSearchResult> SearchProducts(string term)
+        {
+            var results = new System.Collections.Generic.List<ProductSearchResult>();
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand(
+                    "SELECT Barcode, ProductName, SalePrice, Quantity, IsSerialized, ProductImage FROM Products " +
+                    "WHERE Barcode LIKE @Term OR ProductName LIKE @Term ORDER BY ProductName LIMIT 20", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Term", $"%{term}%");
+                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            results.Add(new ProductSearchResult
+                            {
+                                Barcode = reader["Barcode"].ToString(),
+                                ProductName = reader["ProductName"].ToString(),
+                                SalePrice = Convert.ToDecimal(reader["SalePrice"]),
+                                Quantity = Convert.ToInt32(reader["Quantity"]),
+                                IsSerialized = reader["IsSerialized"] != DBNull.Value && Convert.ToInt32(reader["IsSerialized"]) == 1,
+                                Image = reader["ProductImage"] == DBNull.Value ? null : (byte[])reader["ProductImage"]
+                            });
+                        }
+                    }
+                }
+            }
+            return results;
+        }
+
+        // بحث عن جهاز متاح بالسيريال/IMEI (تاب "سيريال" في شاشة البيع) - بس الأجهزة اللي
+        // لسه في المخزون (Status='InStock')، أول 20 نتيجة مطابقة
+        public static System.Collections.Generic.List<SerialSearchResult> SearchProductsBySerial(string term)
+        {
+            var results = new System.Collections.Generic.List<SerialSearchResult>();
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand(@"
+                    SELECT pu.IMEI, p.Barcode, p.ProductName, p.SalePrice
+                    FROM ProductUnits pu
+                    JOIN Products p ON pu.Barcode = p.Barcode
+                    WHERE pu.Status = 'InStock' AND pu.IMEI LIKE @Term
+                    ORDER BY p.ProductName LIMIT 20", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Term", $"%{term}%");
+                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            results.Add(new SerialSearchResult
+                            {
+                                IMEI = reader["IMEI"].ToString(),
+                                Barcode = reader["Barcode"].ToString(),
+                                ProductName = reader["ProductName"].ToString(),
+                                SalePrice = Convert.ToDecimal(reader["SalePrice"])
+                            });
+                        }
+                    }
+                }
+            }
+            return results;
+        }
+
+        // المنتجات الأكثر مبيعًا (بالكمية) - لكروت "الأكثر مبيعًا" السريعة في شاشة البيع.
+        // بيرجع بيانات المنتج الحيّة (السعر/الكمية الحالية) مش القديمة وقت البيع
+        public static System.Collections.Generic.List<ProductSearchResult> GetPopularProducts(int topN = 6)
+        {
+            var results = new System.Collections.Generic.List<ProductSearchResult>();
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand(@"
+                    SELECT p.Barcode, p.ProductName, p.SalePrice, p.Quantity, p.IsSerialized, p.ProductImage
+                    FROM Products p
+                    JOIN (SELECT Barcode, SUM(QuantitySold) AS Sold FROM Sales GROUP BY Barcode ORDER BY Sold DESC LIMIT @TopN) top
+                        ON p.Barcode = top.Barcode
+                    WHERE p.Quantity > 0
+                    ORDER BY top.Sold DESC", conn))
+                {
+                    cmd.Parameters.AddWithValue("@TopN", topN);
+                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            results.Add(new ProductSearchResult
+                            {
+                                Barcode = reader["Barcode"].ToString(),
+                                ProductName = reader["ProductName"].ToString(),
+                                SalePrice = Convert.ToDecimal(reader["SalePrice"]),
+                                Quantity = Convert.ToInt32(reader["Quantity"]),
+                                IsSerialized = reader["IsSerialized"] != DBNull.Value && Convert.ToInt32(reader["IsSerialized"]) == 1,
+                                Image = reader["ProductImage"] == DBNull.Value ? null : (byte[])reader["ProductImage"]
+                            });
+                        }
+                    }
+                }
+            }
+            return results;
         }
 
         // آخر عملية بيع (من غير عميل) - مستخدمة وقت طباعة آخر فاتورة

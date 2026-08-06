@@ -34,6 +34,8 @@ namespace Temo_Mobile_Store
         private Label lblCostPrice;
         private Guna2Button btnAddProduct, btnEditMode, btnSaveUpdate, btnDeleteProduct, btnClear;
         private DataGridView dgvProducts;
+        private PictureBox picProductImage;
+        private byte[] pendingProductImage = null;
 
         // ---------- الأجهزة والسريالات (موبايلات بـ IMEI) ----------
         private Guna2TextBox txtImeiSearch;
@@ -112,58 +114,71 @@ namespace Temo_Mobile_Store
             Guna2Panel pnlCard = new Guna2Panel()
             {
                 Location = new Point(0, 0),
-                Size = new Size(300, 520),
+                Size = new Size(300, 610),
                 FillColor = Color.White,
                 BorderRadius = UIHelpers.CardBorderRadius,
                 BorderColor = Color.FromArgb(230, 232, 238),
                 BorderThickness = 1
             };
 
-            Label lblCardTitle = new Label() { Text = "📦 إضافة / تعديل منتج", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = ColorPrimary };
+            var badgeCardTitle = UIHelpers.CreateIconBadge("📦", UIHelpers.ColorAccentPrimary, new Point(20, 16));
+            Label lblCardTitle = new Label() { Text = "إضافة / تعديل منتج", Location = new Point(64, 24), AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblBarcode = new Label() { Text = "باركود المنتج:", Location = new Point(20, 60), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtBarcode = new Guna2TextBox() { Location = new Point(20, 80), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtBarcode = new Guna2TextBox() { Location = new Point(20, 80), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
 
             Label lblProductName = new Label() { Text = "اسم المنتج:", Location = new Point(20, 118), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtProductName = new Guna2TextBox() { Location = new Point(20, 138), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtProductName = new Guna2TextBox() { Location = new Point(20, 138), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
 
             lblCostPrice = new Label() { Text = "سعر الشراء (التكلفة):", Location = new Point(20, 176), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtCostPrice = new Guna2TextBox() { Location = new Point(20, 196), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtCostPrice = new Guna2TextBox() { Location = new Point(20, 196), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
 
             Label lblSalePrice = new Label() { Text = "سعر البيع للجمهور:", Location = new Point(20, 234), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtSalePrice = new Guna2TextBox() { Location = new Point(20, 254), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtSalePrice = new Guna2TextBox() { Location = new Point(20, 254), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
 
             Label lblQuantity = new Label() { Text = "الكمية:", Location = new Point(20, 292), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtQuantity = new Guna2TextBox() { Location = new Point(20, 312), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtQuantity = new Guna2TextBox() { Location = new Point(20, 312), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
+
+            // ---------- صورة المنتج (اختيارية، تجميلية) - بتتحفظ مباشرة على المخزون
+            // من غير ما تعدّي على CoreEngine، عشان تظهر في كروت "الأكثر مبيعًا" بالمبيعات ----------
+            picProductImage = new PictureBox() { Location = new Point(20, 330), Size = new Size(80, 80), SizeMode = PictureBoxSizeMode.Zoom, BorderStyle = BorderStyle.FixedSingle, BackColor = Color.White };
+            Guna2Button btnUploadProductImage = new Guna2Button() { Text = "رفع صورة 🖼️", Location = new Point(112, 330), Width = 168, Height = 32, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 9, Font = new Font("Segoe UI", 8F) };
+            btnUploadProductImage.Click += BtnUploadProductImage_Click;
+            Guna2Button btnRemoveProductImage = new Guna2Button() { Text = "إزالة الصورة 🗑️", Location = new Point(112, 368), Width = 168, Height = 30, FillColor = UIHelpers.ColorRed, BorderRadius = 9, Font = new Font("Segoe UI", 8F) };
+            btnRemoveProductImage.Click += BtnRemoveProductImage_Click;
 
             Label lblNote = new Label()
             {
                 Text = "لإضافة موبايل بسيريال/IMEI، استخدم تبويب \"الأجهزة والسريالات\" بدل كده.",
-                Location = new Point(20, 350),
+                Location = new Point(20, 420),
                 Size = new Size(260, 32),
                 Font = new Font("Segoe UI", 7.5F),
                 ForeColor = Color.FromArgb(85, 92, 102)
             };
 
-            btnAddProduct = new Guna2Button() { Text = "إضافة منتج جديد", Location = new Point(20, 388), Width = 260, Height = 38, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
+            btnAddProduct = new Guna2Button() { Text = "إضافة منتج جديد", Location = new Point(20, 458), Width = 260, Height = 38, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnAddProduct.Click += BtnAddProduct_Click;
+            UIHelpers.MakePill(btnAddProduct);
 
-            btnEditMode = new Guna2Button() { Text = "تعديل البند المحدّد", Location = new Point(20, 433), Width = 260, Height = 36, FillColor = UIHelpers.ColorOrange, BorderRadius = 10 };
+            btnEditMode = new Guna2Button() { Text = "تعديل البند المحدّد", Location = new Point(20, 503), Width = 260, Height = 36, FillColor = UIHelpers.ColorOrange, BorderRadius = 10 };
             btnEditMode.Click += BtnEditMode_Click;
+            UIHelpers.MakePill(btnEditMode);
 
-            Guna2Button btnPrintBarcode = new Guna2Button() { Text = "طباعة باركود 🏷️", Location = new Point(20, 473), Width = 195, Height = 34, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
-            NumericUpDown numPrintCopies = new NumericUpDown() { Location = new Point(222, 473), Width = 58, Height = 34, Minimum = 1, Maximum = 200, Value = 1, TextAlign = HorizontalAlignment.Center, Font = new Font("Segoe UI", 9F) };
+            Guna2Button btnPrintBarcode = new Guna2Button() { Text = "طباعة باركود 🏷️", Location = new Point(20, 543), Width = 195, Height = 34, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 9 };
+            UIHelpers.MakePill(btnPrintBarcode);
+            NumericUpDown numPrintCopies = new NumericUpDown() { Location = new Point(222, 543), Width = 58, Height = 34, Minimum = 1, Maximum = 200, Value = 1, TextAlign = HorizontalAlignment.Center, Font = new Font("Segoe UI", 9F) };
             btnPrintBarcode.Click += (s, e) => BarcodeHelper.PrintBarcodeLabel(txtBarcode.Text, txtProductName.Text, this.FindForm(), (int)numPrintCopies.Value);
 
             pnlCard.Controls.AddRange(new Control[] {
-                lblCardTitle, lblBarcode, txtBarcode, lblProductName, txtProductName, lblCostPrice, txtCostPrice,
-                lblSalePrice, txtSalePrice, lblQuantity, txtQuantity, lblNote, btnAddProduct, btnEditMode, btnPrintBarcode, numPrintCopies
+                badgeCardTitle, lblCardTitle, lblBarcode, txtBarcode, lblProductName, txtProductName, lblCostPrice, txtCostPrice,
+                lblSalePrice, txtSalePrice, lblQuantity, txtQuantity, picProductImage, btnUploadProductImage, btnRemoveProductImage,
+                lblNote, btnAddProduct, btnEditMode, btnPrintBarcode, numPrintCopies
             });
 
             // ---------- كارت ثاني (حفظ / حذف / تفريغ) ----------
             Guna2Panel pnlActions = new Guna2Panel()
             {
-                Location = new Point(0, 535),
+                Location = new Point(0, 622),
                 Size = new Size(300, 255),
                 FillColor = Color.White,
                 BorderRadius = UIHelpers.CardBorderRadius,
@@ -173,18 +188,23 @@ namespace Temo_Mobile_Store
 
             btnSaveUpdate = new Guna2Button() { Text = "حفظ التعديلات 💾", Location = new Point(20, 20), Width = 260, Height = 40, FillColor = UIHelpers.ColorGreen, Font = new Font("Segoe UI", 9, FontStyle.Bold), Enabled = false, BorderRadius = 10 };
             btnSaveUpdate.Click += BtnSaveUpdate_Click;
+            UIHelpers.MakePill(btnSaveUpdate);
 
             btnDeleteProduct = new Guna2Button() { Text = "حذف المنتج المحدد", Location = new Point(20, 68), Width = 260, Height = 36, FillColor = UIHelpers.ColorRed, BorderRadius = 10 };
             btnDeleteProduct.Click += BtnDeleteProduct_Click;
+            UIHelpers.MakePill(btnDeleteProduct);
 
             btnClear = new Guna2Button() { Text = "تفريغ الخانات", Location = new Point(20, 112), Width = 260, Height = 34, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 10 };
             btnClear.Click += (s, e) => ClearInputs();
+            UIHelpers.MakePill(btnClear);
 
             Guna2Button btnDownloadTemplate = new Guna2Button() { Text = "تحميل قالب إكسل ⬇️", Location = new Point(20, 156), Width = 260, Height = 34, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 10 };
             btnDownloadTemplate.Click += BtnDownloadTemplate_Click;
+            UIHelpers.MakePill(btnDownloadTemplate);
 
             Guna2Button btnImportExcel = new Guna2Button() { Text = "استيراد من إكسل 📥", Location = new Point(20, 200), Width = 260, Height = 34, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 10 };
             btnImportExcel.Click += BtnImportExcel_Click;
+            UIHelpers.MakePill(btnImportExcel);
 
             pnlActions.Controls.AddRange(new Control[] { btnSaveUpdate, btnDeleteProduct, btnClear, btnDownloadTemplate, btnImportExcel });
 
@@ -199,13 +219,14 @@ namespace Temo_Mobile_Store
                 BorderColor = Color.FromArgb(230, 232, 238),
                 BorderThickness = 1
             };
-            Label lblGridTitle = new Label() { Text = "📦 المنتجات المسجّلة (إكسسوارات وغيرها)", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
+            var badgeGridTitle = UIHelpers.CreateIconBadge("📦", UIHelpers.ColorGreen, new Point(20, 16));
+            Label lblGridTitle = new Label() { Text = "المنتجات المسجّلة (إكسسوارات وغيرها)", Location = new Point(64, 24), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvProducts = new DataGridView() { Location = new Point(20, 55), Size = new Size(740, 615), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvProducts.CellClick += DgvProducts_CellClick;
             StyleDataGridView(dgvProducts);
 
-            pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvProducts });
+            pnlGridCard.Controls.AddRange(new Control[] { badgeGridTitle, lblGridTitle, dgvProducts });
 
             pnlAccessoriesOps.Controls.AddRange(new Control[] { pnlCard, pnlActions, pnlGridCard });
         }
@@ -296,7 +317,74 @@ namespace Temo_Mobile_Store
                 txtQuantity.Text = row.Cells["الكمية"].Value.ToString();
                 txtBarcode.ReadOnly = true;
                 btnSaveUpdate.Enabled = false;
+                LoadProductImagePreview(txtBarcode.Text);
             }
+        }
+
+        // ---------- صورة المنتج: تحميل المعاينة، الرفع، الإزالة ----------
+        private void LoadProductImagePreview(string barcode)
+        {
+            pendingProductImage = null;
+            try { pendingProductImage = InventoryRepository.GetProductImage(barcode); }
+            catch { /* منتج جديد لسه ملوش صف في القاعدة - تجاهل */ }
+            RefreshProductImagePreview();
+        }
+
+        private void RefreshProductImagePreview()
+        {
+            if (pendingProductImage != null && pendingProductImage.Length > 0)
+            {
+                using (var ms = new System.IO.MemoryStream(pendingProductImage))
+                    picProductImage.Image = Image.FromStream(ms);
+            }
+            else
+            {
+                picProductImage.Image = null;
+            }
+        }
+
+        private void BtnUploadProductImage_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog() { Filter = "ملفات صور (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp" })
+            {
+                if (ofd.ShowDialog() != DialogResult.OK) return;
+                try
+                {
+                    byte[] imageBytes = System.IO.File.ReadAllBytes(ofd.FileName);
+                    using (var msOriginal = new System.IO.MemoryStream(imageBytes))
+                    using (var original = Image.FromStream(msOriginal))
+                    {
+                        int maxSize = 500;
+                        int width, height;
+                        if (original.Width > original.Height) { width = maxSize; height = (int)(original.Height * (maxSize / (double)original.Width)); }
+                        else { height = maxSize; width = (int)(original.Width * (maxSize / (double)original.Height)); }
+
+                        using (var resized = new Bitmap(original, new Size(width, height)))
+                        using (var msResized = new System.IO.MemoryStream())
+                        {
+                            resized.Save(msResized, System.Drawing.Imaging.ImageFormat.Png);
+                            pendingProductImage = msResized.ToArray();
+                        }
+                    }
+                    RefreshProductImagePreview();
+
+                    // لو المنتج موجود بالفعل (مش إضافة جديدة لسه ما اتحفظتش)، نحفظ الصورة فورًا
+                    if (!string.IsNullOrEmpty(txtBarcode.Text) && txtBarcode.ReadOnly)
+                        InventoryRepository.UpdateProductImage(txtBarcode.Text, pendingProductImage);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("مش قادر يفتح الصورة دي: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void BtnRemoveProductImage_Click(object sender, EventArgs e)
+        {
+            pendingProductImage = null;
+            RefreshProductImagePreview();
+            if (!string.IsNullOrEmpty(txtBarcode.Text) && txtBarcode.ReadOnly)
+                InventoryRepository.UpdateProductImage(txtBarcode.Text, null);
         }
 
         private void BtnDownloadTemplate_Click(object sender, EventArgs e)
@@ -364,6 +452,8 @@ namespace Temo_Mobile_Store
             try
             {
                 AppServices.CoreEngine.Execute(new AddAccessoryProductCommand { Barcode = txtBarcode.Text, ProductName = txtProductName.Text, CostPrice = costPrice, SalePrice = salePrice, Quantity = quantity, PerformedBy = AuthManager.CurrentUsername });
+                if (pendingProductImage != null)
+                    InventoryRepository.UpdateProductImage(txtBarcode.Text, pendingProductImage);
                 LoadProductsData();
                 ClearInputs();
                 MessageBox.Show("تم إضافة المنتج بنجاح!", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -418,6 +508,8 @@ namespace Temo_Mobile_Store
             txtSalePrice.Clear();
             txtQuantity.Clear();
             btnSaveUpdate.Enabled = false;
+            pendingProductImage = null;
+            RefreshProductImagePreview();
             txtBarcode.Focus();
         }
 
@@ -438,10 +530,11 @@ namespace Temo_Mobile_Store
         {
             // ---------- كارت البحث والفلترة ----------
             Guna2Panel gbSearch = new Guna2Panel() { Location = new Point(0, 0), Size = new Size(300, 220), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            Label lblSearchTitle = new Label() { Text = "🔍 بحث وفلترة", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
+            var badgeSearchTitle = UIHelpers.CreateIconBadge("🔍", UIHelpers.ColorPurple, new Point(20, 13));
+            Label lblSearchTitle = new Label() { Text = "بحث وفلترة", Location = new Point(64, 21), AutoSize = true, Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblSearch = new Label() { Text = "بحث برقم الـIMEI أو اسم المنتج:", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtImeiSearch = new Guna2TextBox() { Location = new Point(20, 70), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtImeiSearch = new Guna2TextBox() { Location = new Point(20, 70), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
             txtImeiSearch.TextChanged += (s, e) => LoadImeiUnitsGrid();
 
             Label lblStatusFilter = new Label() { Text = "الحالة:", Location = new Point(20, 108), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -452,27 +545,29 @@ namespace Temo_Mobile_Store
 
             Guna2Button btnRefreshImei = new Guna2Button() { Text = "تحديث 🔄", Location = new Point(20, 168), Width = 260, Height = 34, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 9 };
             btnRefreshImei.Click += (s, e) => LoadImeiUnitsGrid();
+            UIHelpers.MakePill(btnRefreshImei);
 
-            gbSearch.Controls.AddRange(new Control[] { lblSearchTitle, lblSearch, txtImeiSearch, lblStatusFilter, cmbImeiStatusFilter, btnRefreshImei });
+            gbSearch.Controls.AddRange(new Control[] { badgeSearchTitle, lblSearchTitle, lblSearch, txtImeiSearch, lblStatusFilter, cmbImeiStatusFilter, btnRefreshImei });
 
             // ---------- كارت إضافة جهاز يدوي / تعديل سعر موديل محدد ----------
             Guna2Panel gbQuickAdd = new Guna2Panel() { Location = new Point(0, 235), Size = new Size(300, 545), FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            Label lblQaTitle = new Label() { Text = "➕ إضافة جهاز / تعديل سعر موديل", Location = new Point(20, 15), AutoSize = true, Size = new Size(260, 34), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
+            var badgeQaTitle = UIHelpers.CreateIconBadge("➕", UIHelpers.ColorGreen, new Point(20, 13));
+            Label lblQaTitle = new Label() { Text = "إضافة جهاز / تعديل سعر موديل", Location = new Point(64, 19), AutoSize = true, Size = new Size(216, 34), Font = new Font("Segoe UI", 10.5F, FontStyle.Bold), ForeColor = ColorPrimary };
 
             Label lblQaBarcode = new Label() { Text = "الباركود (سيبها فاضية لو مفيش):", Location = new Point(20, 55), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtQaBarcode = new Guna2TextBox() { Location = new Point(20, 75), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtQaBarcode = new Guna2TextBox() { Location = new Point(20, 75), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
 
             Label lblQaName = new Label() { Text = "اسم المنتج:", Location = new Point(20, 113), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtQaProductName = new Guna2TextBox() { Location = new Point(20, 133), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtQaProductName = new Guna2TextBox() { Location = new Point(20, 133), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
 
             Label lblQaImei = new Label() { Text = "رقم الـIMEI (لجهاز جديد بس):", Location = new Point(20, 171), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtQaImei = new Guna2TextBox() { Location = new Point(20, 191), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtQaImei = new Guna2TextBox() { Location = new Point(20, 191), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
 
             Label lblQaCost = new Label() { Text = "سعر الشراء (التكلفة):", Location = new Point(20, 229), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtQaCostPrice = new Guna2TextBox() { Location = new Point(20, 249), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtQaCostPrice = new Guna2TextBox() { Location = new Point(20, 249), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
 
             Label lblQaSale = new Label() { Text = "سعر البيع للجمهور:", Location = new Point(20, 287), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtQaSalePrice = new Guna2TextBox() { Location = new Point(20, 307), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtQaSalePrice = new Guna2TextBox() { Location = new Point(20, 307), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), BorderColor = Color.FromArgb(225, 228, 235), BorderThickness = 1 };
 
             Label lblQaNote = new Label()
             {
@@ -485,22 +580,25 @@ namespace Temo_Mobile_Store
 
             btnQuickAddDevice = new Guna2Button() { Text = "إضافة جهاز جديد ✅", Location = new Point(20, 410), Width = 260, Height = 38, FillColor = UIHelpers.ColorGreen, BorderRadius = 10 };
             btnQuickAddDevice.Click += BtnQuickAddDevice_Click;
+            UIHelpers.MakePill(btnQuickAddDevice);
 
             btnSaveModelPriceEdit = new Guna2Button() { Text = "حفظ تعديل سعر الموديل 💾", Location = new Point(20, 456), Width = 260, Height = 36, FillColor = UIHelpers.ColorGreen, Font = new Font("Segoe UI", 9, FontStyle.Bold), BorderRadius = 10 };
             btnSaveModelPriceEdit.Click += BtnSaveModelPriceEdit_Click;
+            UIHelpers.MakePill(btnSaveModelPriceEdit);
 
-            gbQuickAdd.Controls.AddRange(new Control[] { lblQaTitle, lblQaBarcode, txtQaBarcode, lblQaName, txtQaProductName, lblQaImei, txtQaImei, lblQaCost, txtQaCostPrice, lblQaSale, txtQaSalePrice, lblQaNote, btnQuickAddDevice, btnSaveModelPriceEdit });
+            gbQuickAdd.Controls.AddRange(new Control[] { badgeQaTitle, lblQaTitle, lblQaBarcode, txtQaBarcode, lblQaName, txtQaProductName, lblQaImei, txtQaImei, lblQaCost, txtQaCostPrice, lblQaSale, txtQaSalePrice, lblQaNote, btnQuickAddDevice, btnSaveModelPriceEdit });
 
             // ---------- كارت الجدول ----------
             AnchorStyles gridFillAnchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             Guna2Panel pnlGridCard = new Guna2Panel() { Location = new Point(320, 0), Size = new Size(780, 780), Anchor = gridFillAnchor, FillColor = Color.White, BorderRadius = UIHelpers.CardBorderRadius, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1 };
-            Label lblGridTitle = new Label() { Text = "📱 كل الأجهزة المسجّلة بأرقام الـIMEI", Location = new Point(20, 15), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
+            var badgeDevGridTitle = UIHelpers.CreateIconBadge("📱", UIHelpers.ColorOrange, new Point(20, 13));
+            Label lblGridTitle = new Label() { Text = "كل الأجهزة المسجّلة بأرقام الـIMEI", Location = new Point(64, 21), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
 
             dgvImeiUnits = new DataGridView() { Location = new Point(20, 50), Size = new Size(740, 715), Anchor = gridFillAnchor, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
             dgvImeiUnits.CellClick += DgvImeiUnits_CellClick;
             StyleDataGridView(dgvImeiUnits);
 
-            pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvImeiUnits });
+            pnlGridCard.Controls.AddRange(new Control[] { badgeDevGridTitle, lblGridTitle, dgvImeiUnits });
 
             pnlDevicesOps.Controls.AddRange(new Control[] { gbSearch, gbQuickAdd, pnlGridCard });
         }

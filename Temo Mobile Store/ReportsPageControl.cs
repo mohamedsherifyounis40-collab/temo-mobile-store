@@ -137,7 +137,7 @@ namespace Temo_Mobile_Store
             Label lblOpeningBalance = new Label() { Text = "الرصيد الافتتاحي (نقدي):", Location = new Point(20, 50), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
             lblOpeningBalanceVal = new Label() { Text = "0.00 ج.م", Location = new Point(20, 68), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorPrimary };
 
-            Label lblExpectedClosing = new Label() { Text = "الرصيد الختامي المتوقع:", Location = new Point(20, 95), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            Label lblExpectedClosing = new Label() { Text = "الرصيد النقدي المسجّل حاليًا:", Location = new Point(20, 95), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
             lblExpectedClosingVal = new Label() { Text = "0.00 ج.م", Location = new Point(20, 113), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = ColorWarning };
 
             Label lblAllMethodsTitle = new Label() { Text = "الرصيد الافتتاحي لكل الوسائل (دبل كليك للتعديل):", Location = new Point(20, 145), Size = new Size(240, 24), Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = Color.FromArgb(85, 92, 102) };
@@ -590,9 +590,22 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         // حساب ملخص الإقفال المتوقع لليوم الحالي لكل وسيلة دفع مع بعض
         // ==========================================================================
-        private Dictionary<string, (decimal opening, decimal totalIn, decimal totalOut, decimal expectedClosing)> GetAllMethodsClosureSummary()
+        // بيرجّع الرصيد الحالي المسجّل فعليًا لوسيلة دفع معينة من PaymentMethodBalances - ده
+        // الرصيد اللي بيتحدّث لحظيًا مع كل عملية بيع/شراء/حركة خزينة عن طريق محرك الحسابات،
+        // فهو مصدر الحقيقة الوحيد، مش نسخة منفصلة بنعيد حسابها من جدول الحركات.
+        private decimal GetCurrentMethodBalance(SqliteConnection conn, string method)
         {
-            var result = new Dictionary<string, (decimal opening, decimal totalIn, decimal totalOut, decimal expectedClosing)>();
+            using (SqliteCommand cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn))
+            {
+                cmd.Parameters.AddWithValue("@Method", method);
+                var res = cmd.ExecuteScalar();
+                return (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
+            }
+        }
+
+        private Dictionary<string, (decimal opening, decimal totalIn, decimal totalOut, decimal recordedBalance)> GetAllMethodsClosureSummary()
+        {
+            var result = new Dictionary<string, (decimal opening, decimal totalIn, decimal totalOut, decimal recordedBalance)>();
             string today = DateTime.Now.ToString("yyyy-MM-dd");
 
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
@@ -633,9 +646,9 @@ namespace Temo_Mobile_Store
 
                     decimal totalIn = methodIn;
                     decimal totalOut = methodOut + (method == "نقدي" ? expensesTotal : 0);
-                    decimal expectedClosing = opening + totalIn - totalOut;
+                    decimal recordedBalance = GetCurrentMethodBalance(conn, method);
 
-                    result[method] = (opening, totalIn, totalOut, expectedClosing);
+                    result[method] = (opening, totalIn, totalOut, recordedBalance);
                 }
             }
 
@@ -677,14 +690,14 @@ namespace Temo_Mobile_Store
             var summaries = GetAllMethodsClosureSummary();
             var cashSummary = summaries["نقدي"];
             lblOpeningBalanceVal.Text = cashSummary.opening.ToString("N2") + " ج.م";
-            lblExpectedClosingVal.Text = cashSummary.expectedClosing.ToString("N2") + " ج.م";
+            lblExpectedClosingVal.Text = cashSummary.recordedBalance.ToString("N2") + " ج.م";
 
             DataTable dtSummary = new DataTable();
-            dtSummary.Columns.AddRange(new DataColumn[] { new DataColumn("الوسيلة"), new DataColumn("افتتاحي"), new DataColumn("ختامي متوقع") });
+            dtSummary.Columns.AddRange(new DataColumn[] { new DataColumn("الوسيلة"), new DataColumn("افتتاحي"), new DataColumn("الرصيد المسجّل") });
             foreach (var method in AllPaymentMethods)
             {
                 var s = summaries[method];
-                dtSummary.Rows.Add(method, s.opening.ToString("N2"), s.expectedClosing.ToString("N2"));
+                dtSummary.Rows.Add(method, s.opening.ToString("N2"), s.recordedBalance.ToString("N2"));
             }
             dgvClosureSummary.DataSource = dtSummary;
         }
@@ -806,29 +819,26 @@ namespace Temo_Mobile_Store
             var summaries = GetAllMethodsClosureSummary();
             var cashSummary = summaries["نقدي"];
 
-            var otherExpected = new Dictionary<string, decimal>();
+            var otherRecorded = new Dictionary<string, decimal>();
             foreach (var method in AllPaymentMethods)
             {
                 if (method == "نقدي") continue;
-                otherExpected[method] = summaries[method].expectedClosing;
+                otherRecorded[method] = summaries[method].recordedBalance;
             }
 
-            using (DenominationEntryForm denomForm = new DenominationEntryForm(cashSummary.expectedClosing, otherExpected))
+            using (DenominationEntryForm denomForm = new DenominationEntryForm(cashSummary.recordedBalance, otherRecorded))
             {
                 if (denomForm.ShowDialog() != DialogResult.OK) return;
 
                 decimal actualCash = denomForm.TotalCounted;
-                decimal cashDifference = actualCash - cashSummary.expectedClosing;
 
                 StringBuilder message = new StringBuilder();
-                message.AppendLine("ملخص إقفال اليوم لكل الوسائل:\n");
-                message.AppendLine($"نقدي: متوقع {cashSummary.expectedClosing:N2} | فعلي {actualCash:N2} | الفرق {cashDifference:N2}");
+                message.AppendLine("الأرصدة اللي هتتسجل كإقفال لليوم:\n");
+                message.AppendLine($"نقدي: {actualCash:N2} ج.م");
                 foreach (var method in AllPaymentMethods)
                 {
                     if (method == "نقدي") continue;
-                    decimal actual = denomForm.OtherMethodsActual[method];
-                    decimal diff = actual - summaries[method].expectedClosing;
-                    message.AppendLine($"{method}: متوقع {summaries[method].expectedClosing:N2} | فعلي {actual:N2} | الفرق {diff:N2}");
+                    message.AppendLine($"{method}: {denomForm.OtherMethodsActual[method]:N2} ج.م");
                 }
                 message.AppendLine("\nهل تريد تأكيد إقفال اليوم لكل الوسائل؟ لن يمكن التعديل أو الحذف في حركات اليوم بعد الإقفال.");
 
@@ -838,38 +848,13 @@ namespace Temo_Mobile_Store
                 string today = DateTime.Now.ToString("yyyy-MM-dd");
                 try
                 {
-                    // أي فرق بين المتوقع والفعلي (عجز أو زيادة) لازم يتسجل كحركة قبض/صرف حقيقية
-                    // على حساب "عجز وزيادة الخزينة" (5700) عن طريق محرك الحسابات - مش تحديث مباشر
-                    // للرصيد - عشان يفضل الرصيد الفعلي متسق مع ميزان المراجعة المحسوب من دفتر
-                    // اليومية. ده بيتنفذ الأول قبل أي تسجيل لسجل الإقفال نفسه، عشان لو فشل لأي
-                    // سبب (رصيد غير كافي مثلاً)ميتسجلش إقفال ناقص.
-                    var adjustmentMovementIds = new Dictionary<string, int?>();
-                    foreach (var method in AllPaymentMethods)
-                    {
-                        decimal actual = method == "نقدي" ? actualCash : denomForm.OtherMethodsActual[method];
-                        decimal expected = summaries[method].expectedClosing;
-                        decimal delta = actual - expected;
-
-                        if (delta == 0) { adjustmentMovementIds[method] = null; continue; }
-
-                        var result = AppServices.CoreEngine.Execute(new AddMovementCommand
-                        {
-                            Type = delta > 0 ? "قبض" : "صرف",
-                            Method = method,
-                            Amount = Math.Abs(delta),
-                            AccountCode = 5700,
-                            Description = $"فرق إقفال يومي ({today})",
-                            PerformedBy = AuthManager.CurrentUsername
-                        });
-                        adjustmentMovementIds[method] = result.MovementId;
-                    }
-
                     using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
                     {
                         conn.Open();
                         using (var transaction = conn.BeginTransaction())
                         {
-                            int cashClosureId = InsertClosureRow(conn, transaction, today, "نقدي", cashSummary, actualCash, adjustmentMovementIds["نقدي"]);
+                            int cashClosureId = InsertClosureRow(conn, transaction, today, "نقدي", cashSummary, actualCash);
+                            SetCurrentMethodBalance(conn, transaction, "نقدي", actualCash);
 
                             foreach (var kvp in denomForm.DenominationCounts)
                             {
@@ -890,7 +875,8 @@ namespace Temo_Mobile_Store
                             {
                                 if (method == "نقدي") continue;
                                 decimal actual = denomForm.OtherMethodsActual[method];
-                                InsertClosureRow(conn, transaction, today, method, summaries[method], actual, adjustmentMovementIds[method]);
+                                InsertClosureRow(conn, transaction, today, method, summaries[method], actual);
+                                SetCurrentMethodBalance(conn, transaction, method, actual);
                             }
 
                             transaction.Commit();
@@ -900,10 +886,6 @@ namespace Temo_Mobile_Store
                     MessageBox.Show("تم إقفال اليوم بنجاح لكل الوسائل وتسجيله في السجل. 🔒", "تم الإقفال", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     RefreshClosureSummary();
                 }
-                catch (InsufficientBalanceException ex)
-                {
-                    MessageBox.Show(ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
                 catch (Exception ex)
                 {
                     MessageBox.Show("حدث خطأ أثناء الإقفال: " + ex.Message, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -911,13 +893,28 @@ namespace Temo_Mobile_Store
             }
         }
 
-        private int InsertClosureRow(SqliteConnection conn, SqliteTransaction transaction, string date, string method,
-            (decimal opening, decimal totalIn, decimal totalOut, decimal expectedClosing) summary, decimal actual, int? adjustmentMovementId = null)
+        // بيحدّث الرصيد الحالي المسجّل لوسيلة الدفع مباشرة بالقيمة اللي اتقفل بيها اليوم -
+        // من غير ما يعدي على محرك الحسابات (AddMovementCommand)، عشان مفيش قيد يومية بيتسجل
+        // لفرق الإقفال بعد دلوقتي (القرار: نثق في الرقم اللي بيتقفل بيه اليوم من غير مقارنة/تعديل).
+        private void SetCurrentMethodBalance(SqliteConnection conn, SqliteTransaction transaction, string method, decimal balance)
         {
-            decimal difference = actual - summary.expectedClosing;
+            using (SqliteCommand cmd = new SqliteCommand("UPDATE PaymentMethodBalances SET CurrentBalance = @Balance WHERE PaymentMethod = @Method", conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@Balance", balance);
+                cmd.Parameters.AddWithValue("@Method", method);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        private int InsertClosureRow(SqliteConnection conn, SqliteTransaction transaction, string date, string method,
+            (decimal opening, decimal totalIn, decimal totalOut, decimal recordedBalance) summary, decimal actual)
+        {
+            // مفيش "رصيد متوقع" منفصل بيتقارن بيه بعد دلوقتي - عمود ExpectedClosingBalance/Difference
+            // فضلوا في الجدول بس بيتسجلوا بنفس القيمة الفعلية (فرق = صفر دايمًا) عشان مانغيّرش
+            // شكل الجدول أو أي تقرير قديم بيقرا منه.
             string insertClosure = @"INSERT INTO DailyClosures
                 (ClosureDate, PaymentMethod, OpeningBalance, TotalIn, TotalOut, ExpectedClosingBalance, ActualClosingBalance, Difference, ClosedAt, AdjustmentMovementId)
-                VALUES (@Date, @Method, @Opening, @TotalIn, @TotalOut, @Expected, @Actual, @Diff, @ClosedAt, @AdjustmentMovementId)";
+                VALUES (@Date, @Method, @Opening, @TotalIn, @TotalOut, @Expected, @Actual, @Diff, @ClosedAt, NULL)";
 
             using (SqliteCommand cmd = new SqliteCommand(insertClosure, conn, transaction))
             {
@@ -926,11 +923,10 @@ namespace Temo_Mobile_Store
                 cmd.Parameters.AddWithValue("@Opening", summary.opening);
                 cmd.Parameters.AddWithValue("@TotalIn", summary.totalIn);
                 cmd.Parameters.AddWithValue("@TotalOut", summary.totalOut);
-                cmd.Parameters.AddWithValue("@Expected", summary.expectedClosing);
+                cmd.Parameters.AddWithValue("@Expected", actual);
                 cmd.Parameters.AddWithValue("@Actual", actual);
-                cmd.Parameters.AddWithValue("@Diff", difference);
+                cmd.Parameters.AddWithValue("@Diff", 0m);
                 cmd.Parameters.AddWithValue("@ClosedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
-                cmd.Parameters.AddWithValue("@AdjustmentMovementId", (object)adjustmentMovementId ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
             }
 

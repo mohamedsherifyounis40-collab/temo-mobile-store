@@ -4,6 +4,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Printing;
+using System.Linq;
 using System.Windows.Forms;
 using Guna.UI2.WinForms;
 using TemoStore.Core.Commands;
@@ -41,13 +42,51 @@ namespace Temo_Mobile_Store
         private string CurrentStoreWhatsApp = "";
 
         // ---------- عناصر الشاشة ----------
-        private Guna2TextBox txtSaleBarcode, txtSaleName, txtCustomerPrice, txtSaleQty, txtSaleTotal;
+        private Guna2TextBox txtSaleBarcode, txtSaleName, txtCustomerPrice, txtSaleQty, txtSaleTotal, txtItemDiscount, txtQuickDiscountPercent, txtQuickTaxPercent, txtAmountPaid;
+        private Label lblChangeDue;
         private Label lblSaleImei;
         private Guna2ComboBox cmbSaleImei, cmbSalePaymentType, cmbSalePaymentMethod, cmbSaleCustomer, cmbInvoicePaperSize;
         private Guna2TextBox txtInvoiceNumber, txtInvoiceCustomer;
-        private Guna2Button btnAddItemToCart, btnAddToBill, btnPrintInvoice, btnEditSaleMode, btnSaveSaleEdit, btnCancelSale;
+        private Guna2GradientButton btnAddItemToCart, btnAddToBill;
+        private Guna2Button btnPrintInvoice, btnEditSaleMode, btnSaveSaleEdit, btnCancelSale;
         private DataGridView dgvSales, dgvSaleCart;
         private Label lblSaleCartTotal;
+
+        // ---------- عناصر التصميم الجديد (تابات البحث/كروت الأكثر مبيعًا/سلة بأزرار كمية/دفع سريع) ----------
+        private Guna2Button btnTabBarcode, btnTabProductSearch, btnTabSerialSearch, btnQuickAddCustomer, btnClearCart;
+        private Guna2Button btnViewNewSale, btnViewHistory;
+        private Guna2ShadowPanel pnlSearchCard, pnlCartCard, pnlPaymentCard, pnlGridCard;
+        private Panel pnlTabBarcode, pnlTabProductSearch, pnlTabSerialSearch, pnlPopularProducts;
+        private Guna2TextBox txtProductSearch, txtSerialSearch, txtInvoiceDate, txtInvoiceSeller;
+        private DataGridView dgvProductSearchResults, dgvSerialSearchResults;
+        private Guna2Button[] quickPaymentButtons;
+        private Label lblTotalsGrandTotal, lblTotalsStatus, lblTotalsSubtotal, lblTotalsDiscount, lblTotalsTax;
+        private System.Windows.Forms.Timer clockTimer;
+
+        private readonly System.Collections.Generic.List<ProductSearchResult> lastProductSearchResults = new System.Collections.Generic.List<ProductSearchResult>();
+        private readonly System.Collections.Generic.List<SerialSearchResult> lastSerialSearchResults = new System.Collections.Generic.List<SerialSearchResult>();
+
+        // ---------- قائمة جانبية دائمة وشغالة فعليًا (زي MainShell بالظبط) جوه نافذة المبيعات المستقلة ----------
+        private const int SidebarWidth = 170;
+        private const int CardLeft = 20 + SidebarWidth + 10;
+        private const int CardWidth = 1140 - SidebarWidth - 10;
+        private const int InnerContentWidth = CardWidth - 40; // عرض المحتوى جوه الكارت (بعد هامش 20 يمين ويسار)
+
+        private static readonly (string Key, string Text, string Icon)[] ShellNavItems = new (string, string, string)[]
+        {
+            (MainShell.PageKeys.Home,           "الرئيسية",          "🏠"),
+            (MainShell.PageKeys.Sales,          "المبيعات",          "🛒"),
+            (MainShell.PageKeys.Inventory,      "المخزون",           "🗄️"),
+            (MainShell.PageKeys.InventoryCount, "جرد المخزن",        "📋"),
+            (MainShell.PageKeys.Maintenance,    "الصيانة",           "🔧"),
+            (MainShell.PageKeys.Customers,      "العملاء",           "👥"),
+            (MainShell.PageKeys.Suppliers,      "الموردين",          "🚚"),
+            (MainShell.PageKeys.Treasury,       "الخزينة",           "🏦"),
+            (MainShell.PageKeys.Reports,        "التقارير",          "📊"),
+            (MainShell.PageKeys.Accounts,       "الحسابات",          "📒"),
+            (MainShell.PageKeys.Attendance,     "الحضور والمرتبات",  "🧑‍💼"),
+            (MainShell.PageKeys.Settings,       "الإعدادات",         "⚙️"),
+        };
 
         private int selectedSaleId = -1;
 
@@ -89,143 +128,224 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private void BuildUI()
         {
-            // ---------- كارت شاشة البيع (يسار) ----------
-            Guna2Panel pnlCard = new Guna2Panel()
-            {
-                Location = new Point(20, 20),
-                Size = new Size(300, 1140),
-                FillColor = Color.White,
-                BorderRadius = UIHelpers.CardBorderRadius,
-                BorderColor = Color.FromArgb(230, 232, 238),
-                BorderThickness = 1
-            };
+            this.Size = new Size(1180, 890);
 
-            Label lblCardTitle = new Label()
-            {
-                Text = "🛒 عملية بيع جديدة",
-                Location = new Point(20, 18),
-                AutoSize = true,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = ColorPrimary
-            };
+            BuildSidebarNav();
 
-            Label lblBadgeInvTitle = new Label() { Text = "رقم الفاتورة", Location = new Point(20, 52), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtInvoiceNumber = new Guna2TextBox() { Location = new Point(20, 70), Width = 80, ReadOnly = true, BorderRadius = 8, FillColor = Color.FromArgb(240, 243, 248), Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = ColorPrimary, Text = "-" };
+            // ---------- 1) كارت علوي: العنوان + تبديل العرض + بيانات العميل/الفاتورة (ثابت في العرضين) ----------
+            Guna2ShadowPanel pnlCustomerCard = NewCard(new Point(CardLeft, 16), new Size(CardWidth, 92));
 
-            Label lblBadgeCustTitle = new Label() { Text = "العميل", Location = new Point(110, 52), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtInvoiceCustomer = new Guna2TextBox() { Location = new Point(110, 70), Width = 170, ReadOnly = true, BorderRadius = 8, FillColor = Color.FromArgb(240, 243, 248), Font = new Font("Segoe UI", 9.5F), ForeColor = ColorPrimary, Text = "عميل نقدي" };
+            Label lblScreenTitle = new Label() { Text = "🛒 فاتورة بيع جديدة", Location = new Point(20, 10), AutoSize = true, Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = UIHelpers.ColorAccentPrimary };
 
-            Label lblBarcode = new Label() { Text = "مسح الباركود (Enter):", Location = new Point(20, 116), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtSaleBarcode = new Guna2TextBox() { Location = new Point(20, 136), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
-            txtSaleBarcode.KeyDown += TxtSaleBarcode_KeyDown;
+            btnPrintInvoice = new Guna2Button() { Text = "🖨️", Location = new Point(360, 8), Width = 34, Height = 30, FillColor = Color.White, ForeColor = UIHelpers.ColorAccentPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 8 };
+            btnPrintInvoice.Click += BtnPrintInvoice_Click;
+            Guna2Button btnSendWhatsApp = new Guna2Button() { Text = "📱", Location = new Point(398, 8), Width = 34, Height = 30, FillColor = Color.White, ForeColor = UIHelpers.ColorAccentPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 8 };
+            btnSendWhatsApp.Click += BtnSendInvoiceWhatsApp_Click;
+            Guna2Button btnSavePdf = new Guna2Button() { Text = "📄", Location = new Point(436, 8), Width = 34, Height = 30, FillColor = Color.White, ForeColor = UIHelpers.ColorAccentPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 8 };
+            btnSavePdf.Click += BtnSaveInvoicePdf_Click;
+            cmbInvoicePaperSize = new Guna2ComboBox() { Location = new Point(478, 8), Width = 120, Height = 30, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            cmbInvoicePaperSize.Items.AddRange(new string[] { "80 مم (حرارية)", "58 مم (حرارية)", "A4 (عادية)" });
+            cmbInvoicePaperSize.SelectedIndex = 0;
 
-            Label lblName = new Label() { Text = "اسم المنتج:", Location = new Point(20, 174), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtSaleName = new Guna2TextBox() { Location = new Point(20, 194), Width = 260, ReadOnly = true, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            btnViewNewSale = new Guna2Button() { Text = "🧾 فاتورة جديدة", Location = new Point(610, 8), Width = 130, Height = 32, BorderRadius = 8, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            btnViewHistory = new Guna2Button() { Text = "📋 سجل المبيعات", Location = new Point(746, 8), Width = 154, Height = 32, BorderRadius = 8, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
+            btnViewNewSale.Click += (s, e) => SwitchMainView(0);
+            btnViewHistory.Click += (s, e) => SwitchMainView(1);
 
-            Label lblPrice = new Label() { Text = "سعر البيع (قابل للتعديل):", Location = new Point(20, 232), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtCustomerPrice = new Guna2TextBox() { Location = new Point(20, 252), Width = 260, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
-            txtCustomerPrice.TextChanged += TxtSaleQty_TextChanged;
+            Label lblSaleCustomer = new Label() { Text = "العميل:", Location = new Point(20, 44), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbSaleCustomer = new Guna2ComboBox() { Location = new Point(20, 60), Width = 170, Height = 26, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false, BorderRadius = 8 };
+            btnQuickAddCustomer = new Guna2Button() { Text = "+", Location = new Point(196, 60), Width = 26, Height = 26, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 8, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+            btnQuickAddCustomer.Click += BtnQuickAddCustomer_Click;
 
-            Label lblQty = new Label() { Text = "الكمية المطلوبة:", Location = new Point(20, 290), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtSaleQty = new Guna2TextBox() { Location = new Point(20, 310), Width = 260, Text = "1", BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
-            txtSaleQty.TextChanged += TxtSaleQty_TextChanged;
-
-            lblSaleImei = new Label() { Text = "اختار الجهاز (IMEI):", Location = new Point(20, 348), AutoSize = true, Visible = false, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbSaleImei = new Guna2ComboBox() { Location = new Point(20, 368), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Visible = false, BorderRadius = 8 };
-
-            // كارت إجمالي الصنف الحالي (قبل ما يتضاف للسلة) - بارز بلون مميز
-            Guna2Panel pnlTotal = new Guna2Panel()
-            {
-                Location = new Point(20, 406),
-                Size = new Size(260, 60),
-                FillColor = UIHelpers.LightTint(UIHelpers.ColorOrange, 0.85f),
-                BorderRadius = 10
-            };
-            Label lblTotal = new Label() { Text = "إجمالي الصنف الحالي", Location = new Point(15, 8), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            txtSaleTotal = new Guna2TextBox()
-            {
-                Location = new Point(15, 26),
-                Width = 230,
-                ReadOnly = true,
-                BorderRadius = 6,
-                FillColor = UIHelpers.LightTint(UIHelpers.ColorOrange, 0.85f),
-                Font = new Font("Segoe UI", 12, FontStyle.Bold),
-                ForeColor = UIHelpers.ColorOrange
-            };
-            pnlTotal.Controls.AddRange(new Control[] { lblTotal, txtSaleTotal });
-
-            btnAddItemToCart = new Guna2Button() { Text = "➕ إضافة الصنف للسلة", Location = new Point(20, 474), Width = 260, Height = 38, FillColor = UIHelpers.ColorAccentPrimary, BorderRadius = 10, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold) };
-            btnAddItemToCart.Click += BtnAddItemToCart_Click;
-
-            // ---------- السلة الحالية: الأصناف اللي هتتسجل مع بعض تحت رقم فاتورة واحد ----------
-            Label lblCartTitle = new Label() { Text = "🧺 السلة الحالية", Location = new Point(20, 522), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = ColorPrimary };
-
-            dgvSaleCart = new DataGridView() { Location = new Point(20, 544), Width = 260, Height = 130, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false };
-            dgvSaleCart.CellDoubleClick += DgvSaleCart_CellDoubleClick;
-            StyleDataGridView(dgvSaleCart);
-
-            Label lblCartHint = new Label() { Text = "دبل كليك على صنف عشان تشيله من السلة", Location = new Point(20, 676), Size = new Size(260, 15), Font = new Font("Segoe UI", 7F), ForeColor = Color.FromArgb(150, 155, 165) };
-
-            lblSaleCartTotal = new Label() { Text = "إجمالي السلة: 0.00 ج.م", Location = new Point(20, 694), AutoSize = true, Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = UIHelpers.ColorGreen };
-
-            Label lblPaymentType = new Label() { Text = "نوع البيع:", Location = new Point(20, 722), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbSalePaymentType = new Guna2ComboBox() { Location = new Point(20, 742), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            Label lblPaymentType = new Label() { Text = "نوع البيع:", Location = new Point(232, 44), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbSalePaymentType = new Guna2ComboBox() { Location = new Point(232, 60), Width = 95, Height = 26, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
             cmbSalePaymentType.Items.AddRange(new string[] { "كاش", "آجل" });
             cmbSalePaymentType.SelectedIndex = 0;
             cmbSalePaymentType.SelectedIndexChanged += CmbSalePaymentType_SelectedIndexChanged;
 
-            Label lblSalePaymentMethod = new Label() { Text = "وسيلة الدفع (لو كاش):", Location = new Point(20, 780), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbSalePaymentMethod = new Guna2ComboBox() { Location = new Point(20, 800), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
+            // وسيلة الدفع نفسها بتتحدد من أزرار "الدفع السريع" تحت - الكومبو ده بيفضل موجود
+            // كمخزن قيمة فعلي بس مش ظاهر (نفس منطق BtnAddToBill_Click الأصلي قاري منه)
+            cmbSalePaymentMethod = new Guna2ComboBox() { Location = new Point(232, 60), Width = 95, DropDownStyle = ComboBoxStyle.DropDownList, Visible = false };
             cmbSalePaymentMethod.Items.AddRange(UIHelpers.PaymentMethods);
 
-            Label lblSaleCustomer = new Label() { Text = "العميل (لازم للآجل):", Location = new Point(20, 838), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbSaleCustomer = new Guna2ComboBox() { Location = new Point(20, 858), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false, BorderRadius = 8 };
+            txtInvoiceNumber = new Guna2TextBox() { Location = new Point(337, 60), Width = 105, Height = 26, ReadOnly = true, BorderRadius = 8, FillColor = Color.FromArgb(240, 243, 248), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = UIHelpers.ColorAccentPrimary, Text = "🧾 فاتورة #-" };
+            txtInvoiceCustomer = new Guna2TextBox() { Location = new Point(452, 60), Width = 120, Height = 26, ReadOnly = true, BorderRadius = 8, FillColor = Color.FromArgb(240, 243, 248), Font = new Font("Segoe UI", 8.5F), ForeColor = UIHelpers.ColorAccentPrimary, Text = "عميل نقدي" };
+            txtInvoiceDate = new Guna2TextBox() { Location = new Point(582, 60), Width = 155, Height = 26, ReadOnly = true, BorderRadius = 8, FillColor = Color.FromArgb(240, 243, 248), Font = new Font("Segoe UI", 8F), Text = "📅 " + DateTime.Now.ToString("yyyy-MM-dd hh:mm tt") };
+            txtInvoiceSeller = new Guna2TextBox() { Location = new Point(747, 60), Width = 115, Height = 26, ReadOnly = true, BorderRadius = 8, FillColor = Color.FromArgb(240, 243, 248), Font = new Font("Segoe UI", 8F), Text = "👤 " + AuthManager.CurrentUsername };
 
-            btnAddToBill = new Guna2Button() { Text = "إتمام عملية البيع 🛒", Location = new Point(20, 900), Width = 260, Height = 42, FillColor = UIHelpers.ColorGreen, BorderRadius = 10, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
-            btnAddToBill.Click += BtnAddToBill_Click;
+            clockTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            clockTimer.Tick += (s, e) => { txtInvoiceDate.Text = "📅 " + DateTime.Now.ToString("yyyy-MM-dd hh:mm tt"); };
+            clockTimer.Start();
 
-            btnPrintInvoice = new Guna2Button() { Text = "طباعة آخر فاتورة 🖨️", Location = new Point(20, 948), Width = 260, Height = 36, FillColor = Color.White, ForeColor = ColorPrimary, BorderColor = Color.FromArgb(230, 232, 238), BorderThickness = 1, BorderRadius = 10 };
-            btnPrintInvoice.Click += BtnPrintInvoice_Click;
-
-            Label lblPaperSize = new Label() { Text = "مقاس الطباعة:", Location = new Point(20, 993), AutoSize = true, Font = new Font("Segoe UI", 8.5F), ForeColor = Color.FromArgb(85, 92, 102) };
-            cmbInvoicePaperSize = new Guna2ComboBox() { Location = new Point(20, 1013), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, BorderRadius = 8 };
-            cmbInvoicePaperSize.Items.AddRange(new string[] { "80 مم (طابعة حرارية)", "58 مم (طابعة حرارية)", "A4 (طابعة عادية)" });
-            cmbInvoicePaperSize.SelectedIndex = 0;
-
-            Guna2Button btnSendWhatsApp = new Guna2Button() { Text = "إرسال آخر فاتورة واتساب 📱", Location = new Point(20, 1053), Width = 260, Height = 34, FillColor = Color.FromArgb(37, 211, 102), BorderRadius = 9 };
-            btnSendWhatsApp.Click += BtnSendInvoiceWhatsApp_Click;
-
-            Guna2Button btnSavePdf = new Guna2Button() { Text = "حفظ آخر فاتورة PDF 📄", Location = new Point(20, 1093), Width = 260, Height = 34, FillColor = UIHelpers.ColorPurple, BorderRadius = 9 };
-            btnSavePdf.Click += BtnSaveInvoicePdf_Click;
-
-            pnlCard.Controls.AddRange(new Control[] {
-                lblCardTitle, lblBadgeInvTitle, txtInvoiceNumber, lblBadgeCustTitle, txtInvoiceCustomer,
-                lblBarcode, txtSaleBarcode, lblName, txtSaleName, lblPrice, txtCustomerPrice,
-                lblQty, txtSaleQty, lblSaleImei, cmbSaleImei, pnlTotal, btnAddItemToCart,
-                lblCartTitle, dgvSaleCart, lblCartHint, lblSaleCartTotal, lblPaymentType, cmbSalePaymentType,
-                lblSalePaymentMethod, cmbSalePaymentMethod, lblSaleCustomer, cmbSaleCustomer, btnAddToBill, btnPrintInvoice, lblPaperSize, cmbInvoicePaperSize, btnSendWhatsApp, btnSavePdf
+            pnlCustomerCard.Controls.AddRange(new Control[] {
+                lblScreenTitle, btnPrintInvoice, btnSendWhatsApp, btnSavePdf, cmbInvoicePaperSize, btnViewNewSale, btnViewHistory,
+                lblSaleCustomer, cmbSaleCustomer, btnQuickAddCustomer, lblPaymentType, cmbSalePaymentType, cmbSalePaymentMethod,
+                txtInvoiceNumber, txtInvoiceCustomer, txtInvoiceDate, txtInvoiceSeller
             });
 
-            // ---------- كارت الجدول (يمين) ----------
-            // Anchor بكل الاتجاهات عشان الكارت يتمدد ويملأ المساحة الفاضية لما النافذة تبقى أعرض/أطول
-            // (خصوصًا بعد ما بقت الصفحة بتفتح في نافذة مستقلة بمساحة الشاشة كاملة)
-            Guna2Panel pnlGridCard = new Guna2Panel()
+            // ---------- 2) كارت البحث عن منتج (تابات: منتج / باركود / سيريال) ----------
+            pnlSearchCard = NewCard(new Point(CardLeft, 124), new Size(CardWidth, 300));
+
+            btnTabProductSearch = NewTabButton("منتج", new Point(20, 12));
+            btnTabBarcode = NewTabButton("باركود", new Point(140, 12));
+            btnTabSerialSearch = NewTabButton("سيريال", new Point(260, 12));
+            btnTabProductSearch.Click += (s, e) => SwitchProductTab(1);
+            btnTabBarcode.Click += (s, e) => SwitchProductTab(0);
+            btnTabSerialSearch.Click += (s, e) => SwitchProductTab(2);
+
+            // ---- تاب "باركود" ----
+            pnlTabBarcode = new Panel() { Location = new Point(20, 50), Size = new Size(InnerContentWidth, 34) };
+            txtSaleBarcode = new Guna2TextBox() { Location = new Point(0, 0), Width = 420, Height = 30, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), PlaceholderText = "مسح الباركود (Enter)" };
+            txtSaleBarcode.KeyDown += TxtSaleBarcode_KeyDown;
+            pnlTabBarcode.Controls.Add(txtSaleBarcode);
+
+            // ---- تاب "منتج" (بحث بالاسم أو الباركود) ----
+            pnlTabProductSearch = new Panel() { Location = new Point(20, 50), Size = new Size(InnerContentWidth, 108), Visible = false };
+            txtProductSearch = new Guna2TextBox() { Location = new Point(0, 0), Width = 420, Height = 30, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), PlaceholderText = "بحث بالاسم أو الباركود" };
+            txtProductSearch.TextChanged += TxtProductSearch_TextChanged;
+            dgvProductSearchResults = new DataGridView() { Location = new Point(0, 36), Size = new Size(InnerContentWidth, 68), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, AutoGenerateColumns = false };
+            dgvProductSearchResults.Columns.Add(new DataGridViewTextBoxColumn { Name = "colPName", HeaderText = "المنتج" });
+            dgvProductSearchResults.Columns.Add(new DataGridViewTextBoxColumn { Name = "colPBarcode", HeaderText = "الباركود" });
+            dgvProductSearchResults.Columns.Add(new DataGridViewTextBoxColumn { Name = "colPPrice", HeaderText = "السعر" });
+            dgvProductSearchResults.Columns.Add(new DataGridViewTextBoxColumn { Name = "colPQty", HeaderText = "المتاح" });
+            dgvProductSearchResults.CellDoubleClick += DgvProductSearchResults_CellDoubleClick;
+            StyleDataGridView(dgvProductSearchResults);
+            pnlTabProductSearch.Controls.AddRange(new Control[] { txtProductSearch, dgvProductSearchResults });
+
+            // ---- تاب "سيريال" (بحث بالـIMEI) ----
+            pnlTabSerialSearch = new Panel() { Location = new Point(20, 50), Size = new Size(InnerContentWidth, 108), Visible = false };
+            txtSerialSearch = new Guna2TextBox() { Location = new Point(0, 0), Width = 420, Height = 30, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), PlaceholderText = "بحث بالـIMEI" };
+            txtSerialSearch.TextChanged += TxtSerialSearch_TextChanged;
+            dgvSerialSearchResults = new DataGridView() { Location = new Point(0, 36), Size = new Size(InnerContentWidth, 68), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ReadOnly = true, AllowUserToAddRows = false, AutoGenerateColumns = false };
+            dgvSerialSearchResults.Columns.Add(new DataGridViewTextBoxColumn { Name = "colSName", HeaderText = "المنتج" });
+            dgvSerialSearchResults.Columns.Add(new DataGridViewTextBoxColumn { Name = "colSBarcode", HeaderText = "الباركود" });
+            dgvSerialSearchResults.Columns.Add(new DataGridViewTextBoxColumn { Name = "colSImei", HeaderText = "IMEI" });
+            dgvSerialSearchResults.Columns.Add(new DataGridViewTextBoxColumn { Name = "colSPrice", HeaderText = "السعر" });
+            dgvSerialSearchResults.CellDoubleClick += DgvSerialSearchResults_CellDoubleClick;
+            StyleDataGridView(dgvSerialSearchResults);
+            pnlTabSerialSearch.Controls.AddRange(new Control[] { txtSerialSearch, dgvSerialSearchResults });
+
+            // ---- حقول الصنف المشتركة (اسم/سعر/كمية/IMEI/إجمالي) ----
+            int fieldsY = 168;
+            Label lblName = new Label() { Text = "اسم المنتج:", Location = new Point(20, fieldsY), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtSaleName = new Guna2TextBox() { Location = new Point(20, fieldsY + 18), Width = 190, Height = 28, ReadOnly = true, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+
+            Label lblPrice = new Label() { Text = "سعر البيع:", Location = new Point(220, fieldsY), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtCustomerPrice = new Guna2TextBox() { Location = new Point(220, fieldsY + 18), Width = 80, Height = 28, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtCustomerPrice.TextChanged += TxtSaleQty_TextChanged;
+
+            Label lblQty = new Label() { Text = "الكمية:", Location = new Point(310, fieldsY), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtSaleQty = new Guna2TextBox() { Location = new Point(310, fieldsY + 18), Width = 55, Height = 28, Text = "1", BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtSaleQty.TextChanged += TxtSaleQty_TextChanged;
+
+            Label lblItemDiscount = new Label() { Text = "خصم الصنف:", Location = new Point(375, fieldsY), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtItemDiscount = new Guna2TextBox() { Location = new Point(375, fieldsY + 18), Width = 75, Height = 28, Text = "0", BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtItemDiscount.TextChanged += TxtSaleQty_TextChanged;
+
+            lblSaleImei = new Label() { Text = "اختار IMEI:", Location = new Point(460, fieldsY), AutoSize = true, Visible = false, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            cmbSaleImei = new Guna2ComboBox() { Location = new Point(460, fieldsY + 18), Width = 145, Height = 28, DropDownStyle = ComboBoxStyle.DropDownList, Visible = false, BorderRadius = 8 };
+
+            Guna2Panel pnlTotal = new Guna2Panel() { Location = new Point(615, fieldsY - 6), Size = new Size(140, 60), FillColor = UIHelpers.LightTint(UIHelpers.ColorOrange, 0.85f), BorderRadius = 10 };
+            Label lblTotal = new Label() { Text = "إجمالي الصنف", Location = new Point(12, 5), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtSaleTotal = new Guna2TextBox() { Location = new Point(12, 23), Width = 116, ReadOnly = true, BorderRadius = 6, FillColor = UIHelpers.LightTint(UIHelpers.ColorOrange, 0.85f), Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = UIHelpers.ColorOrange };
+            pnlTotal.Controls.AddRange(new Control[] { lblTotal, txtSaleTotal });
+
+            btnAddItemToCart = new Guna2GradientButton() { Text = "➕ إضافة للسلة", Location = new Point(770, fieldsY - 6), Width = 150, Height = 60, FillColor = UIHelpers.ColorAccentPrimary, FillColor2 = Color.FromArgb(20, 90, 190), GradientMode = System.Drawing.Drawing2D.LinearGradientMode.ForwardDiagonal, BorderRadius = 10, ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            btnAddItemToCart.Click += BtnAddItemToCart_Click;
+
+            // ---- صف "الأكثر مبيعًا" ----
+            Label lblPopularTitle = new Label() { Text = "⭐ الأكثر مبيعًا:", Location = new Point(20, fieldsY + 66), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = UIHelpers.ColorAccentPrimary };
+            pnlPopularProducts = new Panel() { Location = new Point(140, fieldsY + 58), Size = new Size(InnerContentWidth - 120, 64), AutoScroll = true, AutoScrollMinSize = new Size(0, 64) };
+
+            pnlSearchCard.Controls.AddRange(new Control[] {
+                btnTabProductSearch, btnTabBarcode, btnTabSerialSearch, pnlTabBarcode, pnlTabProductSearch, pnlTabSerialSearch,
+                lblName, txtSaleName, lblPrice, txtCustomerPrice, lblQty, txtSaleQty, lblItemDiscount, txtItemDiscount,
+                lblSaleImei, cmbSaleImei, pnlTotal, btnAddItemToCart,
+                lblPopularTitle, pnlPopularProducts
+            });
+
+            // ---------- 3) جدول السلة الحالية ----------
+            pnlCartCard = NewCard(new Point(CardLeft, 440), new Size(CardWidth, 210));
+            Label lblCartTitle = new Label() { Text = "🧺 السلة الحالية", Location = new Point(20, 12), AutoSize = true, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = UIHelpers.ColorAccentPrimary };
+
+            btnClearCart = new Guna2Button() { Text = "مسح الكل 🗑", Location = new Point(20 + InnerContentWidth - 120, 10), Width = 120, Height = 28, FillColor = UIHelpers.ColorRed, BorderRadius = 8, Font = new Font("Segoe UI", 8F) };
+            btnClearCart.Click += BtnClearCart_Click;
+
+            dgvSaleCart = new DataGridView() { Location = new Point(20, 44), Size = new Size(InnerContentWidth, 130), ReadOnly = true, AllowUserToAddRows = false, AutoGenerateColumns = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill };
+            dgvSaleCart.Columns.Add(new DataGridViewTextBoxColumn { Name = "colProduct", HeaderText = "المنتج", FillWeight = 24 });
+            dgvSaleCart.Columns.Add(new DataGridViewTextBoxColumn { Name = "colCode", HeaderText = "الباركود/السيريال", FillWeight = 15 });
+            dgvSaleCart.Columns.Add(new DataGridViewButtonColumn { Name = "colDecrease", HeaderText = "", FillWeight = 7 });
+            dgvSaleCart.Columns.Add(new DataGridViewTextBoxColumn { Name = "colQty", HeaderText = "الكمية", FillWeight = 8 });
+            dgvSaleCart.Columns.Add(new DataGridViewButtonColumn { Name = "colIncrease", HeaderText = "", FillWeight = 7 });
+            dgvSaleCart.Columns.Add(new DataGridViewTextBoxColumn { Name = "colPrice", HeaderText = "سعر الوحدة", FillWeight = 12 });
+            dgvSaleCart.Columns.Add(new DataGridViewTextBoxColumn { Name = "colDiscount", HeaderText = "الخصم", FillWeight = 10 });
+            dgvSaleCart.Columns.Add(new DataGridViewTextBoxColumn { Name = "colTotal", HeaderText = "الإجمالي", FillWeight = 13 });
+            dgvSaleCart.Columns.Add(new DataGridViewButtonColumn { Name = "colDelete", HeaderText = "", FillWeight = 7 });
+            dgvSaleCart.CellContentClick += DgvSaleCart_CellContentClick;
+            dgvSaleCart.CellDoubleClick += DgvSaleCart_CellDoubleClick;
+            StyleDataGridView(dgvSaleCart);
+
+            lblSaleCartTotal = new Label() { Text = "عدد الأصناف: 0    |    إجمالي السلة: 0.00 ج.م", Location = new Point(20, 182), AutoSize = true, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = UIHelpers.ColorGreen };
+
+            pnlCartCard.Controls.AddRange(new Control[] { lblCartTitle, btnClearCart, dgvSaleCart, lblSaleCartTotal });
+
+            // ---------- 4) طرق دفع سريعة + الإجماليات + تأكيد الفاتورة (كارت واحد مدمج) ----------
+            pnlPaymentCard = NewCard(new Point(CardLeft, 666), new Size(CardWidth, 216));
+
+            Label lblQuickPayTitle = new Label() { Text = "طرق دفع سريعة", Location = new Point(20, 12), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = UIHelpers.ColorAccentPrimary };
+            BuildQuickPaymentButtons(pnlPaymentCard, new Point(20, 32));
+
+            Label lblQuickDiscount = new Label() { Text = "خصم سريع على الفاتورة (%):", Location = new Point(20, 82), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtQuickDiscountPercent = new Guna2TextBox() { Location = new Point(230, 78), Width = 70, Height = 26, Text = "0", BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtQuickDiscountPercent.TextChanged += (s, e) => UpdateTotalsSummary();
+
+            Label lblQuickTax = new Label() { Text = "ضريبة سريعة على الفاتورة (%):", Location = new Point(330, 82), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtQuickTaxPercent = new Guna2TextBox() { Location = new Point(560, 78), Width = 70, Height = 26, Text = "0", BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251) };
+            txtQuickTaxPercent.TextChanged += (s, e) => UpdateTotalsSummary();
+
+            Label lblAmountPaid = new Label() { Text = "المبلغ المدفوع (كاش):", Location = new Point(20, 116), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            txtAmountPaid = new Guna2TextBox() { Location = new Point(180, 112), Width = 90, Height = 26, BorderRadius = 8, FillColor = Color.FromArgb(248, 249, 251), PlaceholderText = "المبلغ بالظبط" };
+            txtAmountPaid.TextChanged += (s, e) => UpdateTotalsSummary();
+
+            Label lblChangeDueCaption = new Label() { Text = "الباقي (الفكة):", Location = new Point(300, 116), AutoSize = true, Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(85, 92, 102) };
+            lblChangeDue = new Label() { Text = "0.00 ج.م", Location = new Point(400, 114), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = UIHelpers.ColorGreen };
+
+            btnAddToBill = new Guna2GradientButton() { Text = "✅ تأكيد الفاتورة", Location = new Point(20, 154), Width = 610, Height = 50, FillColor = UIHelpers.ColorGreen, FillColor2 = Color.FromArgb(14, 130, 70), GradientMode = System.Drawing.Drawing2D.LinearGradientMode.ForwardDiagonal, BorderRadius = 12, ForeColor = Color.White, Font = new Font("Segoe UI", 12, FontStyle.Bold) };
+            btnAddToBill.Click += BtnAddToBill_Click;
+
+            Guna2GradientPanel pnlTotalsBox = new Guna2GradientPanel() { Location = new Point(650, 12), Size = new Size(InnerContentWidth - 630, 192), FillColor = UIHelpers.LightTint(UIHelpers.ColorGreen, 0.92f), FillColor2 = UIHelpers.LightTint(UIHelpers.ColorAccentPrimary, 0.9f), GradientMode = System.Drawing.Drawing2D.LinearGradientMode.ForwardDiagonal, BorderRadius = 10 };
+            Label lblSubtotalCaption = new Label() { Text = "الإجمالي الفرعي", Location = new Point(16, 8), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            lblTotalsSubtotal = new Label() { Text = "0.00 ج.م", Location = new Point(16, 22), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = ColorPrimary };
+            lblTotalsDiscount = new Label() { Text = "- 0.00 ج.م", Location = new Point(16, 44), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = UIHelpers.ColorRed };
+            lblTotalsTax = new Label() { Text = "+ 0.00 ج.م", Location = new Point(16, 64), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = UIHelpers.ColorOrange };
+            Label lblTotalsCaption = new Label() { Text = "الإجمالي الصافي", Location = new Point(16, 88), AutoSize = true, Font = new Font("Segoe UI", 7.5F), ForeColor = Color.FromArgb(85, 92, 102) };
+            lblTotalsGrandTotal = new Label() { Text = "0.00 ج.م", Location = new Point(16, 104), AutoSize = true, Font = new Font("Segoe UI", 15, FontStyle.Bold), ForeColor = UIHelpers.ColorGreen };
+            lblTotalsStatus = new Label() { Text = "مدفوعة بالكامل", Location = new Point(16, 140), Size = new Size(210, 28), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = UIHelpers.ColorGreen };
+            pnlTotalsBox.Controls.AddRange(new Control[] { lblSubtotalCaption, lblTotalsSubtotal, lblTotalsDiscount, lblTotalsTax, lblTotalsCaption, lblTotalsGrandTotal, lblTotalsStatus });
+
+            pnlPaymentCard.Controls.AddRange(new Control[] { lblQuickPayTitle, lblQuickDiscount, txtQuickDiscountPercent, lblQuickTax, txtQuickTaxPercent, lblAmountPaid, txtAmountPaid, lblChangeDueCaption, lblChangeDue, btnAddToBill, pnlTotalsBox });
+
+            // ---------- 5) كارت سجل المبيعات (شاشة تانية بالتبديل، بتاخد المساحة كاملة تحت الكارت العلوي) ----------
+            pnlGridCard = new Guna2ShadowPanel()
             {
-                Location = new Point(340, 20),
-                Size = new Size(780, 850),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Location = new Point(CardLeft, 124),
+                Size = new Size(CardWidth, 706),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 FillColor = Color.White,
-                BorderRadius = UIHelpers.CardBorderRadius,
-                BorderColor = Color.FromArgb(230, 232, 238),
-                BorderThickness = 1
+                Radius = UIHelpers.CardBorderRadius,
+                ShadowColor = Color.FromArgb(45, 30, 45, 90),
+                ShadowDepth = 22,
+                ShadowShift = 3,
+                ShadowStyle = Guna2ShadowPanel.ShadowMode.Dropped,
+                Visible = false
             };
-            Label lblGridTitle = new Label() { Text = "📋 سجل المبيعات (دوس على فاتورة عشان تعدلها أو تلغيها)", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = ColorPrimary };
+            Label lblGridTitle = new Label() { Text = "📋 سجل المبيعات (دوس على فاتورة عشان تعدلها أو تلغيها)", Location = new Point(20, 18), AutoSize = true, Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = UIHelpers.ColorAccentPrimary };
 
             dgvSales = new DataGridView()
             {
                 Location = new Point(20, 55),
-                Size = new Size(740, 715),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                Size = new Size(InnerContentWidth, 590),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 ReadOnly = true,
                 AllowUserToAddRows = false
@@ -235,18 +355,475 @@ namespace Temo_Mobile_Store
 
             // ---------- تعديل/إلغاء البيع المحدد - صف أزرار تحت جدول سجل المبيعات مباشرة
             // (نفس نمط "تعديل/إلغاء فاتورة شراء" في شاشة الموردين) بدل كارت منفصل تحت كارت البيع ----------
-            btnEditSaleMode = new Guna2Button() { Text = "تعديل البيع المحدد ✏️", Location = new Point(20, 785), Width = 240, Height = 34, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
+            btnEditSaleMode = new Guna2Button() { Text = "تعديل البيع المحدد ✏️", Location = new Point(20, 656), Width = 350, Height = 34, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, FillColor = UIHelpers.ColorOrange, BorderRadius = 9 };
             btnEditSaleMode.Click += BtnEditSaleMode_Click;
 
-            btnSaveSaleEdit = new Guna2Button() { Text = "حفظ تعديل البيع 💾", Location = new Point(270, 785), Width = 240, Height = 34, FillColor = UIHelpers.ColorGreen, Enabled = false, BorderRadius = 9 };
+            btnSaveSaleEdit = new Guna2Button() { Text = "حفظ تعديل البيع 💾", Location = new Point(390, 656), Width = 350, Height = 34, Anchor = AnchorStyles.Bottom | AnchorStyles.Left, FillColor = UIHelpers.ColorGreen, Enabled = false, BorderRadius = 9 };
             btnSaveSaleEdit.Click += BtnSaveSaleEdit_Click;
 
-            btnCancelSale = new Guna2Button() { Text = "إلغاء البيع ❌", Location = new Point(520, 785), Width = 240, Height = 34, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
+            btnCancelSale = new Guna2Button() { Text = "إلغاء البيع ❌", Location = new Point(760, 656), Width = 360, Height = 34, Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right, FillColor = UIHelpers.ColorRed, BorderRadius = 9 };
             btnCancelSale.Click += BtnCancelSale_Click;
 
             pnlGridCard.Controls.AddRange(new Control[] { lblGridTitle, dgvSales, btnEditSaleMode, btnSaveSaleEdit, btnCancelSale });
 
-            this.Controls.AddRange(new Control[] { pnlCard, pnlGridCard });
+            this.Controls.AddRange(new Control[] { pnlCustomerCard, pnlSearchCard, pnlCartCard, pnlPaymentCard, pnlGridCard });
+
+            SwitchProductTab(0);
+            SwitchMainView(0);
+            LoadPopularProductsRow();
+            UpdateTotalsSummary();
+        }
+
+        // ==========================================================================
+        // قائمة جانبية دائمة وشغالة فعليًا (مش ديكور) - بتظهر بس جوه نافذة المبيعات المستقلة دي،
+        // وكل بند فيها (غير "المبيعات" نفسها) بينادي MainShell.Instance.OpenPageByKey(key) اللي
+        // بتفتح/تفعّل نفس نافذة الصفحة التانية اللي القائمة الجانبية الأصلية في MainShell بتفتحها
+        // بالظبط - من غير ما نكرر أي منطق فتح نوافذ هنا.
+        // ==========================================================================
+        private void BuildSidebarNav()
+        {
+            Guna2GradientPanel pnlSidebarNav = new Guna2GradientPanel()
+            {
+                Location = new Point(0, 0),
+                Size = new Size(SidebarWidth, 900),
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left,
+                FillColor = UIHelpers.ColorSidebar,
+                FillColor2 = Color.FromArgb(30, 46, 78),
+                GradientMode = System.Drawing.Drawing2D.LinearGradientMode.ForwardDiagonal
+            };
+
+            Label lblLogo = new Label()
+            {
+                Text = "📱 TEMO\nMOBILE STORE",
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 0),
+                Size = new Size(SidebarWidth, 70)
+            };
+            pnlSidebarNav.Controls.Add(lblLogo);
+
+            var adminOnlyKeys = new System.Collections.Generic.HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.Settings, MainShell.PageKeys.InventoryCount, MainShell.PageKeys.Attendance
+            };
+            var visibleItems = AuthManager.IsAdmin ? ShellNavItems : ShellNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+
+            int y = 78;
+            foreach (var item in visibleItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.Sales;
+                Guna2Button btn = new Guna2Button()
+                {
+                    Text = $"{item.Icon}  {item.Text}",
+                    Location = new Point(8, y),
+                    Size = new Size(SidebarWidth - 16, 38),
+                    FillColor = isCurrent ? UIHelpers.ColorAccentPrimary : Color.Transparent,
+                    ForeColor = isCurrent ? Color.White : Color.FromArgb(190, 200, 218),
+                    BorderRadius = 8,
+                    Font = new Font("Segoe UI", 8.5F, isCurrent ? FontStyle.Bold : FontStyle.Regular)
+                };
+                string key = item.Key;
+                if (!isCurrent)
+                    btn.Click += (s, e) => MainShell.Instance?.OpenPageByKey(key);
+                pnlSidebarNav.Controls.Add(btn);
+                y += 44;
+            }
+
+            this.Controls.Add(pnlSidebarNav);
+        }
+
+        // ---------- التبديل بين "فاتورة جديدة" و"سجل المبيعات" داخل نفس الشاشة (بدون سكرول) ----------
+        private void SwitchMainView(int viewIndex)
+        {
+            bool newSale = viewIndex == 0;
+            pnlSearchCard.Visible = newSale;
+            pnlCartCard.Visible = newSale;
+            pnlPaymentCard.Visible = newSale;
+            pnlGridCard.Visible = !newSale;
+
+            btnViewNewSale.FillColor = newSale ? UIHelpers.ColorAccentPrimary : Color.White;
+            btnViewNewSale.ForeColor = newSale ? Color.White : UIHelpers.ColorAccentPrimary;
+            btnViewHistory.FillColor = !newSale ? UIHelpers.ColorAccentPrimary : Color.White;
+            btnViewHistory.ForeColor = !newSale ? Color.White : UIHelpers.ColorAccentPrimary;
+
+            if (!newSale) LoadSalesData();
+        }
+
+        // ---------- كارت أبيض قياسي (نفس الأسلوب المستخدم في كل الكروت الجديدة) ----------
+        private static Guna2ShadowPanel NewCard(Point location, Size size) => new Guna2ShadowPanel()
+        {
+            Location = location,
+            Size = size,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            FillColor = Color.White,
+            Radius = UIHelpers.CardBorderRadius,
+            ShadowColor = Color.FromArgb(45, 30, 45, 90),
+            ShadowDepth = 22,
+            ShadowShift = 3,
+            ShadowStyle = Guna2ShadowPanel.ShadowMode.Dropped
+        };
+
+        // ---------- زرار Tab بحث المنتج (يتلوّن لما يبقى نشط في SwitchProductTab) ----------
+        private static Guna2Button NewTabButton(string text, Point location) => new Guna2Button()
+        {
+            Text = text,
+            Location = location,
+            Width = 110,
+            Height = 34,
+            FillColor = Color.White,
+            ForeColor = UIHelpers.ColorAccentPrimary,
+            BorderColor = UIHelpers.ColorAccentPrimary,
+            BorderThickness = 1,
+            BorderRadius = 8,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+        };
+
+        // ---------- التبديل بين تابات البحث الثلاثة (منتج / باركود / سيريال) ----------
+        private void SwitchProductTab(int tabIndex)
+        {
+            pnlTabBarcode.Visible = tabIndex == 0;
+            pnlTabProductSearch.Visible = tabIndex == 1;
+            pnlTabSerialSearch.Visible = tabIndex == 2;
+
+            Guna2Button[] tabs = { btnTabBarcode, btnTabProductSearch, btnTabSerialSearch };
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                bool active = i == tabIndex;
+                tabs[i].FillColor = active ? UIHelpers.ColorAccentPrimary : Color.White;
+                tabs[i].ForeColor = active ? Color.White : UIHelpers.ColorAccentPrimary;
+            }
+
+            if (tabIndex == 0) txtSaleBarcode.Focus();
+            else if (tabIndex == 1) txtProductSearch.Focus();
+            else txtSerialSearch.Focus();
+        }
+
+        // ---------- بناء أزرار "الدفع السريع" الستة (نفس UIHelpers.PaymentMethods بالظبط) ----------
+        private void BuildQuickPaymentButtons(Control host, Point start)
+        {
+            string[] methods = UIHelpers.PaymentMethods;
+            quickPaymentButtons = new Guna2Button[methods.Length];
+            int x = start.X;
+            for (int i = 0; i < methods.Length; i++)
+            {
+                string method = methods[i];
+                Guna2Button btn = new Guna2Button()
+                {
+                    Text = method,
+                    Location = new Point(x, start.Y),
+                    Width = 115,
+                    Height = 40,
+                    FillColor = Color.White,
+                    ForeColor = UIHelpers.ColorAccentPrimary,
+                    BorderColor = UIHelpers.ColorAccentPrimary,
+                    BorderThickness = 1,
+                    BorderRadius = 8,
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Bold)
+                };
+                btn.Click += (s, e) => SelectQuickPaymentMethod(method);
+                quickPaymentButtons[i] = btn;
+                host.Controls.Add(btn);
+                x += 122;
+            }
+        }
+
+        // ---------- تحديد وسيلة الدفع من الأزرار السريعة (مفعّلة بس لو البيع كاش) ----------
+        private void SelectQuickPaymentMethod(string method)
+        {
+            if (!cmbSalePaymentMethod.Enabled)
+            {
+                MessageBox.Show("البيع آجل - اختار العميل من الكارت اللي فوق بدل وسيلة الدفع.", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            cmbSalePaymentMethod.SelectedItem = method;
+            HighlightSelectedQuickPaymentButton(method);
+            UpdateTotalsSummary();
+        }
+
+        private void HighlightSelectedQuickPaymentButton(string method)
+        {
+            if (quickPaymentButtons == null) return;
+            foreach (var btn in quickPaymentButtons)
+            {
+                bool selected = btn.Text == method;
+                btn.FillColor = selected ? UIHelpers.ColorAccentPrimary : Color.White;
+                btn.ForeColor = selected ? Color.White : UIHelpers.ColorAccentPrimary;
+            }
+        }
+
+        // ---------- إجماليات السلة الحالية (قبل تسجيل البيع) - الإجمالي الفرعي، خصم الأصناف،
+        // خصم الفاتورة السريع (لسه معاينة بس، هيتطبق فعليًا وقت التأكيد)، والصافي النهائي ----------
+        private (decimal Subtotal, decimal ItemsDiscount, decimal QuickDiscountAmount, decimal Net, decimal TaxAmount, decimal AmountDue) CalculateCartTotals()
+        {
+            decimal subtotal = 0, itemsDiscount = 0;
+            foreach (var item in currentSaleItems)
+            {
+                subtotal += item.Total;
+                itemsDiscount += item.Discount;
+            }
+
+            decimal.TryParse(txtQuickDiscountPercent?.Text, out decimal quickPercent);
+            quickPercent = Math.Max(0, Math.Min(100, quickPercent));
+            decimal afterItemsDiscount = subtotal - itemsDiscount;
+            decimal quickDiscountAmount = afterItemsDiscount * quickPercent / 100m;
+
+            decimal net = subtotal - itemsDiscount - quickDiscountAmount;
+
+            decimal.TryParse(txtQuickTaxPercent?.Text, out decimal quickTaxPercent);
+            quickTaxPercent = Math.Max(0, quickTaxPercent);
+            decimal taxAmount = net * quickTaxPercent / 100m;
+            decimal amountDue = net + taxAmount;
+
+            return (subtotal, itemsDiscount, quickDiscountAmount, net, taxAmount, amountDue);
+        }
+
+        // ---------- تحديث كارت الإجماليات (الإجمالي الفرعي/الخصم/الضريبة/الصافي + حالة الفاتورة المتوقعة + الباقي) ----------
+        private void UpdateTotalsSummary()
+        {
+            if (lblTotalsGrandTotal == null) return;
+            var totals = CalculateCartTotals();
+            decimal totalDiscount = totals.ItemsDiscount + totals.QuickDiscountAmount;
+
+            lblTotalsSubtotal.Text = $"{totals.Subtotal:N2} ج.م";
+            lblTotalsDiscount.Text = $"- {totalDiscount:N2} ج.م";
+            lblTotalsTax.Text = $"+ {totals.TaxAmount:N2} ج.م";
+            lblTotalsGrandTotal.Text = $"{totals.AmountDue:N2} ج.م";
+
+            bool isCredit = cmbSalePaymentType.SelectedItem?.ToString() == "آجل";
+            if (isCredit)
+            {
+                lblTotalsStatus.Text = "آجل - غير مدفوعة";
+                lblTotalsStatus.ForeColor = UIHelpers.ColorOrange;
+            }
+            else
+            {
+                string method = cmbSalePaymentMethod.SelectedItem?.ToString();
+                lblTotalsStatus.Text = string.IsNullOrEmpty(method) ? "مدفوعة بالكامل" : $"مدفوعة بالكامل ({method})";
+                lblTotalsStatus.ForeColor = UIHelpers.ColorGreen;
+            }
+
+            if (txtAmountPaid != null && lblChangeDue != null)
+            {
+                if (!isCredit && decimal.TryParse(txtAmountPaid.Text, out decimal amountPaid) && amountPaid > 0)
+                {
+                    decimal change = amountPaid - totals.AmountDue;
+                    lblChangeDue.Text = $"{change:N2} ج.م";
+                    lblChangeDue.ForeColor = change < 0 ? UIHelpers.ColorRed : UIHelpers.ColorGreen;
+                }
+                else
+                {
+                    lblChangeDue.Text = "0.00 ج.م";
+                    lblChangeDue.ForeColor = UIHelpers.ColorGreen;
+                }
+            }
+        }
+
+        // ---------- إضافة عميل جديد سريع (اسم + تليفون) من نفس شاشة البيع ----------
+        private void BtnQuickAddCustomer_Click(object sender, EventArgs e)
+        {
+            using (Form dlg = new Form())
+            {
+                dlg.Text = "إضافة عميل جديد";
+                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.ClientSize = new Size(340, 190);
+                dlg.MaximizeBox = false;
+                dlg.MinimizeBox = false;
+                dlg.RightToLeft = RightToLeft.Yes;
+                dlg.RightToLeftLayout = true;
+
+                Label lblName = new Label() { Text = "اسم العميل:", Location = new Point(20, 16), AutoSize = true };
+                Guna2TextBox txtName = new Guna2TextBox() { Location = new Point(20, 38), Width = 300, BorderRadius = 8 };
+                Label lblPhone = new Label() { Text = "رقم الجوال:", Location = new Point(20, 76), AutoSize = true };
+                Guna2TextBox txtPhone = new Guna2TextBox() { Location = new Point(20, 98), Width = 300, BorderRadius = 8 };
+                Guna2Button btnSave = new Guna2Button() { Text = "حفظ", Location = new Point(20, 138), Width = 300, Height = 34, FillColor = UIHelpers.ColorGreen, BorderRadius = 9 };
+
+                btnSave.Click += (s2, e2) =>
+                {
+                    if (string.IsNullOrWhiteSpace(txtName.Text))
+                    {
+                        MessageBox.Show("من فضلك أدخل اسم العميل.", "بيانات ناقصة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    try { CustomersRepository.AddCustomer(txtName.Text.Trim(), txtPhone.Text.Trim()); }
+                    catch (Exception ex) { MessageBox.Show(ex.Message); return; }
+                    dlg.DialogResult = DialogResult.OK;
+                    dlg.Close();
+                };
+
+                dlg.Controls.AddRange(new Control[] { lblName, txtName, lblPhone, txtPhone, btnSave });
+                string addedName = txtName.Text;
+                if (dlg.ShowDialog(this.FindForm()) == DialogResult.OK)
+                {
+                    addedName = txtName.Text.Trim();
+                    LoadCustomersIntoCombo();
+                    SelectCustomerByName(addedName);
+                }
+            }
+        }
+
+        private void SelectCustomerByName(string name)
+        {
+            if (!(cmbSaleCustomer.DataSource is DataTable)) return;
+            foreach (DataRowView row in cmbSaleCustomer.Items)
+            {
+                if (row["CustomerName"].ToString() == name)
+                {
+                    cmbSaleCustomer.SelectedItem = row;
+                    return;
+                }
+            }
+        }
+
+        // ---------- تاب "منتج": بحث بالاسم أو الباركود أثناء الكتابة ----------
+        private void TxtProductSearch_TextChanged(object sender, EventArgs e)
+        {
+            string term = txtProductSearch.Text.Trim();
+            dgvProductSearchResults.Rows.Clear();
+            lastProductSearchResults.Clear();
+            if (term.Length == 0) return;
+
+            try
+            {
+                lastProductSearchResults.AddRange(SalesRepository.SearchProducts(term));
+                foreach (var r in lastProductSearchResults)
+                    dgvProductSearchResults.Rows.Add(r.ProductName, r.Barcode, r.SalePrice.ToString("N2"), r.Quantity);
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        private void DgvProductSearchResults_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= lastProductSearchResults.Count) return;
+            var r = lastProductSearchResults[e.RowIndex];
+            LoadProductIntoCurrentItemFields(r.Barcode, r.ProductName, r.SalePrice, r.Quantity, r.IsSerialized);
+        }
+
+        // ---------- تاب "سيريال": بحث بالـIMEI أثناء الكتابة ----------
+        private void TxtSerialSearch_TextChanged(object sender, EventArgs e)
+        {
+            string term = txtSerialSearch.Text.Trim();
+            dgvSerialSearchResults.Rows.Clear();
+            lastSerialSearchResults.Clear();
+            if (term.Length == 0) return;
+
+            try
+            {
+                lastSerialSearchResults.AddRange(SalesRepository.SearchProductsBySerial(term));
+                foreach (var r in lastSerialSearchResults)
+                    dgvSerialSearchResults.Rows.Add(r.ProductName, r.Barcode, r.IMEI, r.SalePrice.ToString("N2"));
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        private void DgvSerialSearchResults_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= lastSerialSearchResults.Count) return;
+            var r = lastSerialSearchResults[e.RowIndex];
+            if (currentSaleItems.Exists(x => x.Imei == r.IMEI))
+            {
+                MessageBox.Show("الجهاز ده اتضاف للسلة بالفعل.", "مكرر", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            LoadProductIntoCurrentItemFields(r.Barcode, r.ProductName, r.SalePrice, 1, true, r.IMEI);
+        }
+
+        // ---------- صف "الأكثر مبيعًا" - كروت بدون صور (اسم + سعر + أيقونة) ----------
+        private void LoadPopularProductsRow()
+        {
+            pnlPopularProducts.Controls.Clear();
+
+            System.Collections.Generic.List<ProductSearchResult> popular;
+            try { popular = SalesRepository.GetPopularProducts(6); }
+            catch { popular = new System.Collections.Generic.List<ProductSearchResult>(); }
+
+            if (popular.Count == 0)
+            {
+                Label lblEmpty = new Label() { Text = "لسه معندكش مبيعات كفاية لعرض الأكثر مبيعًا", AutoSize = true, ForeColor = Color.FromArgb(150, 155, 165), Font = new Font("Segoe UI", 8.5F), Location = new Point(0, 6) };
+                pnlPopularProducts.Controls.Add(lblEmpty);
+                return;
+            }
+
+            int x = 0;
+            foreach (var p in popular)
+            {
+                Guna2GradientPanel card = new Guna2GradientPanel() { Location = new Point(x, 0), Size = new Size(170, 60), FillColor = UIHelpers.LightTint(UIHelpers.ColorAccentPrimary, 0.94f), FillColor2 = UIHelpers.LightTint(UIHelpers.ColorAccentPrimary, 0.82f), GradientMode = System.Drawing.Drawing2D.LinearGradientMode.Vertical, BorderRadius = 8, Cursor = Cursors.Hand };
+
+                Control thumb;
+                if (p.Image != null && p.Image.Length > 0)
+                {
+                    var pic = new PictureBox() { Location = new Point(6, 8), Size = new Size(44, 44), SizeMode = PictureBoxSizeMode.Zoom, Cursor = Cursors.Hand };
+                    using (var ms = new System.IO.MemoryStream(p.Image)) pic.Image = Image.FromStream(ms);
+                    thumb = pic;
+                }
+                else
+                {
+                    thumb = new Label() { Text = p.IsSerialized ? "📱" : "📦", Location = new Point(6, 6), Size = new Size(44, 44), Font = new Font("Segoe UI Emoji", 18F), TextAlign = ContentAlignment.MiddleCenter, Cursor = Cursors.Hand };
+                }
+
+                Label lblName = new Label() { Text = p.ProductName, Location = new Point(54, 7), Size = new Size(110, 30), Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = UIHelpers.ColorAccentPrimary, AutoEllipsis = true, Cursor = Cursors.Hand };
+                Label lblPrice = new Label() { Text = $"{p.SalePrice:N0} ج.م", Location = new Point(54, 37), Size = new Size(110, 18), Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = UIHelpers.ColorGreen, Cursor = Cursors.Hand };
+
+                EventHandler clickHandler = (s, e) => LoadProductIntoCurrentItemFields(p.Barcode, p.ProductName, p.SalePrice, p.Quantity, p.IsSerialized);
+                card.Click += clickHandler;
+                thumb.Click += clickHandler;
+                lblName.Click += clickHandler;
+                lblPrice.Click += clickHandler;
+
+                card.Controls.AddRange(new Control[] { thumb, lblName, lblPrice });
+                pnlPopularProducts.Controls.Add(card);
+                x += 178;
+            }
+        }
+
+        // ---------- أزرار ➖/➕/🗑 داخل جدول السلة ----------
+        private void DgvSaleCart_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            string colName = dgvSaleCart.Columns[e.ColumnIndex].Name;
+            if (colName == "colDecrease") DecrementCartQty(e.RowIndex);
+            else if (colName == "colIncrease") IncrementCartQty(e.RowIndex);
+            else if (colName == "colDelete") RemoveCartRow(e.RowIndex);
+        }
+
+        private void IncrementCartQty(int rowIndex)
+        {
+            if (rowIndex < 0 || rowIndex >= currentSaleItems.Count) return;
+            var item = currentSaleItems[rowIndex];
+            if (!string.IsNullOrEmpty(item.Imei)) return; // جهاز بسيريال - الكمية دايمًا 1
+            item.Quantity += 1;
+            item.Total = item.UnitPrice * item.Quantity;
+            RefreshSaleCartGrid();
+        }
+
+        private void DecrementCartQty(int rowIndex)
+        {
+            if (rowIndex < 0 || rowIndex >= currentSaleItems.Count) return;
+            var item = currentSaleItems[rowIndex];
+            if (!string.IsNullOrEmpty(item.Imei)) return;
+            if (item.Quantity <= 1) return; // لو عايز يشيله يستخدم زرار الحذف
+            item.Quantity -= 1;
+            item.Total = item.UnitPrice * item.Quantity;
+            RefreshSaleCartGrid();
+        }
+
+        private void RemoveCartRow(int rowIndex)
+        {
+            if (rowIndex < 0 || rowIndex >= currentSaleItems.Count) return;
+            currentSaleItems.RemoveAt(rowIndex);
+            RefreshSaleCartGrid();
+        }
+
+        private void BtnClearCart_Click(object sender, EventArgs e)
+        {
+            if (currentSaleItems.Count == 0) return;
+            if (MessageBox.Show("هل تريد إفراغ السلة بالكامل؟", "تأكيد", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            currentSaleItems.Clear();
+            txtQuickDiscountPercent.Text = "0";
+            txtQuickTaxPercent.Text = "0";
+            txtAmountPaid.Text = "";
+            RefreshSaleCartGrid();
         }
 
         // ==========================================================================
@@ -306,7 +883,8 @@ namespace Temo_Mobile_Store
             {
                 try
                 {
-                    ProductForSale product = SalesRepository.GetProductForSale(txtSaleBarcode.Text);
+                    string barcode = txtSaleBarcode.Text;
+                    ProductForSale product = SalesRepository.GetProductForSale(barcode);
                     if (product == null)
                     {
                         MessageBox.Show("هذا الباركود غير مسجل في المخزن!", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -315,33 +893,48 @@ namespace Temo_Mobile_Store
                         return;
                     }
 
-                    if (product.Quantity <= 0)
-                    {
-                        MessageBox.Show("عذراً، هذا المنتج نفذ من المخزن تماماً!", "نفذت الكمية", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-
-                    txtSaleName.Text = product.ProductName;
-                    txtCustomerPrice.Text = product.SalePrice.ToString();
-                    CalculateTotal();
-
-                    lblSaleImei.Visible = product.IsSerialized;
-                    cmbSaleImei.Visible = product.IsSerialized;
-
-                    if (product.IsSerialized)
-                    {
-                        txtSaleQty.Text = "1";
-                        txtSaleQty.ReadOnly = true;
-                        LoadAvailableImeisForSale(txtSaleBarcode.Text.Trim());
-                        cmbSaleImei.Focus();
-                    }
-                    else
-                    {
-                        txtSaleQty.ReadOnly = false;
-                        txtSaleQty.Focus();
-                    }
+                    LoadProductIntoCurrentItemFields(barcode, product.ProductName, product.SalePrice, product.Quantity, product.IsSerialized);
                 }
                 catch (Exception ex) { MessageBox.Show(ex.Message); }
+            }
+        }
+
+        // ==========================================================================
+        // بيملأ حقول "الصنف الحالي" (باركود/اسم/سعر/كمية/IMEI) من بيانات منتج معين - بيستخدمها
+        // كل مصادر اختيار المنتج (مسح باركود / بحث بالاسم / بحث بالسيريال / كارت "الأكثر مبيعًا")
+        // عشان الكل يشتغل بنفس السلوك بالظبط من غير تكرار منطق. preselectedImei اختياري
+        // (تاب "سيريال" بيحدد جهاز بعينه بدل ما يسيب المستخدم يختار من القائمة).
+        // ==========================================================================
+        private void LoadProductIntoCurrentItemFields(string barcode, string productName, decimal salePrice, int quantity, bool isSerialized, string preselectedImei = null)
+        {
+            if (quantity <= 0)
+            {
+                MessageBox.Show("عذراً، هذا المنتج نفذ من المخزن تماماً!", "نفذت الكمية", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            txtSaleBarcode.Text = barcode;
+            txtSaleName.Text = productName;
+            txtCustomerPrice.Text = salePrice.ToString();
+            txtItemDiscount.Text = "0";
+            CalculateTotal();
+
+            lblSaleImei.Visible = isSerialized;
+            cmbSaleImei.Visible = isSerialized;
+
+            if (isSerialized)
+            {
+                txtSaleQty.Text = "1";
+                txtSaleQty.ReadOnly = true;
+                LoadAvailableImeisForSale(barcode.Trim());
+                if (!string.IsNullOrEmpty(preselectedImei))
+                    cmbSaleImei.SelectedValue = preselectedImei;
+                cmbSaleImei.Focus();
+            }
+            else
+            {
+                txtSaleQty.ReadOnly = false;
+                txtSaleQty.Focus();
             }
         }
 
@@ -350,7 +943,11 @@ namespace Temo_Mobile_Store
         private void CalculateTotal()
         {
             if (decimal.TryParse(txtCustomerPrice.Text, out decimal price) && int.TryParse(txtSaleQty.Text, out int qty))
-                txtSaleTotal.Text = (price * qty).ToString();
+            {
+                decimal.TryParse(txtItemDiscount.Text, out decimal discount);
+                decimal gross = price * qty;
+                txtSaleTotal.Text = (gross - discount).ToString();
+            }
         }
 
         private void CmbSalePaymentType_SelectedIndexChanged(object sender, EventArgs e)
@@ -358,6 +955,17 @@ namespace Temo_Mobile_Store
             bool isCredit = cmbSalePaymentType.SelectedItem?.ToString() == "آجل";
             cmbSaleCustomer.Enabled = isCredit;
             cmbSalePaymentMethod.Enabled = !isCredit;
+            if (txtAmountPaid != null)
+            {
+                txtAmountPaid.Enabled = !isCredit;
+                if (isCredit) txtAmountPaid.Text = "";
+            }
+            if (quickPaymentButtons != null)
+            {
+                foreach (var btn in quickPaymentButtons) btn.Enabled = !isCredit;
+                if (isCredit) HighlightSelectedQuickPaymentButton(null);
+            }
+            UpdateTotalsSummary();
         }
 
         // ==========================================================================
@@ -402,6 +1010,14 @@ namespace Temo_Mobile_Store
                 return;
             }
 
+            decimal.TryParse(txtItemDiscount.Text, out decimal itemDiscount);
+            decimal lineGross = unitPrice * qtySold;
+            if (itemDiscount < 0 || itemDiscount > lineGross)
+            {
+                MessageBox.Show("قيمة خصم الصنف لازم تكون بين صفر وإجمالي الصنف.", "بيانات غير صحيحة", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
             string selectedImei = null;
             if (lblSaleImei.Visible)
             {
@@ -424,7 +1040,8 @@ namespace Temo_Mobile_Store
                 ProductName = txtSaleName.Text,
                 UnitPrice = unitPrice,
                 Quantity = qtySold,
-                Total = unitPrice * qtySold,
+                Total = lineGross,
+                Discount = itemDiscount,
                 Imei = selectedImei
             });
 
@@ -434,18 +1051,20 @@ namespace Temo_Mobile_Store
 
         private void RefreshSaleCartGrid()
         {
-            DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("المنتج"), new DataColumn("الكمية"), new DataColumn("السعر"), new DataColumn("الإجمالي") });
+            dgvSaleCart.Rows.Clear();
 
-            decimal grandTotal = 0;
             foreach (var item in currentSaleItems)
             {
-                dt.Rows.Add(item.ProductName, item.Quantity, item.UnitPrice.ToString("N2"), item.Total.ToString("N2"));
-                grandTotal += item.Total;
+                string code = !string.IsNullOrEmpty(item.Imei) ? item.Imei : item.Barcode;
+                string stepper = string.IsNullOrEmpty(item.Imei) ? "➖" : "";
+                string stepperUp = string.IsNullOrEmpty(item.Imei) ? "➕" : "";
+                decimal lineNet = item.Total - item.Discount;
+                dgvSaleCart.Rows.Add(item.ProductName, code, stepper, item.Quantity, stepperUp, item.UnitPrice.ToString("N2"), item.Discount.ToString("N2"), lineNet.ToString("N2"), "🗑");
             }
 
-            dgvSaleCart.DataSource = dt;
-            lblSaleCartTotal.Text = $"إجمالي السلة: {grandTotal:N2} ج.م";
+            var totals = CalculateCartTotals();
+            lblSaleCartTotal.Text = $"عدد الأصناف: {currentSaleItems.Count}    |    إجمالي السلة: {totals.Net:N2} ج.م";
+            UpdateTotalsSummary();
         }
 
         private void DgvSaleCart_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
@@ -459,7 +1078,7 @@ namespace Temo_Mobile_Store
         // المستخدم يمسح الصنف اللي بعده، من غير ما يلمس السلة أو بيانات العميل/الدفع
         private void ClearCurrentItemInputs()
         {
-            txtSaleBarcode.Clear(); txtSaleName.Clear(); txtCustomerPrice.Clear(); txtSaleQty.Text = "1"; txtSaleTotal.Clear();
+            txtSaleBarcode.Clear(); txtSaleName.Clear(); txtCustomerPrice.Clear(); txtSaleQty.Text = "1"; txtSaleTotal.Clear(); txtItemDiscount.Text = "0";
             lblSaleImei.Visible = false;
             cmbSaleImei.Visible = false;
             txtSaleQty.ReadOnly = false;
@@ -506,7 +1125,40 @@ namespace Temo_Mobile_Store
                 paymentMethod = cmbSalePaymentMethod.SelectedItem.ToString();
             }
 
+            // خصم سريع على مستوى الفاتورة (لو موجود) بيتوزّع نسبيًا على كل الأصناف وقت التأكيد،
+            // فوق أي خصم صنف موجود بالفعل من غير ما يستبدله
+            decimal.TryParse(txtQuickDiscountPercent.Text, out decimal quickPercent);
+            quickPercent = Math.Max(0, Math.Min(100, quickPercent));
+            if (quickPercent > 0)
+            {
+                foreach (var item in currentSaleItems)
+                {
+                    decimal afterItemDiscount = item.Total - item.Discount;
+                    item.Discount += afterItemDiscount * quickPercent / 100m;
+                }
+            }
+
+            // ضريبة سريعة على مستوى الفاتورة (لو موجودة) بتتوزّع نسبيًا على كل الأصناف
+            // بعد الخصم بالظبط - نفس أسلوب الخصم السريع فوق
+            decimal.TryParse(txtQuickTaxPercent.Text, out decimal quickTaxPercent);
+            quickTaxPercent = Math.Max(0, quickTaxPercent);
+            if (quickTaxPercent > 0)
+            {
+                foreach (var item in currentSaleItems)
+                {
+                    decimal lineNet = item.Total - item.Discount;
+                    item.Tax = lineNet * quickTaxPercent / 100m;
+                }
+            }
+
+            // "المبلغ المدفوع" اختياري وبيتفعّل بس مع الكاش - لو فاضي، السيرفر بيعتبر العميل
+            // دافع المبلغ المطلوب بالظبط (فكة = صفر)
+            decimal? amountPaid = null;
+            if (paymentType == "Cash" && decimal.TryParse(txtAmountPaid.Text, out decimal enteredAmountPaid) && enteredAmountPaid > 0)
+                amountPaid = enteredAmountPaid;
+
             int dailyInvoiceNumber;
+            decimal changeDue;
             try
             {
                 var result = AppServices.CoreEngine.Execute(new CreateSaleCommand
@@ -515,9 +1167,11 @@ namespace Temo_Mobile_Store
                     CustomerId = customerId,
                     PaymentType = paymentType,
                     PaymentMethod = paymentMethod,
-                    PerformedBy = AuthManager.CurrentUsername
+                    PerformedBy = AuthManager.CurrentUsername,
+                    AmountPaid = amountPaid
                 });
                 dailyInvoiceNumber = result.DailyInvoiceNumber;
+                changeDue = result.ChangeDue;
             }
             catch (InsufficientStockException ex)
             {
@@ -535,11 +1189,17 @@ namespace Temo_Mobile_Store
                 return;
             }
 
-            txtInvoiceNumber.Text = dailyInvoiceNumber.ToString();
+            txtInvoiceNumber.Text = $"🧾 فاتورة #{dailyInvoiceNumber}";
             txtInvoiceCustomer.Text = paymentType == "Credit" ? cmbSaleCustomer.Text : "عميل نقدي";
 
-            MessageBox.Show($"تمت عملية البيع بنجاح!\nرقم الفاتورة اليوم: {dailyInvoiceNumber}", "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            string successMessage = $"تمت عملية البيع بنجاح!\nرقم الفاتورة اليوم: {dailyInvoiceNumber}";
+            if (changeDue > 0)
+                successMessage += $"\nالباقي (الفكة) للعميل: {changeDue:N2} ج.م";
+            MessageBox.Show(successMessage, "نجاح", MessageBoxButtons.OK, MessageBoxIcon.Information);
             currentSaleItems.Clear();
+            txtQuickDiscountPercent.Text = "0";
+            txtQuickTaxPercent.Text = "0";
+            txtAmountPaid.Text = "";
             RefreshSaleCartGrid();
             LoadSalesData();
             ClearPOSInputs();
@@ -590,6 +1250,8 @@ namespace Temo_Mobile_Store
                 if (sale == null) return;
 
                 selectedSaleId = saleId;
+                SwitchMainView(0); // يفضل عرض "فاتورة جديدة" ظاهر أثناء التعديل (فيه الحقول المشتركة)
+                SwitchProductTab(0); // يفضل الباركود ظاهر أثناء التعديل حتى لو كان تاب تاني نشط
                 txtSaleBarcode.Text = sale.Barcode;
                 txtSaleName.Text = sale.ProductName;
                 txtCustomerPrice.Text = sale.Price.ToString();
@@ -717,7 +1379,7 @@ namespace Temo_Mobile_Store
 
         private void ClearPOSInputs()
         {
-            txtSaleBarcode.Clear(); txtSaleName.Clear(); txtCustomerPrice.Clear(); txtSaleQty.Text = "1"; txtSaleTotal.Clear();
+            txtSaleBarcode.Clear(); txtSaleName.Clear(); txtCustomerPrice.Clear(); txtSaleQty.Text = "1"; txtSaleTotal.Clear(); txtItemDiscount.Text = "0";
             txtSaleBarcode.ReadOnly = false;
             txtSaleQty.ReadOnly = false;
             if (lblSaleImei != null) lblSaleImei.Visible = false;
@@ -1044,10 +1706,10 @@ namespace Temo_Mobile_Store
             Dashed(yPos);
             yPos += isThermal ? 12 : 16;
 
-            // 9) الإجماليات (خصم=0 دايمًا حاليًا - النظام مفيهوش خاصية خصم على مستوى البيع)
+            // 9) الإجماليات
             decimal subtotal = 0m;
-            foreach (var item in items) subtotal += item.Total;
             decimal discount = 0m;
+            foreach (var item in items) { subtotal += item.Total; discount += item.Discount; }
             decimal grandTotal = subtotal - discount;
 
             void TotalLine(string label, decimal amount)

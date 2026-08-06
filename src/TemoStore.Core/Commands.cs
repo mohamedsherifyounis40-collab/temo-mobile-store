@@ -15,6 +15,7 @@ namespace TemoStore.Core.Commands
         public required string PaymentType { get; set; }     // "Cash" | "Credit"
         public string? PaymentMethod { get; set; }
         public required string PerformedBy { get; set; }
+        public decimal? AmountPaid { get; set; }              // اختياري - للبيع الكاش بس (حاسبة فكة). لو مش مُرسلة = المبلغ المطلوب بالظبط
     }
 
     public class SaleResult
@@ -23,6 +24,9 @@ namespace TemoStore.Core.Commands
         public int SalesInvoiceId { get; set; }
         public List<int> SaleIds { get; set; } = new();
         public int DailyInvoiceNumber { get; set; }
+        public decimal TaxTotal { get; set; }
+        public decimal AmountPaid { get; set; }
+        public decimal ChangeDue { get; set; }
     }
 
     public class UpdateSaleQuantityCommand : ICommand<SaleResult>
@@ -318,6 +322,23 @@ namespace TemoStore.Core.Commands
     public class DeleteEmployeeCommand : ICommand<bool>
     {
         public required int EmployeeId { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    // ==========================================================================
+    // شاشة التقارير - إقفال اليوم
+    // ==========================================================================
+
+    public class CloseDayCommand : ICommand<int>
+    {
+        // لازم يشمل كل وسائل الدفع، بما فيها "نقدي" - الـ Handler بيرفض لو "نقدي" ناقصة
+        public required Dictionary<string, decimal> MethodActualBalances { get; set; }
+        public Dictionary<decimal, int>? CashDenominationCounts { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class ReopenDayCommand : ICommand<int>
+    {
         public required string PerformedBy { get; set; }
     }
 }

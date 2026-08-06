@@ -1,0 +1,71 @@
+/* قالب موحّد لشاشات "قائمة بيانات" الجديدة (مخزون/عملاء/موردين/مشتريات...) - شريط KPI صغير +
+   تابات + جدول بأيقونات تعديل/حذف + بانل إضافة/تعديل قابل للطي. مبني فوق shell.css
+   (الهيكل العام Sidebar/Topbar/كروت/أزرار). أي شاشة قائمة جديدة تستخدم الأنماط دي بدل
+   ما تعيد تعريفها زي ما كانت هتتكرر في كل شاشة WinForms قديمة. */
+
+/* ---------- شريط KPI ---------- */
+.kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+@media (max-width: 900px) { .kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+.kpi-chip { display: flex; align-items: center; gap: 12px; }
+.kpi-chip-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+    background: var(--color-bg-app);
+}
+.kpi-chip-value { font-size: 16px; font-weight: bold; color: var(--color-text); }
+.kpi-chip-label { font-size: 11.5px; color: var(--color-text-muted); }
+
+/* ---------- تابات ---------- */
+.list-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.list-tab {
+    padding: 9px 18px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--color-text-muted);
+}
+.list-tab.active { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+
+/* ---------- شريط أدوات القائمة ---------- */
+.list-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.list-toolbar .field-input { max-width: 320px; }
+
+/* ---------- جدول البيانات ---------- */
+.data-table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.data-table th {
+    background: var(--color-bg-app);
+    color: var(--color-text-muted);
+    font-weight: bold;
+    padding: 10px 8px;
+    text-align: center;
+    white-space: nowrap;
+}
+.data-table td { padding: 9px 8px; text-align: center; border-bottom: 1px solid var(--color-border); }
+.data-table tbody tr:hover { background: var(--color-bg-app); }
+.data-table .empty-row { color: var(--color-text-muted); padding: 26px !important; }
+.qty-low { color: var(--color-red); font-weight: bold; }
+.qty-out { color: #fff; background: var(--color-red); border-radius: 6px; padding: 2px 8px; font-weight: bold; }
+
+.row-actions { display: flex; gap: 6px; justify-content: center; }
+.row-action-btn {
+    width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--color-border);
+    background: var(--color-bg-card); font-size: 13px;
+}
+.row-action-btn.edit:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.row-action-btn.delete:hover { border-color: var(--color-red); color: var(--color-red); }
+
+/* ---------- بانل إضافة/تعديل قابل للطي ---------- */
+.form-panel {
+    background: var(--color-bg-app);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+.form-panel-title { font-size: 13px; font-weight: bold; margin-bottom: 12px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.form-actions { display: flex; gap: 8px; }

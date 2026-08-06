@@ -1,0 +1,874 @@
+@using System.Data
+@using System.Globalization
+@using System.Timers
+@using TemoStore.Core.Entities
+@using TemoStore.Core.Commands
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.SalesBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime">
+                    <span>@nowText</span>
+                </div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>🧾 فاتورة مبيعات جديدة</h1>
+                    <div class="breadcrumb">المبيعات &gt; فواتير المبيعات &gt; فاتورة مبيعات جديدة</div>
+                </div>
+                <div class="toolbar">
+                    <button class="btn btn-primary" @onclick="ResetInvoice">➕ فاتورة جديدة</button>
+                    <button class="btn btn-outline" disabled title="قريبًا">🖨️ طباعة</button>
+                    <button class="btn btn-outline" disabled title="قريبًا">💾 حفظ وطباعة</button>
+                    <button class="btn btn-danger-outline" @onclick="ResetInvoice">✖ إلغاء</button>
+                    <button class="btn btn-outline" @onclick="ToggleHistory">📋 @(showHistory ? "إخفاء سجل المبيعات" : "سجل المبيعات")</button>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error">⚠️ @errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">✅ @successMessage</div>
+            }
+
+            @if (showHistory)
+            {
+                <div class="card">
+                    <div class="card-title">📋 سجل المبيعات (دوس على "تعديل" أو "إلغاء" لعملية بيع)</div>
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th>رقم البيع</th>
+                                <th>المنتج</th>
+                                <th>الكمية</th>
+                                <th>الإجمالي</th>
+                                <th>التاريخ والوقت</th>
+                                @if (AuthManager.IsAdmin)
+                                {
+                                    <th>إجراءات</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (salesHistory != null)
+                            {
+                                foreach (DataRow row in salesHistory.Rows)
+                                {
+                                    int rowSaleId = Convert.ToInt32(row["رقم البيع"]);
+                                    <tr>
+                                        <td>@rowSaleId</td>
+                                        <td>@row["المنتج"]</td>
+                                        <td>@row["الكمية المباعة"]</td>
+                                        <td class="num">@Convert.ToDecimal(row["الإجمالي"]).ToString("N2")</td>
+                                        <td class="muted">@row["التاريخ والوقت ⏰"]</td>
+                                        @if (AuthManager.IsAdmin)
+                                        {
+                                            <td>
+                                                <button class="btn btn-outline btn-sm" @onclick="() => StartEditSale(rowSaleId)">✏️ تعديل</button>
+                                                <button class="btn btn-danger-outline btn-sm" @onclick="() => RequestCancelSale(rowSaleId)">❌ إلغاء</button>
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+
+                    @if (editingSaleId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">تعديل كمية البيع رقم @editingSaleId — @editingSaleProductName</div>
+                            <input class="field-input" type="number" min="1" @bind="editQuantity" />
+                            <button class="btn btn-primary btn-sm" @onclick="SaveEditSale">💾 حفظ الكمية الجديدة</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => editingSaleId = null">إلغاء</button>
+                        </div>
+                    }
+
+                    @if (pendingCancelSaleId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">⚠️ متأكد من إلغاء عملية البيع رقم @pendingCancelSaleId؟ هيترجع الصنف للمخزون تاني.</div>
+                            <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmCancelSale">✅ تأكيد الإلغاء</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => pendingCancelSaleId = null">تراجع</button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="grid-top">
+                <div class="card invoice-card">
+                    <div class="card-title">بيانات الفاتورة</div>
+
+                    <label class="field-label">العميل</label>
+                    <div class="customer-row">
+                        <select class="field-input" value="@selectedCustomerId" @onchange="OnCustomerChanged" disabled="@(saleType != "Credit")">
+                            <option value="">عميل نقدي</option>
+                            @if (customersTable != null)
+                            {
+                                foreach (DataRow row in customersTable.Rows)
+                                {
+                                    <option value="@row["CustomerId"]">@row["CustomerName"]</option>
+                                }
+                            }
+                        </select>
+                        <button class="btn-icon-add" title="إضافة عميل جديد" @onclick="() => showAddCustomer = !showAddCustomer">+</button>
+                    </div>
+
+                    @if (showAddCustomer)
+                    {
+                        <div class="add-customer-panel">
+                            <input class="field-input" placeholder="اسم العميل" @bind="newCustomerName" />
+                            <input class="field-input" placeholder="رقم الجوال" @bind="newCustomerPhone" />
+                            <button class="btn btn-primary btn-sm" @onclick="AddCustomer">حفظ</button>
+                        </div>
+                    }
+
+                    <label class="field-label">نوع البيع</label>
+                    <select class="field-input" @bind="saleType">
+                        <option value="Cash">كاش</option>
+                        <option value="Credit">آجل</option>
+                    </select>
+
+                    <div class="meta-list">
+                        <div class="meta-row"><span>رقم الفاتورة</span><b>@invoiceNumberText</b></div>
+                        <div class="meta-row"><span>التاريخ</span><b>@DateTime.Now.ToString("d MMMM yyyy", arCulture)</b></div>
+                        <div class="meta-row"><span>الوقت</span><b>@DateTime.Now.ToString("hh:mm tt")</b></div>
+                        <div class="meta-row"><span>البائع</span><b>@userName</b></div>
+                        <div class="meta-row"><span>الفرع</span><b>الفرع الرئيسي</b></div>
+                    </div>
+                </div>
+
+                <div class="card search-card">
+                    <div class="card-title">بحث عن منتج</div>
+                    <div class="tabs">
+                        <button class="tab @(activeTab=="product"?"active":"")" @onclick='() => activeTab="product"'>منتج</button>
+                        <button class="tab @(activeTab=="barcode"?"active":"")" @onclick='() => activeTab="barcode"'>باركود</button>
+                        <button class="tab @(activeTab=="serial"?"active":"")" @onclick='() => activeTab="serial"'>سيريال</button>
+                    </div>
+
+                    @if (activeTab == "product")
+                    {
+                        <input class="field-input" placeholder="ابحث عن منتج بالاسم أو الباركود..." value="@productSearchTerm" @oninput="OnProductSearchChanged" />
+                        @if (productResults.Count > 0)
+                        {
+                            <div class="search-results">
+                                @foreach (var p in productResults)
+                                {
+                                    <div class="search-result-row" @onclick="() => AddProductResultToCart(p)">
+                                        <span>@p.ProductName</span>
+                                        <span class="muted">@p.SalePrice.ToString("N2") ج.م — متاح: @p.Quantity</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                    else if (activeTab == "barcode")
+                    {
+                        <input class="field-input" placeholder="امسح الباركود (Enter)" value="@barcodeInput" @oninput="OnBarcodeInput" @onkeydown="OnBarcodeKeyDown" />
+                    }
+                    else
+                    {
+                        <input class="field-input" placeholder="ابحث برقم السيريال/IMEI..." value="@serialSearchTerm" @oninput="OnSerialSearchChanged" />
+                        @if (serialResults.Count > 0)
+                        {
+                            <div class="search-results">
+                                @foreach (var s in serialResults)
+                                {
+                                    <div class="search-result-row" @onclick="() => AddSerialResultToCart(s)">
+                                        <span>@s.ProductName</span>
+                                        <span class="muted">IMEI: @s.IMEI — @s.SalePrice.ToString("N2") ج.م</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+
+                    @if (pendingImeiOptions != null)
+                    {
+                        <div class="imei-picker">
+                            <div class="card-title">اختر رقم IMEI لـ "@pendingImeiProductName"</div>
+                            @foreach (var imei in pendingImeiOptions)
+                            {
+                                <button class="btn btn-outline btn-sm" @onclick="() => ConfirmImeiPick(imei)">@imei</button>
+                            }
+                            <button class="btn btn-danger-outline btn-sm" @onclick="() => pendingImeiOptions = null">إلغاء</button>
+                        </div>
+                    }
+
+                    <div class="card-title popular-title">⭐ الأكثر مبيعًا</div>
+                    <div class="popular-row">
+                        @if (popularProducts.Count == 0)
+                        {
+                            <div class="muted">لسه معندكش كفاية مبيعات لعرض الأكثر مبيعًا</div>
+                        }
+                        else
+                        {
+                            @foreach (var p in popularProducts)
+                            {
+                                <div class="popular-card" @onclick="() => AddProductResultToCart(p)">
+                                    <div class="popular-icon">📱</div>
+                                    <div class="popular-name">@p.ProductName</div>
+                                    <div class="popular-price">@p.SalePrice.ToString("N0") ج.م</div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="card cart-card">
+                <div class="cart-header">
+                    <div class="card-title">السلة الحالية 🛒</div>
+                    <button class="btn btn-danger-outline btn-sm" @onclick="ClearCart">🗑 مسح الكل</button>
+                </div>
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>الإجمالي</th>
+                            <th>الخصم</th>
+                            <th>سعر الوحدة</th>
+                            <th>الكمية</th>
+                            <th>الباركود/السيريال</th>
+                            <th>المنتج</th>
+                            <th>م</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < cart.Count; i++)
+                        {
+                            var idx = i;
+                            var line = cart[idx];
+                            <tr>
+                                <td><button class="row-delete" @onclick="() => RemoveCartLine(idx)">🗑</button></td>
+                                <td class="num">@line.LineTotalAfterDiscount.ToString("N2")</td>
+                                <td><input class="mini-input" type="number" min="0" value="@line.Discount" @onchange="e => OnDiscountChanged(idx, e)" /></td>
+                                <td><input class="mini-input" type="number" min="0" step="0.01" value="@line.UnitPrice" disabled="@line.IsSerialized" @onchange="e => OnPriceChanged(idx, e)" /></td>
+                                <td class="qty-cell">
+                                    <button class="stepper" disabled="@line.IsSerialized" @onclick="() => ChangeQty(idx, -1)">−</button>
+                                    <span>@line.Quantity</span>
+                                    <button class="stepper" disabled="@line.IsSerialized" @onclick="() => ChangeQty(idx, 1)">+</button>
+                                </td>
+                                <td class="muted">@(line.Imei ?? line.Barcode)</td>
+                                <td>@line.ProductName</td>
+                                <td>@(idx + 1)</td>
+                            </tr>
+                        }
+                        @if (cart.Count == 0)
+                        {
+                            <tr><td colspan="8" class="empty-cart">السلة فارغة — ابحث عن منتج وابدأ البيع 👆</td></tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="cart-footer">عدد الأصناف: @cart.Count | إجمالي السلة: @Subtotal.ToString("N2") ج.م</div>
+            </div>
+
+            <div class="grid-bottom">
+                <div class="card notes-card">
+                    <div class="card-title">ملاحظات <span class="muted-tag">قريبًا (مش بتتحفظ حاليًا)</span></div>
+                    <textarea class="notes-input" placeholder="اكتب ملاحظة هنا..." @bind="notes"></textarea>
+                </div>
+
+                <div class="card payments-card">
+                    <div class="card-title">طرق دفع سريعة</div>
+                    <div class="payment-methods-grid">
+                        @foreach (var method in UIHelpers.PaymentMethods)
+                        {
+                            <button class="payment-btn @(selectedPaymentMethod == method ? "active" : "")"
+                                    disabled="@(saleType != "Cash")"
+                                    @onclick="() => selectedPaymentMethod = method">
+                                @PaymentIcon(method) @method
+                            </button>
+                        }
+                    </div>
+
+                    <div class="card-title quick-discount-title">خصم سريع على الفاتورة (%)</div>
+                    <input class="field-input" type="number" min="0" max="100" @bind="quickDiscountPercent" />
+
+                    <div class="card-title quick-discount-title">ضريبة على الفاتورة (%) - اختياري</div>
+                    <input class="field-input" type="number" min="0" @bind="TaxRatePercent" />
+                </div>
+
+                <div class="card summary-card">
+                    <div class="card-title">تفاصيل الدفع</div>
+                    <div class="summary-row"><span>إجمالي المنتجات</span><b>@Subtotal.ToString("N2") ج.م</b></div>
+                    <div class="summary-row"><span>إجمالي الخصم</span><b>-@TotalDiscount.ToString("N2") ج.م</b></div>
+                    <div class="summary-row"><span>إجمالي الضرائب (@TaxRatePercent.ToString("0")%)</span><b>@TaxTotal.ToString("N2") ج.م</b></div>
+                    <div class="summary-row total"><span>الإجمالي الكلي</span><b>@GrandTotal.ToString("N2") ج.م</b></div>
+
+                    @if (saleType == "Cash")
+                    {
+                        <label class="field-label">المدفوع</label>
+                        <input class="field-input" type="number" min="0" step="0.01" value="@EffectiveAmountPaid" @onchange="OnAmountPaidChanged" />
+                        <div class="summary-row change"><span>الباقي (فكة)</span><b class="@(ChangeDue < 0 ? "negative" : "")">@ChangeDue.ToString("N2") ج.م</b></div>
+                    }
+                    else
+                    {
+                        <div class="summary-row"><span>حالة الفاتورة</span><b>آجل - غير مدفوعة</b></div>
+                    }
+
+                    <button class="btn btn-confirm" disabled="@isSaving" @onclick="ConfirmInvoice">
+                        ✅ @(isSaving ? "جارِ الحفظ..." : "تأكيد الفاتورة")
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+    // ضريبة يدوية اختيارية - افتراضي صفر (مش بتتفرض تلقائيًا)، الكاشير بيكتبها بنفسه لو محتاجها
+    private decimal TaxRatePercent;
+
+    private class CartLine
+    {
+        public required string Barcode { get; set; }
+        public required string ProductName { get; set; }
+        public decimal UnitPrice { get; set; }
+        public int Quantity { get; set; } = 1;
+        public decimal Discount { get; set; }
+        public string? Imei { get; set; }
+        public bool IsSerialized { get; set; }
+        public decimal LineSubtotal => UnitPrice * Quantity;
+        public decimal LineTotalAfterDiscount => LineSubtotal - Discount;
+    }
+
+    // نفس عناصر القائمة الجانبية في MainShell.cs (navItems) - مكرّرة هنا بنفس نمط
+    // SalesPageControl.BuildSidebarNav بالظبط (كل شاشة بتبني القائمة الجانبية بتاعتها)
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.SalesBlazor,    "المبيعات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCount, MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private DataTable? customersTable;
+    private string selectedCustomerId = "";
+    private bool showAddCustomer;
+    private string newCustomerName = "";
+    private string newCustomerPhone = "";
+
+    private string saleType = "Cash";
+    private string? selectedPaymentMethod;
+    private decimal quickDiscountPercent;
+    private string notes = "";
+
+    private string activeTab = "product";
+    private string barcodeInput = "";
+    private string productSearchTerm = "";
+    private string serialSearchTerm = "";
+    private List<ProductSearchResult> productResults = new();
+    private List<SerialSearchResult> serialResults = new();
+    private List<ProductSearchResult> popularProducts = new();
+
+    private List<string>? pendingImeiOptions;
+    private string pendingImeiProductName = "";
+    private string pendingImeiBarcode = "";
+    private decimal pendingImeiPrice;
+
+    private List<CartLine> cart = new();
+
+    private bool amountPaidManuallyEdited;
+    private decimal amountPaidInput;
+
+    private bool isSaving;
+    private string? errorMessage;
+    private string? successMessage;
+    private string invoiceNumberText = "غير محفوظة بعد";
+
+    // ---------- سجل المبيعات (تعديل/إلغاء بيع سابق) - نفس منطق SalesPageControl.BtnSaveSaleEdit_Click/BtnCancelSale_Click بالظبط ----------
+    private bool showHistory;
+    private DataTable? salesHistory;
+    private int? editingSaleId;
+    private string editingSaleProductName = "";
+    private int editQuantity = 1;
+    private int? pendingCancelSaleId;
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        LoadCustomers();
+        LoadPopular();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void LoadCustomers() => customersTable = SalesRepository.GetCustomers();
+
+    private void LoadPopular() => popularProducts = SalesRepository.GetPopularProducts(6);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    // ---------- حسابات الفاتورة ----------
+    private decimal Subtotal => cart.Sum(c => c.LineSubtotal);
+    private decimal ItemDiscountTotal => cart.Sum(c => c.Discount);
+    private decimal NetBeforeQuickDiscount => Subtotal - ItemDiscountTotal;
+    private decimal QuickDiscountAmount => NetBeforeQuickDiscount * (quickDiscountPercent / 100m);
+    private decimal TotalDiscount => ItemDiscountTotal + QuickDiscountAmount;
+    private decimal NetBeforeTax => Subtotal - TotalDiscount;
+    private decimal TaxTotal => Math.Round(NetBeforeTax * TaxRatePercent / 100m, 2);
+    private decimal GrandTotal => NetBeforeTax + TaxTotal;
+    private decimal EffectiveAmountPaid => amountPaidManuallyEdited ? amountPaidInput : GrandTotal;
+    private decimal ChangeDue => EffectiveAmountPaid - GrandTotal;
+
+    private static string PaymentIcon(string method) => method switch
+    {
+        "نقدي" => "💵",
+        "فوري" => "⚡",
+        "أمان" => "🛡️",
+        "سهولة" => "🟢",
+        "فودافون كاش" => "📱",
+        "إنستاباي" => "🔷",
+        _ => "💳"
+    };
+
+    // ---------- العميل ----------
+    private void OnCustomerChanged(ChangeEventArgs e) => selectedCustomerId = e.Value?.ToString() ?? "";
+
+    private void AddCustomer()
+    {
+        if (string.IsNullOrWhiteSpace(newCustomerName))
+        {
+            errorMessage = "من فضلك أدخل اسم العميل.";
+            return;
+        }
+        try
+        {
+            CustomersRepository.AddCustomer(newCustomerName.Trim(), newCustomerPhone.Trim());
+            LoadCustomers();
+            var match = customersTable?.Select($"CustomerName = '{newCustomerName.Trim().Replace("'", "''")}'").FirstOrDefault();
+            if (match != null)
+                selectedCustomerId = match["CustomerId"].ToString() ?? "";
+            showAddCustomer = false;
+            newCustomerName = "";
+            newCustomerPhone = "";
+            errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    // ---------- بحث المنتجات ----------
+    private void OnProductSearchChanged(ChangeEventArgs e)
+    {
+        productSearchTerm = e.Value?.ToString() ?? "";
+        productResults = string.IsNullOrWhiteSpace(productSearchTerm) || productSearchTerm.Length < 2
+            ? new List<ProductSearchResult>()
+            : SalesRepository.SearchProducts(productSearchTerm);
+    }
+
+    private void OnSerialSearchChanged(ChangeEventArgs e)
+    {
+        serialSearchTerm = e.Value?.ToString() ?? "";
+        serialResults = string.IsNullOrWhiteSpace(serialSearchTerm) || serialSearchTerm.Length < 2
+            ? new List<SerialSearchResult>()
+            : SalesRepository.SearchProductsBySerial(serialSearchTerm);
+    }
+
+    private void OnBarcodeInput(ChangeEventArgs e) => barcodeInput = e.Value?.ToString() ?? "";
+
+    private void OnBarcodeKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter" || string.IsNullOrWhiteSpace(barcodeInput)) return;
+
+        var product = SalesRepository.GetProductForSale(barcodeInput.Trim());
+        if (product == null)
+        {
+            errorMessage = "لم يتم العثور على منتج بهذا الباركود.";
+            return;
+        }
+        errorMessage = null;
+        AddToCartOrPromptImei(barcodeInput.Trim(), product.ProductName, product.SalePrice, product.IsSerialized);
+        barcodeInput = "";
+    }
+
+    private void AddProductResultToCart(ProductSearchResult p)
+        => AddToCartOrPromptImei(p.Barcode, p.ProductName, p.SalePrice, p.IsSerialized);
+
+    private void AddToCartOrPromptImei(string barcode, string productName, decimal price, bool isSerialized)
+    {
+        if (!isSerialized)
+        {
+            var existing = cart.FirstOrDefault(c => c.Barcode == barcode && !c.IsSerialized);
+            if (existing != null)
+                existing.Quantity++;
+            else
+                cart.Add(new CartLine { Barcode = barcode, ProductName = productName, UnitPrice = price, Quantity = 1 });
+            return;
+        }
+
+        var imeis = SalesRepository.GetAvailableImeisForSale(barcode);
+        var options = imeis.Rows.Cast<DataRow>().Select(r => r["IMEI"].ToString() ?? "").Where(s => s.Length > 0).ToList();
+        if (options.Count == 0)
+        {
+            errorMessage = $"لا توجد وحدات متاحة (IMEI) للمنتج \"{productName}\" حاليًا.";
+            return;
+        }
+        pendingImeiOptions = options;
+        pendingImeiProductName = productName;
+        pendingImeiBarcode = barcode;
+        pendingImeiPrice = price;
+    }
+
+    private void ConfirmImeiPick(string imei)
+    {
+        if (cart.Any(c => c.Imei == imei))
+        {
+            errorMessage = "الوحدة دي مضافة بالفعل في السلة.";
+            return;
+        }
+        cart.Add(new CartLine
+        {
+            Barcode = pendingImeiBarcode,
+            ProductName = pendingImeiProductName,
+            UnitPrice = pendingImeiPrice,
+            Quantity = 1,
+            Imei = imei,
+            IsSerialized = true
+        });
+        pendingImeiOptions = null;
+        errorMessage = null;
+    }
+
+    private void AddSerialResultToCart(SerialSearchResult s)
+    {
+        if (cart.Any(c => c.Imei == s.IMEI))
+        {
+            errorMessage = "الوحدة دي مضافة بالفعل في السلة.";
+            return;
+        }
+        cart.Add(new CartLine
+        {
+            Barcode = s.Barcode,
+            ProductName = s.ProductName,
+            UnitPrice = s.SalePrice,
+            Quantity = 1,
+            Imei = s.IMEI,
+            IsSerialized = true
+        });
+        errorMessage = null;
+    }
+
+    // ---------- السلة ----------
+    private void RemoveCartLine(int index) => cart.RemoveAt(index);
+
+    private void ChangeQty(int index, int delta)
+    {
+        var line = cart[index];
+        if (line.IsSerialized) return;
+        int newQty = line.Quantity + delta;
+        if (newQty < 1) return;
+        line.Quantity = newQty;
+    }
+
+    private void OnDiscountChanged(int index, ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var val) && val >= 0)
+            cart[index].Discount = val;
+    }
+
+    private void OnPriceChanged(int index, ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var val) && val >= 0)
+            cart[index].UnitPrice = val;
+    }
+
+    private void ClearCart()
+    {
+        cart.Clear();
+        errorMessage = null;
+    }
+
+    private void OnAmountPaidChanged(ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var val))
+        {
+            amountPaidInput = val;
+            amountPaidManuallyEdited = true;
+        }
+    }
+
+    private void ResetInvoice()
+    {
+        cart.Clear();
+        selectedCustomerId = "";
+        saleType = "Cash";
+        selectedPaymentMethod = null;
+        quickDiscountPercent = 0;
+        notes = "";
+        amountPaidManuallyEdited = false;
+        amountPaidInput = 0;
+        errorMessage = null;
+        successMessage = null;
+        invoiceNumberText = "غير محفوظة بعد";
+        pendingImeiOptions = null;
+        TaxRatePercent = 0;
+    }
+
+    // ---------- سجل المبيعات ----------
+    private void ToggleHistory()
+    {
+        showHistory = !showHistory;
+        if (showHistory) LoadSalesHistory();
+    }
+
+    private void LoadSalesHistory() => salesHistory = SalesRepository.GetSales();
+
+    private void StartEditSale(int saleId)
+    {
+        errorMessage = null;
+        pendingCancelSaleId = null;
+        var sale = SalesRepository.GetSaleById(saleId);
+        if (sale == null)
+        {
+            errorMessage = "لم يتم العثور على عملية البيع.";
+            return;
+        }
+        editingSaleId = saleId;
+        editingSaleProductName = sale.ProductName;
+        editQuantity = sale.QuantitySold;
+    }
+
+    private void SaveEditSale()
+    {
+        if (!editingSaleId.HasValue) return;
+        if (editQuantity <= 0)
+        {
+            errorMessage = "من فضلك أدخل كمية صحيحة.";
+            return;
+        }
+
+        var existing = SalesRepository.GetSaleById(editingSaleId.Value);
+        if (existing == null)
+        {
+            errorMessage = "لم يتم العثور على عملية البيع.";
+            editingSaleId = null;
+            return;
+        }
+        if (UIHelpers.IsDateClosed(DateTime.Parse(existing.SaleDate).Date))
+        {
+            errorMessage = "لا يمكن تعديل عملية بيع تابعة ليوم تم إقفاله بالفعل.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new UpdateSaleQuantityCommand { SaleId = editingSaleId.Value, NewQuantity = editQuantity, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            successMessage = "تم تعديل عملية البيع بنجاح.";
+            errorMessage = null;
+            editingSaleId = null;
+            LoadSalesHistory();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void RequestCancelSale(int saleId)
+    {
+        errorMessage = null;
+        editingSaleId = null;
+        pendingCancelSaleId = saleId;
+    }
+
+    private void ConfirmCancelSale()
+    {
+        if (!pendingCancelSaleId.HasValue) return;
+        int saleId = pendingCancelSaleId.Value;
+
+        var existing = SalesRepository.GetSaleById(saleId);
+        if (existing == null)
+        {
+            errorMessage = "لم يتم العثور على عملية البيع.";
+            pendingCancelSaleId = null;
+            return;
+        }
+        if (UIHelpers.IsDateClosed(DateTime.Parse(existing.SaleDate).Date))
+        {
+            errorMessage = "لا يمكن إلغاء عملية بيع تابعة ليوم تم إقفاله بالفعل.";
+            pendingCancelSaleId = null;
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new CancelSaleCommand { SaleId = saleId, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            successMessage = "تم إلغاء عملية البيع بنجاح.";
+            errorMessage = null;
+            pendingCancelSaleId = null;
+            LoadSalesHistory();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            pendingCancelSaleId = null;
+        }
+    }
+
+    // توزيع الخصم السريع + الضريبة على كل الأسطر تناسبيًا - نفس أسلوب SalesPageControl
+    // بالظبط (BtnAddToBill_Click) عشان مجموع أسطر الفاتورة يطابق الإجمالي المعروض بالظبط
+    private List<SaleLine> BuildCommandLines()
+    {
+        var lines = new List<SaleLine>();
+        decimal netBase = NetBeforeQuickDiscount;
+        foreach (var c in cart)
+        {
+            decimal lineNetOfItemDiscount = c.LineSubtotal - c.Discount;
+            decimal shareOfQuickDiscount = netBase > 0 ? QuickDiscountAmount * (lineNetOfItemDiscount / netBase) : 0;
+            decimal lineDiscountTotal = Math.Round(c.Discount + shareOfQuickDiscount, 2);
+            decimal lineNetAfterAllDiscounts = c.LineSubtotal - lineDiscountTotal;
+            decimal lineTax = NetBeforeTax > 0 ? Math.Round(TaxTotal * (lineNetAfterAllDiscounts / NetBeforeTax), 2) : 0;
+
+            lines.Add(new SaleLine
+            {
+                Barcode = c.Barcode,
+                ProductName = c.ProductName,
+                UnitPrice = c.UnitPrice,
+                Quantity = c.Quantity,
+                Total = c.LineSubtotal,
+                Discount = lineDiscountTotal,
+                Tax = lineTax,
+                Imei = c.Imei
+            });
+        }
+        return lines;
+    }
+
+    private void ConfirmInvoice()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (cart.Count == 0)
+        {
+            errorMessage = "السلة فارغة.";
+            return;
+        }
+        if (saleType == "Credit" && string.IsNullOrEmpty(selectedCustomerId))
+        {
+            errorMessage = "البيع بالآجل لازم يكون له عميل محدد.";
+            return;
+        }
+        if (saleType == "Cash" && string.IsNullOrEmpty(selectedPaymentMethod))
+        {
+            errorMessage = "اختر وسيلة الدفع للبيع الكاش.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var command = new CreateSaleCommand
+            {
+                Lines = BuildCommandLines(),
+                CustomerId = saleType == "Credit" && int.TryParse(selectedCustomerId, out var cid) ? cid : null,
+                PaymentType = saleType,
+                PaymentMethod = saleType == "Cash" ? selectedPaymentMethod : null,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown",
+                AmountPaid = saleType == "Cash" ? EffectiveAmountPaid : null
+            };
+
+            var result = AppServices.CoreEngine.Execute(command);
+
+            invoiceNumberText = $"#{result.DailyInvoiceNumber}";
+            successMessage = $"تم تأكيد الفاتورة رقم {result.DailyInvoiceNumber} بنجاح. الباقي: {result.ChangeDue:N2} ج.م";
+            cart.Clear();
+            quickDiscountPercent = 0;
+            TaxRatePercent = 0;
+            amountPaidManuallyEdited = false;
+            selectedPaymentMethod = null;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

@@ -34,17 +34,30 @@ namespace Temo_Mobile_Store
         public static class PageKeys
         {
             public const string Home = "Home";
+            public const string HomeBlazor = "HomeBlazor"; // تجربة شاشة رئيسية جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string Sales = "Sales";
+            public const string SalesBlazor = "SalesBlazor"; // تجربة شاشة مبيعات جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string Inventory = "Inventory";
+            public const string InventoryBlazor = "InventoryBlazor"; // تجربة شاشة مخزون جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string InventoryCount = "InventoryCount";
+            public const string InventoryCountBlazor = "InventoryCountBlazor"; // تجربة شاشة جرد مخزن جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string Maintenance = "Maintenance";
+            public const string MaintenanceBlazor = "MaintenanceBlazor"; // تجربة شاشة صيانة جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string Customers = "Customers";
+            public const string CustomersBlazor = "CustomersBlazor"; // تجربة شاشة عملاء جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string Suppliers = "Suppliers";
+            public const string SuppliersBlazor = "SuppliersBlazor"; // تجربة شاشة موردين جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
+            public const string PurchasesBlazor = "PurchasesBlazor"; // تجربة شاشة مشتريات جديدة (Blazor Hybrid) - مفيش شاشة قديمة مستقلة ليها، فاتورة الشراء كانت جوه شاشة الموردين بس
             public const string Treasury = "Treasury";
+            public const string TreasuryBlazor = "TreasuryBlazor"; // تجربة شاشة خزينة جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string Reports = "Reports";
+            public const string ReportsBlazor = "ReportsBlazor"; // تجربة شاشة التقارير الجديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string Accounts = "Accounts";
+            public const string AccountsBlazor = "AccountsBlazor"; // تجربة شاشة حسابات جديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string Attendance = "Attendance";
+            public const string AttendanceBlazor = "AttendanceBlazor"; // تجربة شاشة الحضور والمرتبات الجديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
             public const string Settings = "Settings";
+            public const string SettingsBlazor = "SettingsBlazor"; // تجربة شاشة الإعدادات الجديدة (Blazor Hybrid) - مرحلة تجريبية بجانب الشاشة الأصلية
         }
 
         // نفس الـ Connection String المستخدم في Form1.cs بالظبط عشان نقرأ من نفس قاعدة البيانات
@@ -106,23 +119,50 @@ namespace Temo_Mobile_Store
         private readonly (string Key, string Text, string Icon)[] navItems = new (string, string, string)[]
         {
             (PageKeys.Home,           "الرئيسية",   "🏠"),
+            (PageKeys.HomeBlazor,     "الرئيسية (تجربة) 🧪", "🧪"),
             (PageKeys.Sales,          "المبيعات",   "🛒"),
+            (PageKeys.SalesBlazor,    "المبيعات (تجربة) 🧪", "🧪"),
             (PageKeys.Inventory,      "المخزون",    "🗄️"),
+            (PageKeys.InventoryBlazor,"المخزون (تجربة) 🧪", "🧪"),
             (PageKeys.InventoryCount, "جرد المخزن", "📋"),
+            (PageKeys.InventoryCountBlazor, "جرد المخزن (تجربة) 🧪", "🧪"),
             (PageKeys.Maintenance,    "الصيانة",    "🔧"),
+            (PageKeys.MaintenanceBlazor,"الصيانة (تجربة) 🧪", "🧪"),
             (PageKeys.Customers,      "العملاء",    "👥"),
+            (PageKeys.CustomersBlazor,"العملاء (تجربة) 🧪", "🧪"),
             (PageKeys.Suppliers,      "الموردين",   "🚚"),
+            (PageKeys.SuppliersBlazor,"الموردين (تجربة) 🧪", "🧪"),
+            (PageKeys.PurchasesBlazor,"المشتريات (تجربة) 🧪", "🧪"),
             (PageKeys.Treasury,       "الخزينة",    "🏦"),
+            (PageKeys.TreasuryBlazor, "الخزينة (تجربة) 🧪", "🧪"),
             (PageKeys.Reports,        "التقارير",   "📊"),
+            (PageKeys.ReportsBlazor,  "التقارير (تجربة) 🧪", "🧪"),
             (PageKeys.Accounts,       "الحسابات",   "📒"),
+            (PageKeys.AccountsBlazor, "الحسابات (تجربة) 🧪", "🧪"),
             (PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+            (PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة) 🧪", "🧪"),
             (PageKeys.Settings,       "الإعدادات",  "⚙️"),
+            (PageKeys.SettingsBlazor, "الإعدادات (تجربة) 🧪", "🧪"),
         };
+
+        // ==========================================================================
+        // MainShell عمليًا Singleton - نسخة واحدة بس حية في كل لحظة (راجع حلقة تسجيل
+        // الدخول/الخروج في Program.cs). ده مرجع ثابت ليها عشان أي نافذة صفحة تانية (زي
+        // نافذة المبيعات المستقلة) تقدر تفتح صفحة تانية بنفس منطق الـ Sidebar الأصلي
+        // (OpenPageWindow/openPageWindows) من غير ما نكرر المنطق ده في كل شاشة.
+        // ==========================================================================
+        public static MainShell Instance { get; private set; }
 
         public MainShell()
         {
+            Instance = this;
+            this.FormClosed += (s, e) => { if (Instance == this) Instance = null; };
             InitializeShell();
         }
+
+        // بتفتح/تفعّل صفحة تانية بمفتاحها (نفس اللي بيحصل لو دُست على بند القائمة الجانبية
+        // الأصلي بالظبط) - مستخدمة من القائمة الجانبية المكرّرة جوه نافذة المبيعات المستقلة.
+        public void OpenPageByKey(string pageKey) => NavigateToPageKey(pageKey);
 
         // ==========================================================================
         // دالة مساعدة موحّدة لفتح اتصال بقاعدة البيانات - بدل ما نكرر
@@ -223,7 +263,7 @@ namespace Temo_Mobile_Store
             };
 
             // العناصر المخصصة للأدمن بس - نفس القائمة بالظبط اللي في Form1.cs (ApplyEmployeeRestrictions)
-            var adminOnlyKeys = new HashSet<string> { PageKeys.Customers, PageKeys.Suppliers, PageKeys.Reports, PageKeys.Accounts, PageKeys.Settings, PageKeys.InventoryCount, PageKeys.Attendance };
+            var adminOnlyKeys = new HashSet<string> { PageKeys.Customers, PageKeys.Suppliers, PageKeys.Reports, PageKeys.ReportsBlazor, PageKeys.Accounts, PageKeys.AccountsBlazor, PageKeys.Settings, PageKeys.SettingsBlazor, PageKeys.InventoryCount, PageKeys.InventoryCountBlazor, PageKeys.Attendance, PageKeys.AttendanceBlazor };
             var visibleNavItems = AuthManager.IsAdmin
                 ? navItems
                 : navItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
@@ -916,26 +956,52 @@ namespace Temo_Mobile_Store
 
             if (pageKey == PageKeys.Home)
                 BuildHomeDashboardPage();
+            else if (pageKey == PageKeys.HomeBlazor)
+                BuildHomeBlazorPage();
             else if (pageKey == PageKeys.Sales)
                 BuildSalesPage(highlightKey, landingMode);
+            else if (pageKey == PageKeys.SalesBlazor)
+                BuildSalesBlazorPage();
+            else if (pageKey == PageKeys.InventoryBlazor)
+                BuildInventoryBlazorPage();
             else if (pageKey == PageKeys.Inventory)
                 BuildInventoryPage(highlightKey, landingMode);
+            else if (pageKey == PageKeys.InventoryCountBlazor)
+                BuildInventoryCountBlazorPage();
             else if (pageKey == PageKeys.InventoryCount)
                 BuildInventoryCountPage();
+            else if (pageKey == PageKeys.CustomersBlazor)
+                BuildCustomersBlazorPage();
             else if (pageKey == PageKeys.Customers)
                 BuildCustomersPage(highlightKey, landingMode);
+            else if (pageKey == PageKeys.MaintenanceBlazor)
+                BuildMaintenanceBlazorPage();
             else if (pageKey == PageKeys.Maintenance)
                 BuildMaintenancePage(highlightKey);
+            else if (pageKey == PageKeys.TreasuryBlazor)
+                BuildTreasuryBlazorPage();
             else if (pageKey == PageKeys.Treasury)
                 BuildTreasuryPage(presetMovementType);
+            else if (pageKey == PageKeys.SuppliersBlazor)
+                BuildSuppliersBlazorPage();
             else if (pageKey == PageKeys.Suppliers)
                 BuildSuppliersPage(highlightKey, landingMode);
+            else if (pageKey == PageKeys.PurchasesBlazor)
+                BuildPurchasesBlazorPage();
+            else if (pageKey == PageKeys.ReportsBlazor)
+                BuildReportsBlazorPage();
             else if (pageKey == PageKeys.Reports)
                 BuildReportsPage();
+            else if (pageKey == PageKeys.AccountsBlazor)
+                BuildAccountsBlazorPage();
             else if (pageKey == PageKeys.Accounts)
                 BuildAccountsPage();
+            else if (pageKey == PageKeys.AttendanceBlazor)
+                BuildAttendanceBlazorPage();
             else if (pageKey == PageKeys.Attendance)
                 BuildAttendancePage();
+            else if (pageKey == PageKeys.SettingsBlazor)
+                BuildSettingsBlazorPage();
             else if (pageKey == PageKeys.Settings)
                 BuildSettingsPage();
             else
@@ -994,11 +1060,26 @@ namespace Temo_Mobile_Store
         }
 
         // ==========================================================================
+        // بناء صفحة "الإعدادات" التجريبية (Blazor Hybrid) - SettingsPageBlazorHost
+        // ==========================================================================
+        private void BuildSettingsBlazorPage()
+        {
+            OpenPageWindow(PageKeys.SettingsBlazor, "الإعدادات (تجربة)", () => new SettingsPageBlazorHost());
+        }
+
+        // ==========================================================================
         // بناء صفحة "الحسابات" - بتستخدم شجرة الحسابات وقائمة الدخل وميزان المراجعة (AccountsPageControl)
         // ==========================================================================
         private void BuildAccountsPage()
         {
             OpenPageWindow(PageKeys.Accounts, "الحسابات", () => new AccountsPageControl());
+        }
+
+        // تجربة شاشة حسابات جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // الحسابات الأصلية، بنفس نمط InventoryBlazor بالظبط (أدمن بس زي الأصلية)
+        private void BuildAccountsBlazorPage()
+        {
+            OpenPageWindow(PageKeys.AccountsBlazor, "الحسابات (تجربة)", () => new AccountsPageBlazorHost());
         }
 
         // ==========================================================================
@@ -1010,11 +1091,27 @@ namespace Temo_Mobile_Store
         }
 
         // ==========================================================================
+        // بناء صفحة "الحضور والمرتبات" التجريبية (Blazor Hybrid) - AttendancePageBlazorHost
+        // ==========================================================================
+        private void BuildAttendanceBlazorPage()
+        {
+            OpenPageWindow(PageKeys.AttendanceBlazor, "الحضور والمرتبات (تجربة)", () => new AttendancePageBlazorHost());
+        }
+
+        // ==========================================================================
         // بناء صفحة "التقارير" - بتستخدم شاشة التقارير وإقفال اليوم الحقيقية (ReportsPageControl)
         // ==========================================================================
         private void BuildReportsPage()
         {
             OpenPageWindow(PageKeys.Reports, "التقارير", () => new ReportsPageControl());
+        }
+
+        // ==========================================================================
+        // بناء صفحة "التقارير" التجريبية (Blazor Hybrid) - ReportsPageBlazorHost
+        // ==========================================================================
+        private void BuildReportsBlazorPage()
+        {
+            OpenPageWindow(PageKeys.ReportsBlazor, "التقارير (تجربة)", () => new ReportsPageBlazorHost());
         }
 
         // ==========================================================================
@@ -1084,6 +1181,13 @@ namespace Temo_Mobile_Store
             OpenPageWindow(PageKeys.InventoryCount, "جرد المخزن", () => new InventoryCountPageControl());
         }
 
+        // تجربة شاشة جرد مخزن جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // جرد المخزن الأصلية، بنفس نمط InventoryBlazor بالظبط (أدمن بس زي الأصلية)
+        private void BuildInventoryCountBlazorPage()
+        {
+            OpenPageWindow(PageKeys.InventoryCountBlazor, "جرد المخزن (تجربة)", () => new InventoryCountPageBlazorHost());
+        }
+
         // ==========================================================================
         // بناء صفحة "المبيعات" - بتستخدم شاشة نقطة البيع الحقيقية (SalesPageControl)
         // ==========================================================================
@@ -1094,6 +1198,62 @@ namespace Temo_Mobile_Store
                 form.Controls.OfType<SalesPageControl>().FirstOrDefault()?.HighlightSale(highlightKey);
             if (landingMode)
                 form.Controls.OfType<SalesPageControl>().FirstOrDefault()?.FocusBarcodeEntry();
+        }
+
+        // تجربة شاشة مبيعات جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // المبيعات الأصلية، بنفس نمط فتح أي صفحة تانية بالظبط (OpenPageWindow)
+        private void BuildSalesBlazorPage()
+        {
+            OpenPageWindow(PageKeys.SalesBlazor, "المبيعات (تجربة)", () => new SalesPageBlazorHost());
+        }
+
+        // تجربة شاشة رئيسية جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن داشبورد
+        // الرئيسية الأصلي (اللي بيتبني جوه pnlContent نفسه)، بنفس نمط SalesBlazor بالظبط
+        private void BuildHomeBlazorPage()
+        {
+            OpenPageWindow(PageKeys.HomeBlazor, "الرئيسية (تجربة)", () => new HomePageBlazorHost());
+        }
+
+        // تجربة شاشة مخزون جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // المخزون الأصلية، بنفس نمط SalesBlazor/HomeBlazor بالظبط
+        private void BuildInventoryBlazorPage()
+        {
+            OpenPageWindow(PageKeys.InventoryBlazor, "المخزون (تجربة)", () => new InventoryPageBlazorHost());
+        }
+
+        // تجربة شاشة عملاء جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // العملاء الأصلية، بنفس نمط SalesBlazor/HomeBlazor/InventoryBlazor بالظبط
+        private void BuildCustomersBlazorPage()
+        {
+            OpenPageWindow(PageKeys.CustomersBlazor, "العملاء (تجربة)", () => new CustomersPageBlazorHost());
+        }
+
+        // تجربة شاشة موردين جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // الموردين الأصلية، بنفس نمط SalesBlazor/HomeBlazor/InventoryBlazor/CustomersBlazor بالظبط
+        private void BuildSuppliersBlazorPage()
+        {
+            OpenPageWindow(PageKeys.SuppliersBlazor, "الموردين (تجربة)", () => new SuppliersPageBlazorHost());
+        }
+
+        // تجربة شاشة مشتريات جديدة (Blazor Hybrid) - مفيش شاشة قديمة مستقلة تتقارن بيها
+        // (فاتورة الشراء كانت جوه شاشة الموردين بس)، بنفس نمط SalesBlazor بالظبط
+        private void BuildPurchasesBlazorPage()
+        {
+            OpenPageWindow(PageKeys.PurchasesBlazor, "المشتريات (تجربة)", () => new PurchasesPageBlazorHost());
+        }
+
+        // تجربة شاشة صيانة جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // الصيانة الأصلية، بنفس نمط InventoryBlazor بالظبط
+        private void BuildMaintenanceBlazorPage()
+        {
+            OpenPageWindow(PageKeys.MaintenanceBlazor, "الصيانة (تجربة)", () => new MaintenancePageBlazorHost());
+        }
+
+        // تجربة شاشة خزينة جديدة (Blazor Hybrid) - نافذة مستقلة منفصلة تمامًا عن شاشة
+        // الخزينة الأصلية، بنفس نمط InventoryBlazor بالظبط
+        private void BuildTreasuryBlazorPage()
+        {
+            OpenPageWindow(PageKeys.TreasuryBlazor, "الخزينة (تجربة)", () => new TreasuryPageBlazorHost());
         }
 
         // ==========================================================================

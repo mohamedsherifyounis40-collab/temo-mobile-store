@@ -36,9 +36,12 @@ namespace TemoStore.Engines.Validation
                     // في أكتر من سطر في نفس الفاتورة، نتأكد إن الإجمالي مش أكبر من المتاح
                     var requestedQtyByBarcode = new Dictionary<string, int>();
                     var seenImeis = new HashSet<string>();
+                    decimal amountDue = 0;
 
                     foreach (var line in command.Lines)
                     {
+                        amountDue += line.Total - line.Discount + line.Tax;
+
                         if (string.IsNullOrWhiteSpace(line.Barcode))
                         {
                             errors.Add("لازم باركود لكل صنف في الفاتورة.");
@@ -80,6 +83,9 @@ namespace TemoStore.Engines.Validation
                     {
                         errors.Add("لازم تحدد وسيلة الدفع للبيع الكاش.");
                     }
+
+                    if (command.PaymentType == "Cash" && command.AmountPaid.HasValue && command.AmountPaid.Value < amountDue)
+                        errors.Add($"المبلغ المدفوع ({command.AmountPaid.Value:N2}) أقل من إجمالي الفاتورة ({amountDue:N2}).");
 
                     uow.Rollback();
                 }

@@ -1,0 +1,657 @@
+@using System.Data
+@using System.Globalization
+@using Microsoft.Data.Sqlite
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.HomeBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>🏠 الرئيسية</h1>
+                    <div class="breadcrumb">الرئيسية &gt; لوحة التحكم</div>
+                </div>
+                <div class="toolbar">
+                    <button class="btn btn-outline" disabled title="قريبًا">🖨️ طباعة ملخص اليوم</button>
+                </div>
+            </div>
+
+            <div class="kpi-row">
+                <div class="card kpi-card">
+                    <div class="kpi-top">
+                        <span class="kpi-icon accent-green">📊</span>
+                        <span class="kpi-trend @TrendClass(salesPct)">@TrendText(salesPct)</span>
+                    </div>
+                    <div class="kpi-value">@todaySales.ToString("N2") ج.م</div>
+                    <div class="kpi-label">المبيعات اليوم</div>
+                    <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
+                        <polyline points="@BuildSparklinePoints(last7Values, 100, 28)" fill="none" stroke="var(--color-green)" stroke-width="2" />
+                    </svg>
+                </div>
+
+                <div class="card kpi-card">
+                    <div class="kpi-top">
+                        <span class="kpi-icon accent-blue">💵</span>
+                        <span class="kpi-trend @TrendClass(profitPct)">@TrendText(profitPct)</span>
+                    </div>
+                    <div class="kpi-value">@todayProfit.ToString("N2") ج.م</div>
+                    <div class="kpi-label">إجمالي الأرباح</div>
+                </div>
+
+                <div class="card kpi-card">
+                    <div class="kpi-top">
+                        <span class="kpi-icon accent-purple">📄</span>
+                        <span class="kpi-trend @TrendClass(invoicePct)">@TrendText(invoicePct)</span>
+                    </div>
+                    <div class="kpi-value">@invoiceCount</div>
+                    <div class="kpi-label">عدد الفواتير</div>
+                </div>
+
+                <div class="card kpi-card">
+                    <div class="kpi-top">
+                        <span class="kpi-icon accent-orange">👥</span>
+                        <span class="kpi-trend @(newCustomersDiff >= 0 ? "trend-up" : "trend-down")">@((newCustomersDiff >= 0 ? "+" : "") + newCustomersDiff) عن أمس</span>
+                    </div>
+                    <div class="kpi-value">@newCustomersToday</div>
+                    <div class="kpi-label">العملاء الجدد</div>
+                </div>
+
+                <div class="card kpi-card">
+                    <div class="kpi-top">
+                        <span class="kpi-icon accent-red">⚠️</span>
+                        <span class="kpi-trend trend-down">⚠ تنبيه</span>
+                    </div>
+                    <div class="kpi-value">@lowStockCount</div>
+                    <div class="kpi-label">مخزون منخفض</div>
+                </div>
+            </div>
+
+            <div class="card quick-actions-card">
+                <div class="card-title">إجراءات سريعة</div>
+                <div class="quick-actions-row">
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Sales)'>
+                        <span>➕</span><span>فاتورة جديدة</span>
+                    </button>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Inventory)'>
+                        <span>📦</span><span>إضافة منتج</span>
+                    </button>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Customers)'>
+                        <span>👤</span><span>عميل جديد</span>
+                    </button>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Suppliers)'>
+                        <span>🛒</span><span>فاتورة شراء</span>
+                    </button>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Treasury)'>
+                        <span>💳</span><span>إضافة مصروف</span>
+                    </button>
+                    <button class="quick-action-btn" @onclick='() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Sales)'>
+                        <span>📶</span><span>مسح باركود</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="card balances-card">
+                <div class="card-title">💰 أرصدة وسائل الدفع</div>
+                <div class="balances-row">
+                    @foreach (var mb in methodBalances)
+                    {
+                        <div class="balance-chip">
+                            <span class="balance-icon">@PaymentIcon(mb.Method)</span>
+                            <div>
+                                <div class="balance-value">@mb.Balance.ToString("N2") ج.م</div>
+                                <div class="balance-label">@mb.Method</div>
+                            </div>
+                        </div>
+                    }
+                    <div class="balance-chip balance-total">
+                        <span class="balance-icon">Σ</span>
+                        <div>
+                            <div class="balance-value">@totalBalance.ToString("N2") ج.م</div>
+                            <div class="balance-label">الإجمالي</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-mid">
+                <div class="card">
+                    <div class="card-title">🔔 تنبيهات</div>
+                    @if (notificationRows.Count == 0)
+                    {
+                        <div class="muted">مفيش تنبيهات دلوقتي 👍</div>
+                    }
+                    else
+                    {
+                        @foreach (var row in notificationRows)
+                        {
+                            <div class="notif-row">
+                                <span class="notif-dot @row.AccentClass">@row.Icon</span>
+                                <span class="notif-text">@row.Text</span>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="card">
+                    <div class="card-title">🧾 أحدث الفواتير</div>
+                    @if (latestInvoices.Count == 0)
+                    {
+                        <div class="muted">لسه معملتش فواتير</div>
+                    }
+                    else
+                    {
+                        <table class="mini-table">
+                            <thead><tr><th>العميل</th><th>الإجمالي</th><th>النوع</th></tr></thead>
+                            <tbody>
+                                @foreach (var inv in latestInvoices)
+                                {
+                                    <tr class="clickable-row" @onclick="() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.Sales)">
+                                        <td>@inv.CustomerName</td>
+                                        <td class="num">@inv.Total.ToString("N0") ج.م</td>
+                                        <td>@(inv.PaymentType == "Cash" ? "كاش" : "آجل")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+
+            <div class="grid-bottom-3">
+                <div class="card">
+                    <div class="card-title">توزيع المبيعات (آخر 7 أيام)</div>
+                    @{ var segments = BuildDonutSegments(); }
+                    @if (segments.Count == 0)
+                    {
+                        <div class="muted">لسه مفيش بيانات كفاية</div>
+                    }
+                    else
+                    {
+                        <div class="donut-wrap">
+                            <svg viewBox="0 0 100 100" width="120" height="120">
+                                <circle cx="50" cy="50" r="40" fill="none" stroke="var(--color-border)" stroke-width="14" />
+                                @foreach (var seg in segments)
+                                {
+                                    <circle cx="50" cy="50" r="40" fill="none" stroke="@seg.Color" stroke-width="14"
+                                            stroke-dasharray="@(seg.Dash.ToString("F1", CultureInfo.InvariantCulture) + " " + seg.Gap.ToString("F1", CultureInfo.InvariantCulture))"
+                                            stroke-dashoffset="@((-seg.Offset).ToString("F1", CultureInfo.InvariantCulture))"
+                                            transform="rotate(-90 50 50)" />
+                                }
+                            </svg>
+                            <div class="donut-legend">
+                                <div><span class="legend-dot accent-green"></span> كاش: @distCash.ToString("N0") ج.م</div>
+                                <div><span class="legend-dot accent-blue"></span> آجل: @distCredit.ToString("N0") ج.م</div>
+                                <div><span class="legend-dot accent-purple"></span> صيانة: @distMaintenance.ToString("N0") ج.م</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="card">
+                    <div class="card-title">🕓 نشاط حديث</div>
+                    @if (recentActivity.Count == 0)
+                    {
+                        <div class="muted">لسه مفيش نشاط</div>
+                    }
+                    else
+                    {
+                        @foreach (var a in recentActivity)
+                        {
+                            <div class="activity-row">
+                                <span>@a.Icon</span>
+                                <span class="activity-text">@a.Text</span>
+                                <span class="activity-time">@FormatRelativeTime(a.When)</span>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="card">
+                    <div class="card-title">⚠️ المخزون المنخفض</div>
+                    @if (lowStockProducts.Count == 0)
+                    {
+                        <div class="muted">المخزون كويس 👍</div>
+                    }
+                    else
+                    {
+                        @foreach (var p in lowStockProducts)
+                        {
+                            <div class="low-stock-row">
+                                <span class="low-stock-name">@p.Name</span>
+                                <span class="low-stock-qty">@p.Qty</span>
+                            </div>
+                            <div class="low-stock-bar-bg">
+                                <div class="low-stock-bar-fill" style="width: @(Math.Min(100, p.Qty * 100 / 3))%"></div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCount, MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private List<(string Method, decimal Balance)> methodBalances = new();
+    private decimal totalBalance;
+
+    private decimal todaySales, todayCogs, todayExpenses;
+    private int invoiceCount;
+    private decimal todayProfit => todaySales - todayCogs - todayExpenses;
+
+    private decimal yesterdaySales, yesterdayProfit;
+    private int yesterdayInvoiceCount, yesterdayNewCustomers;
+    private int newCustomersToday;
+    private int newCustomersDiff => newCustomersToday - yesterdayNewCustomers;
+
+    private (int InStock, int LowStock, int OutOfStock) stock;
+    private int lowStockCount => stock.LowStock + stock.OutOfStock;
+
+    private double[] last7Values = new double[7];
+    private string[] last7Labels = new string[7];
+
+    private decimal distCash, distCredit, distMaintenance;
+
+    private List<(int InvoiceId, int SaleId, string CustomerName, string Date, decimal Total, string PaymentType)> latestInvoices = new();
+    private List<(string Icon, string Text, string AccentClass)> notificationRows = new();
+    private List<(string Icon, string Text, DateTime When)> recentActivity = new();
+    private List<(string Name, int Qty)> lowStockProducts = new();
+
+    private double salesPct => PctChange(todaySales, yesterdaySales);
+    private double profitPct => PctChange(todayProfit, yesterdayProfit);
+    private double invoicePct => PctChangeInt(invoiceCount, yesterdayInvoiceCount);
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        LoadDashboard();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private static string PaymentIcon(string method) => method switch
+    {
+        "نقدي" => "💵",
+        "فوري" => "⚡",
+        "أمان" => "🛡️",
+        "سهولة" => "🟢",
+        "فودافون كاش" => "📱",
+        "إنستاباي" => "🔷",
+        _ => "💳"
+    };
+
+    private static int GetNewCustomersCount(SqliteConnection conn, string dateStr)
+    {
+        using var cmd = new SqliteCommand("SELECT COUNT(*) FROM Customers WHERE CreatedAt LIKE @D", conn);
+        cmd.Parameters.AddWithValue("@D", dateStr + "%");
+        var res = cmd.ExecuteScalar();
+        return (res != null && res != DBNull.Value) ? Convert.ToInt32(res) : 0;
+    }
+
+    private static string FormatRelativeTime(DateTime when)
+    {
+        var diff = DateTime.Now - when;
+        if (diff.TotalMinutes < 1) return "الآن";
+        if (diff.TotalMinutes < 60) return $"منذ {(int)diff.TotalMinutes} دقيقة";
+        if (diff.TotalHours < 24) return $"منذ {(int)diff.TotalHours} ساعة";
+        if (diff.TotalDays < 30) return $"منذ {(int)diff.TotalDays} يوم";
+        return when.ToString("dd/MM/yyyy");
+    }
+
+    private double PctChange(decimal today, decimal yesterday) => yesterday > 0 ? (double)((today - yesterday) / yesterday * 100) : (today > 0 ? 100 : 0);
+    private double PctChangeInt(int today, int yesterday) => yesterday > 0 ? (today - yesterday) / (double)yesterday * 100 : (today > 0 ? 100 : 0);
+    private string TrendText(double pct) => (pct >= 0 ? "▲ +" : "▼ ") + Math.Abs(pct).ToString("N0") + "% عن أمس";
+    private string TrendClass(double pct) => pct >= 0 ? "trend-up" : "trend-down";
+
+    private string BuildSparklinePoints(double[] values, double width, double height)
+    {
+        if (values.Length == 0) return "";
+        double max = values.Max();
+        if (max <= 0) max = 1;
+        double stepX = width / (values.Length - 1);
+        var pts = new List<string>();
+        for (int i = 0; i < values.Length; i++)
+        {
+            double x = i * stepX;
+            double y = height - (values[i] / max * height);
+            pts.Add(x.ToString("F1", CultureInfo.InvariantCulture) + "," + y.ToString("F1", CultureInfo.InvariantCulture));
+        }
+        return string.Join(" ", pts);
+    }
+
+    private List<(string Color, double Dash, double Gap, double Offset)> BuildDonutSegments()
+    {
+        var result = new List<(string, double, double, double)>();
+        double total = (double)(distCash + distCredit + distMaintenance);
+        if (total <= 0) return result;
+
+        double circumference = 2 * Math.PI * 40;
+        var raw = new (string Color, double Value)[]
+        {
+            ("var(--color-green)", (double)distCash),
+            ("var(--color-accent)", (double)distCredit),
+            ("var(--color-purple)", (double)distMaintenance),
+        };
+
+        double cumulative = 0;
+        foreach (var seg in raw)
+        {
+            if (seg.Value <= 0) continue;
+            double dash = seg.Value / total * circumference;
+            result.Add((seg.Color, dash, circumference - dash, cumulative));
+            cumulative += dash;
+        }
+        return result;
+    }
+
+    private void LoadDashboard()
+    {
+        try
+        {
+            using var conn = new SqliteConnection(AuthManager.ConnectionString);
+            conn.Open();
+            string today = DateTime.Now.ToString("yyyy-MM-dd");
+            string yesterday = DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd");
+
+            LoadDayTotals(conn, today, out todaySales, out todayCogs, out invoiceCount);
+            todayExpenses = GetSumScalar(conn, "SELECT SUM(Amount) FROM Expenses WHERE ExpenseDate LIKE @D", today);
+            newCustomersToday = GetNewCustomersCount(conn, today);
+
+            foreach (string method in UIHelpers.PaymentMethods)
+            {
+                using var cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = @Method", conn);
+                cmd.Parameters.AddWithValue("@Method", method);
+                var res = cmd.ExecuteScalar();
+                decimal bal = (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
+                methodBalances.Add((method, bal));
+                totalBalance += bal;
+            }
+
+            LoadDayTotals(conn, yesterday, out yesterdaySales, out var yCogs, out yesterdayInvoiceCount);
+            decimal yExpenses = GetSumScalar(conn, "SELECT SUM(Amount) FROM Expenses WHERE ExpenseDate LIKE @D", yesterday);
+            yesterdayProfit = yesterdaySales - yCogs - yExpenses;
+            yesterdayNewCustomers = GetNewCustomersCount(conn, yesterday);
+
+            using (var cmd = new SqliteCommand(@"
+                SELECT SUM(CASE WHEN Quantity > 3 THEN 1 ELSE 0 END) AS InStock,
+                       SUM(CASE WHEN Quantity BETWEEN 1 AND 3 THEN 1 ELSE 0 END) AS LowStock,
+                       SUM(CASE WHEN Quantity <= 0 THEN 1 ELSE 0 END) AS OutOfStock
+                FROM Products", conn))
+            using (var r = cmd.ExecuteReader())
+            {
+                if (r.Read())
+                    stock = (
+                        r["InStock"] == DBNull.Value ? 0 : Convert.ToInt32(r["InStock"]),
+                        r["LowStock"] == DBNull.Value ? 0 : Convert.ToInt32(r["LowStock"]),
+                        r["OutOfStock"] == DBNull.Value ? 0 : Convert.ToInt32(r["OutOfStock"]));
+            }
+
+            var dailyTotals = new Dictionary<string, double>();
+            using (var cmd = new SqliteCommand("SELECT substr(SaleDate,1,10) AS D, SUM(Total) AS T FROM Sales WHERE date(SaleDate) >= date('now','-6 days') GROUP BY D", conn))
+            using (var r = cmd.ExecuteReader())
+            {
+                while (r.Read())
+                    dailyTotals[r["D"].ToString()!] = r["T"] == DBNull.Value ? 0 : Convert.ToDouble(r["T"]);
+            }
+            for (int i = 0; i < 7; i++)
+            {
+                var d = DateTime.Now.Date.AddDays(-6 + i);
+                string key = d.ToString("yyyy-MM-dd");
+                last7Values[i] = dailyTotals.TryGetValue(key, out var v) ? v : 0;
+                last7Labels[i] = d.ToString("dd/MM");
+            }
+
+            distCash = GetSumScalarPlain(conn, "SELECT COALESCE(SUM(Total),0) FROM Sales WHERE PaymentType = 'Cash' AND date(SaleDate) >= date('now','-6 days')");
+            distCredit = GetSumScalarPlain(conn, "SELECT COALESCE(SUM(Total),0) FROM Sales WHERE PaymentType = 'Credit' AND date(SaleDate) >= date('now','-6 days')");
+            distMaintenance = GetSumScalarPlain(conn, "SELECT COALESCE(SUM(ActualCost),0) FROM MaintenanceTickets WHERE Status = 'تم التسليم' AND date(DeliveredDate) >= date('now','-6 days')");
+
+            using (var cmd = new SqliteCommand(@"
+                SELECT S.SalesInvoiceId, MIN(S.SaleID) AS FirstSaleId, MAX(S.SaleDate) AS SaleDate,
+                       SUM(S.Total) AS Total, MAX(S.PaymentType) AS PaymentType, C.CustomerName
+                FROM Sales S LEFT JOIN Customers C ON S.CustomerId = C.CustomerId
+                WHERE S.SalesInvoiceId IS NOT NULL
+                GROUP BY S.SalesInvoiceId
+                ORDER BY MAX(S.SaleID) DESC LIMIT 5", conn))
+            using (var r = cmd.ExecuteReader())
+            {
+                while (r.Read())
+                {
+                    latestInvoices.Add((
+                        Convert.ToInt32(r["SalesInvoiceId"]),
+                        Convert.ToInt32(r["FirstSaleId"]),
+                        r["CustomerName"] == DBNull.Value ? "عميل نقدي" : r["CustomerName"].ToString()!,
+                        r["SaleDate"].ToString()!,
+                        r["Total"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Total"]),
+                        r["PaymentType"] == DBNull.Value ? "Cash" : r["PaymentType"].ToString()!));
+                }
+            }
+
+            using (var cmd = new SqliteCommand("SELECT ProductName, Quantity FROM Products WHERE Quantity <= 3 ORDER BY Quantity ASC LIMIT 6", conn))
+            using (var r = cmd.ExecuteReader())
+            {
+                while (r.Read())
+                    lowStockProducts.Add((r["ProductName"].ToString()!, Convert.ToInt32(r["Quantity"])));
+            }
+
+            LoadNotifications(conn);
+            LoadRecentActivity(conn);
+        }
+        catch
+        {
+            // نفس أسلوب MainShell.cs - أي خطأ في تحميل بيانات الداشبورد ميوقفش الشاشة، بيسيب الأقسام فاضية
+        }
+    }
+
+    private static void LoadDayTotals(SqliteConnection conn, string dateStr, out decimal sales, out decimal cogs, out int count)
+    {
+        sales = 0; cogs = 0; count = 0;
+        using var cmd = new SqliteCommand("SELECT SUM(Total) AS T, SUM(CostPrice * QuantitySold) AS C, COUNT(*) AS N FROM Sales WHERE SaleDate LIKE @D", conn);
+        cmd.Parameters.AddWithValue("@D", dateStr + "%");
+        using var r = cmd.ExecuteReader();
+        if (r.Read())
+        {
+            sales = r["T"] == DBNull.Value ? 0 : Convert.ToDecimal(r["T"]);
+            cogs = r["C"] == DBNull.Value ? 0 : Convert.ToDecimal(r["C"]);
+            count = r["N"] == DBNull.Value ? 0 : Convert.ToInt32(r["N"]);
+        }
+    }
+
+    private static decimal GetSumScalar(SqliteConnection conn, string sql, string dateStr)
+    {
+        using var cmd = new SqliteCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@D", dateStr + "%");
+        var res = cmd.ExecuteScalar();
+        return (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
+    }
+
+    private static decimal GetSumScalarPlain(SqliteConnection conn, string sql)
+    {
+        using var cmd = new SqliteCommand(sql, conn);
+        return Convert.ToDecimal(cmd.ExecuteScalar());
+    }
+
+    private void LoadNotifications(SqliteConnection conn)
+    {
+        var bellItems = new List<(string Icon, string Text)>();
+
+        using (var cmd = new SqliteCommand("SELECT ProductName, Quantity FROM Products WHERE Quantity <= 3 ORDER BY Quantity ASC LIMIT 8", conn))
+        using (var r = cmd.ExecuteReader())
+        {
+            while (r.Read())
+            {
+                int qty = Convert.ToInt32(r["Quantity"]);
+                string label = qty <= 0 ? "نفدت الكمية" : $"باقي {qty} بس";
+                bellItems.Add(("📦", $"{r["ProductName"]} — {label}"));
+            }
+        }
+
+        using (var cmd = new SqliteCommand("SELECT CustomerName, DeviceInfo FROM MaintenanceTickets WHERE Status = 'جاهز للتسليم' ORDER BY ReceivedDate ASC LIMIT 8", conn))
+        using (var r = cmd.ExecuteReader())
+        {
+            while (r.Read())
+                bellItems.Add(("🔧", $"جهاز {r["CustomerName"]} ({r["DeviceInfo"]}) جاهز للتسليم"));
+        }
+
+        using (var cmd = new SqliteCommand(@"
+            SELECT C.CustomerName,
+                   (COALESCE((SELECT SUM(Total) FROM Sales WHERE CustomerId = C.CustomerId AND PaymentType = 'Credit'), 0)
+                    - COALESCE((SELECT SUM(Amount) FROM CashMovements WHERE CustomerId = C.CustomerId AND MovementType = 'قبض'), 0)) AS Balance
+            FROM Customers C", conn))
+        using (var r = cmd.ExecuteReader())
+        {
+            while (r.Read())
+            {
+                decimal balance = Convert.ToDecimal(r["Balance"]);
+                if (balance > 0)
+                    bellItems.Add(("💰", $"{r["CustomerName"]} عليه {balance:N2} ج.م"));
+            }
+        }
+
+        var supplierDebts = new List<(string Name, decimal Balance)>();
+        try
+        {
+            var dt = SuppliersRepository.GetSuppliersWithBalances();
+            foreach (DataRow row in dt.Rows)
+            {
+                decimal balance = row["المتبقي"] == DBNull.Value ? 0 : Convert.ToDecimal(row["المتبقي"]);
+                if (balance > 0)
+                    supplierDebts.Add((row["اسم المورد"].ToString()!, balance));
+            }
+        }
+        catch { }
+        supplierDebts = supplierDebts.OrderByDescending(x => x.Balance).Take(5).ToList();
+
+        foreach (var item in bellItems.Take(3))
+        {
+            string accentClass = item.Icon == "📦" ? "accent-orange" : item.Icon == "🔧" ? "accent-blue" : "accent-red";
+            notificationRows.Add((item.Icon, item.Text, accentClass));
+        }
+        foreach (var sd in supplierDebts.Take(2))
+            notificationRows.Add(("🚚", $"مورد {sd.Name} له مستحقات {sd.Balance:N0} ج.م", "accent-purple"));
+    }
+
+    private void LoadRecentActivity(SqliteConnection conn)
+    {
+        using (var cmd = new SqliteCommand("SELECT ProductName, Total, SaleDate FROM Sales ORDER BY SaleID DESC LIMIT 8", conn))
+        using (var r = cmd.ExecuteReader())
+        {
+            while (r.Read())
+                if (DateTime.TryParse(r["SaleDate"].ToString(), out var dt))
+                    recentActivity.Add(("🛒", $"بيع {r["ProductName"]} بـ {Convert.ToDecimal(r["Total"]):N0} ج.م", dt));
+        }
+        using (var cmd = new SqliteCommand("SELECT TotalAmount, PurchaseDate FROM Purchases ORDER BY PurchaseId DESC LIMIT 5", conn))
+        using (var r = cmd.ExecuteReader())
+        {
+            while (r.Read())
+                if (DateTime.TryParse(r["PurchaseDate"].ToString(), out var dt))
+                    recentActivity.Add(("🚚", $"فاتورة شراء بـ {Convert.ToDecimal(r["TotalAmount"]):N0} ج.م", dt));
+        }
+        using (var cmd = new SqliteCommand("SELECT CustomerName, ReceivedDate FROM MaintenanceTickets ORDER BY TicketId DESC LIMIT 5", conn))
+        using (var r = cmd.ExecuteReader())
+        {
+            while (r.Read())
+                if (DateTime.TryParse(r["ReceivedDate"].ToString(), out var dt))
+                    recentActivity.Add(("🔧", $"استلام جهاز صيانة من {r["CustomerName"]}", dt));
+        }
+        using (var cmd = new SqliteCommand("SELECT MovementType, Amount, MovementDate FROM CashMovements WHERE MovementType IN ('قبض','صرف') ORDER BY Id DESC LIMIT 8", conn))
+        using (var r = cmd.ExecuteReader())
+        {
+            while (r.Read())
+                if (DateTime.TryParse(r["MovementDate"].ToString(), out var dt))
+                {
+                    bool isCollect = r["MovementType"].ToString() == "قبض";
+                    recentActivity.Add((isCollect ? "💰" : "💳", (isCollect ? "تحصيل مبلغ " : "سداد مبلغ ") + $"{Convert.ToDecimal(r["Amount"]):N0} ج.م", dt));
+                }
+        }
+        recentActivity = recentActivity.OrderByDescending(x => x.When).Take(5).ToList();
+    }
+}

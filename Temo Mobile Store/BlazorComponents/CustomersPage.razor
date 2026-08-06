@@ -1,0 +1,508 @@
+@using System.Data
+@using System.Globalization
+@using TemoStore.Core.Commands
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.CustomersBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>👥 العملاء</h1>
+                    <div class="breadcrumb">العملاء &gt; قائمة العملاء</div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error">⚠️ @errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">✅ @successMessage</div>
+            }
+
+            <div class="kpi-strip">
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-blue">👥</span>
+                    <div>
+                        <div class="kpi-chip-value">@customers.Count</div>
+                        <div class="kpi-chip-label">عدد العملاء</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-purple">🧾</span>
+                    <div>
+                        <div class="kpi-chip-value">@customers.Sum(c => c.TotalCredit).ToString("N0") ج.م</div>
+                        <div class="kpi-chip-label">إجمالي المبيعات بالآجل</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-green">💰</span>
+                    <div>
+                        <div class="kpi-chip-value">@customers.Sum(c => c.TotalCollected).ToString("N0") ج.م</div>
+                        <div class="kpi-chip-label">إجمالي المحصّل</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-red">⚠️</span>
+                    <div>
+                        <div class="kpi-chip-value">@customers.Sum(c => c.Remaining).ToString("N0") ج.م</div>
+                        <div class="kpi-chip-label">إجمالي المتبقي</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="list-toolbar">
+                    <input class="field-input" placeholder="بحث بالاسم أو التليفون..." value="@search" @oninput="e => search = e.Value?.ToString() ?? string.Empty" />
+                    <button class="btn btn-primary" @onclick="OpenNewCustomerForm">➕ إضافة عميل</button>
+                    <button class="btn btn-outline" @onclick="OpenCollectForm">💰 تحصيل من عميل</button>
+                </div>
+
+                @if (showCustomerForm)
+                {
+                    <div class="form-panel">
+                        <div class="form-panel-title">@(editingCustomerId == null ? "إضافة عميل جديد" : "تعديل العميل")</div>
+                        <div class="form-grid">
+                            <div>
+                                <label class="field-label">اسم العميل</label>
+                                <input class="field-input" value="@custName" @oninput="e => custName = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div>
+                                <label class="field-label">رقم التليفون</label>
+                                <input class="field-input" value="@custPhone" @oninput="e => custPhone = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" @onclick="SaveCustomer">💾 حفظ</button>
+                            <button class="btn btn-outline" @onclick="() => showCustomerForm = false">إلغاء</button>
+                        </div>
+                    </div>
+                }
+
+                @if (showCollectForm)
+                {
+                    <div class="form-panel">
+                        <div class="form-panel-title">تحصيل من عميل</div>
+                        <div class="form-grid">
+                            <div>
+                                <label class="field-label">العميل</label>
+                                <select class="field-input" value="@collectCustomerId" @onchange="e => collectCustomerId = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">اختر عميل</option>
+                                    @foreach (var c in customers)
+                                    {
+                                        <option value="@c.Id">@c.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label class="field-label">وسيلة الدفع</label>
+                                <select class="field-input" value="@collectMethod" @onchange="e => collectMethod = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">اختر وسيلة</option>
+                                    @foreach (var m in UIHelpers.PaymentMethods)
+                                    {
+                                        <option value="@m">@m</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label class="field-label">المبلغ</label>
+                                <input class="field-input" type="number" value="@collectAmount" @oninput="e => collectAmount = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" @onclick="SaveCollection">💾 تحصيل</button>
+                            <button class="btn btn-outline" @onclick="() => showCollectForm = false">إلغاء</button>
+                        </div>
+                    </div>
+                }
+
+                @if (statementCustomerId != null)
+                {
+                    <div class="form-panel">
+                        <div class="form-panel-title">📄 كشف حساب: @statementCustomerName</div>
+                        <table class="data-table">
+                            <thead><tr><th>التاريخ</th><th>النوع</th><th>التفاصيل</th><th>المبلغ</th></tr></thead>
+                            <tbody>
+                                @foreach (var s in statementRows)
+                                {
+                                    <tr>
+                                        <td class="muted">@s.Date</td>
+                                        <td>@s.Type</td>
+                                        <td>@s.Details</td>
+                                        <td>@s.Amount</td>
+                                    </tr>
+                                }
+                                @if (statementRows.Count == 0)
+                                {
+                                    <tr><td colspan="4" class="empty-row">مفيش حركات لسه</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                        <div class="form-actions">
+                            <button class="btn btn-outline" @onclick="() => statementCustomerId = null">إغلاق كشف الحساب</button>
+                        </div>
+                    </div>
+                }
+
+                <div class="data-table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th></th><th>المتبقي</th><th>إجمالي المحصّل</th><th>إجمالي الآجل</th><th>التليفون</th><th>اسم العميل</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in FilteredCustomers)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="row-actions">
+                                            <button class="row-action-btn" title="كشف حساب" @onclick="() => ShowStatement(c)">📄</button>
+                                            <button class="row-action-btn edit" title="تعديل" @onclick="() => OpenEditCustomerForm(c)">✏️</button>
+                                            <button class="row-action-btn delete" title="حذف" @onclick="() => DeleteCustomer(c)">🗑</button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if (c.Remaining > 0)
+                                        {
+                                            <span class="qty-low">@c.Remaining.ToString("N2")</span>
+                                        }
+                                        else
+                                        {
+                                            @c.Remaining.ToString("N2")
+                                        }
+                                    </td>
+                                    <td>@c.TotalCollected.ToString("N2")</td>
+                                    <td>@c.TotalCredit.ToString("N2")</td>
+                                    <td class="muted">@c.Phone</td>
+                                    <td>@c.Name</td>
+                                </tr>
+                            }
+                            @if (FilteredCustomers.Count == 0)
+                            {
+                                <tr><td colspan="6" class="empty-row">مفيش عملاء مطابقين</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون (تجربة)", "🧪"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.CustomersBlazor,"العملاء (تجربة)", "🧪"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCount, MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private string? errorMessage;
+    private string? successMessage;
+
+    private class CustomerRow
+    {
+        public int Id { get; set; }
+        public required string Name { get; set; }
+        public string Phone { get; set; } = "";
+        public decimal TotalCredit { get; set; }
+        public decimal TotalCollected { get; set; }
+        public decimal Remaining { get; set; }
+    }
+
+    private class StatementRow
+    {
+        public required string Date { get; set; }
+        public required string Type { get; set; }
+        public required string Details { get; set; }
+        public required string Amount { get; set; }
+    }
+
+    private List<CustomerRow> customers = new();
+    private string search = "";
+
+    private List<CustomerRow> FilteredCustomers =>
+        string.IsNullOrWhiteSpace(search)
+            ? customers
+            : customers.Where(c => c.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || c.Phone.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    private bool showCustomerForm;
+    private int? editingCustomerId;
+    private string custName = "", custPhone = "";
+
+    private bool showCollectForm;
+    private string collectCustomerId = "", collectMethod = "", collectAmount = "";
+
+    private int? statementCustomerId;
+    private string statementCustomerName = "";
+    private List<StatementRow> statementRows = new();
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        LoadCustomers();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private static decimal ParseFormattedDecimal(object value)
+    {
+        var text = value?.ToString() ?? "0";
+        return decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var result) ? result : 0;
+    }
+
+    private void LoadCustomers()
+    {
+        customers.Clear();
+        var dt = CustomersRepository.GetCustomersWithBalances();
+        foreach (DataRow row in dt.Rows)
+        {
+            customers.Add(new CustomerRow
+            {
+                Id = Convert.ToInt32(row["CustomerId"]),
+                Name = row["اسم العميل"].ToString() ?? "",
+                Phone = row["التليفون"]?.ToString() ?? "",
+                TotalCredit = ParseFormattedDecimal(row["إجمالي المبيعات بالآجل"]),
+                TotalCollected = ParseFormattedDecimal(row["إجمالي المحصّل"]),
+                Remaining = ParseFormattedDecimal(row["المتبقي عليه"])
+            });
+        }
+    }
+
+    // ---------- إضافة/تعديل/حذف ----------
+    private void OpenNewCustomerForm()
+    {
+        editingCustomerId = null;
+        custName = custPhone = "";
+        showCustomerForm = true;
+        showCollectForm = false;
+        errorMessage = null;
+    }
+
+    private void OpenEditCustomerForm(CustomerRow c)
+    {
+        editingCustomerId = c.Id;
+        custName = c.Name;
+        custPhone = c.Phone;
+        showCustomerForm = true;
+        showCollectForm = false;
+        errorMessage = null;
+    }
+
+    private void SaveCustomer()
+    {
+        errorMessage = null;
+        if (string.IsNullOrWhiteSpace(custName))
+        {
+            errorMessage = "من فضلك أدخل اسم العميل.";
+            return;
+        }
+
+        try
+        {
+            if (editingCustomerId == null)
+            {
+                CustomersRepository.AddCustomer(custName.Trim(), custPhone.Trim());
+                successMessage = "تم إضافة العميل بنجاح.";
+            }
+            else
+            {
+                CustomersRepository.UpdateCustomer(editingCustomerId.Value, custName.Trim(), custPhone.Trim());
+                successMessage = "تم تعديل بيانات العميل بنجاح.";
+            }
+            showCustomerForm = false;
+            LoadCustomers();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void DeleteCustomer(CustomerRow c)
+    {
+        errorMessage = null;
+        if (CustomersRepository.HasSales(c.Id))
+        {
+            errorMessage = "لا يمكن حذف هذا العميل لأن له مبيعات مسجّلة بالفعل.";
+            return;
+        }
+        try
+        {
+            CustomersRepository.DeleteCustomer(c.Id);
+            successMessage = "تم حذف العميل.";
+            LoadCustomers();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    // ---------- كشف حساب ----------
+    private void ShowStatement(CustomerRow c)
+    {
+        statementCustomerId = c.Id;
+        statementCustomerName = c.Name;
+        statementRows.Clear();
+        var dt = CustomersRepository.GetCustomerStatement(c.Id);
+        foreach (DataRow row in dt.Rows)
+        {
+            statementRows.Add(new StatementRow
+            {
+                Date = row["التاريخ"].ToString() ?? "",
+                Type = row["النوع"].ToString() ?? "",
+                Details = row["التفاصيل"].ToString() ?? "",
+                Amount = row["المبلغ"].ToString() ?? ""
+            });
+        }
+        showCustomerForm = false;
+        showCollectForm = false;
+        errorMessage = null;
+    }
+
+    // ---------- تحصيل من عميل ----------
+    private void OpenCollectForm()
+    {
+        showCollectForm = true;
+        showCustomerForm = false;
+        collectCustomerId = collectMethod = collectAmount = "";
+        errorMessage = null;
+    }
+
+    private void SaveCollection()
+    {
+        errorMessage = null;
+        if (!int.TryParse(collectCustomerId, out var customerId))
+        {
+            errorMessage = "اختر عميل.";
+            return;
+        }
+        if (string.IsNullOrEmpty(collectMethod))
+        {
+            errorMessage = "اختر وسيلة الدفع.";
+            return;
+        }
+        if (!decimal.TryParse(collectAmount, out var amount) || amount <= 0)
+        {
+            errorMessage = "المبلغ لازم يكون أكبر من صفر.";
+            return;
+        }
+        if (UIHelpers.IsTodayClosed(collectMethod))
+        {
+            errorMessage = "تم إقفال اليوم بالفعل، لا يمكن تسجيل تحصيل جديد.";
+            return;
+        }
+
+        var customer = customers.FirstOrDefault(c => c.Id == customerId);
+        if (customer == null)
+        {
+            errorMessage = "العميل غير موجود.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new CollectFromCustomerCommand
+            {
+                CustomerId = customerId,
+                CustomerName = customer.Name,
+                Method = collectMethod,
+                Amount = amount,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = $"تم تحصيل {amount:N2} ج.م من {customer.Name} بنجاح.";
+            showCollectForm = false;
+            LoadCustomers();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}

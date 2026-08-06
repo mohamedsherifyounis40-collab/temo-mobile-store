@@ -1,0 +1,25 @@
+/* شاشة "الحضور والمرتبات" - أغلب التنسيق جاي من shell.css و list-template.css،
+   الملف ده لعناصر خاصة بالشاشة دي بس (كارت رصيد الموظف وصفوف "إدارة الموظفين"). */
+
+.grid-mid-attendance { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid-mid-attendance { grid-template-columns: 1fr; } }
+
+.balance-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 22px;
+    margin-bottom: 14px;
+}
+.balance-card-value { font-size: 20px; font-weight: bold; }
+.balance-card-value.negative { color: var(--color-red); }
+.balance-card-value.positive { color: var(--color-accent); }
+
+.employee-form-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+.payroll-totals {
+    margin-top: 10px;
+    font-weight: bold;
+    color: var(--color-accent);
+}

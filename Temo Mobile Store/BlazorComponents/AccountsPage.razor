@@ -1,0 +1,435 @@
+@using System.Data
+@using System.Globalization
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.AccountsBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>📒 الحسابات</h1>
+                    <div class="breadcrumb">الحسابات &gt; شجرة الحسابات والتقارير</div>
+                </div>
+            </div>
+
+            @if (!AuthManager.IsAdmin)
+            {
+                <div class="alert alert-error">⚠️ الشاشة دي للمدير بس - مش عندك صلاحية الوصول ليها.</div>
+            }
+            else
+            {
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-error">⚠️ @errorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="alert alert-success">✅ @successMessage</div>
+                }
+
+                <div class="list-tabs">
+                    <button class="list-tab @(activeTab == "Tree" ? "active" : "")" @onclick='() => SwitchTab("Tree")'>🌳 شجرة الحسابات</button>
+                    <button class="list-tab @(activeTab == "Income" ? "active" : "")" @onclick='() => SwitchTab("Income")'>📈 قائمة الدخل</button>
+                    <button class="list-tab @(activeTab == "Trial" ? "active" : "")" @onclick='() => SwitchTab("Trial")'>⚖️ ميزان المراجعة</button>
+                </div>
+
+                @if (activeTab == "Tree")
+                {
+                    <div class="card">
+                        <div class="list-toolbar">
+                            <input class="field-input" placeholder="بحث بالكود أو الاسم..." value="@treeSearch" @oninput="e => treeSearch = e.Value?.ToString() ?? string.Empty" />
+                            <button class="btn btn-primary" @onclick="OpenNewAccountForm">➕ إضافة حساب</button>
+                        </div>
+
+                        @if (showAccountForm)
+                        {
+                            <div class="form-panel">
+                                <div class="form-panel-title">@(editingCode == null ? "إضافة حساب جديد" : "تعديل الحساب")</div>
+                                <div class="form-grid">
+                                    <div>
+                                        <label class="field-label">كود الحساب</label>
+                                        <input class="field-input" value="@accCode" disabled="@(editingCode != null)" @oninput="e => accCode = e.Value?.ToString() ?? string.Empty" />
+                                    </div>
+                                    <div>
+                                        <label class="field-label">اسم الحساب</label>
+                                        <input class="field-input" value="@accName" @oninput="e => accName = e.Value?.ToString() ?? string.Empty" />
+                                    </div>
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn btn-primary" @onclick="SaveAccount">💾 حفظ</button>
+                                    <button class="btn btn-outline" @onclick="() => showAccountForm = false">إلغاء</button>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="data-table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th></th><th>اسم الحساب</th><th>كود الحساب</th></tr></thead>
+                                <tbody>
+                                    @foreach (var a in FilteredAccounts)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="row-actions">
+                                                    <button class="row-action-btn edit" title="تعديل" @onclick="() => OpenEditAccountForm(a)">✏️</button>
+                                                    <button class="row-action-btn delete" title="حذف" @onclick="() => DeleteAccount(a)">🗑</button>
+                                                </div>
+                                            </td>
+                                            <td>@a.Name</td>
+                                            <td class="muted">@a.Code</td>
+                                        </tr>
+                                    }
+                                    @if (FilteredAccounts.Count == 0)
+                                    {
+                                        <tr><td colspan="3" class="empty-row">مفيش حسابات مطابقة</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else if (activeTab == "Income")
+                {
+                    <div class="card">
+                        <div class="list-toolbar">
+                            <div>
+                                <label class="field-label">من</label>
+                                <input class="field-input" type="date" value="@incomeFrom.ToString("yyyy-MM-dd")" @onchange="e => incomeFrom = DateTime.Parse(e.Value!.ToString()!)" />
+                            </div>
+                            <div>
+                                <label class="field-label">إلى</label>
+                                <input class="field-input" type="date" value="@incomeTo.ToString("yyyy-MM-dd")" @onchange="e => incomeTo = DateTime.Parse(e.Value!.ToString()!)" />
+                            </div>
+                            <button class="btn btn-primary" @onclick="LoadIncomeStatement">📈 عرض</button>
+                        </div>
+
+                        <div class="data-table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th>المبلغ</th><th>البند</th></tr></thead>
+                                <tbody>
+                                    @foreach (var r in incomeRows)
+                                    {
+                                        @if (string.IsNullOrEmpty(r.Label))
+                                        {
+                                            <tr><td colspan="2">&nbsp;</td></tr>
+                                        }
+                                        else if (IsTotalRow(r.Label))
+                                        {
+                                            <tr class="total-row"><td><b>@r.Amount</b></td><td><b>@r.Label</b></td></tr>
+                                        }
+                                        else
+                                        {
+                                            <tr><td>@r.Amount</td><td>@r.Label</td></tr>
+                                        }
+                                    }
+                                    @if (incomeRows.Count == 0)
+                                    {
+                                        <tr><td colspan="2" class="empty-row">مفيش بيانات في الفترة دي</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="card">
+                        <div class="list-toolbar">
+                            <button class="btn btn-primary" @onclick="LoadTrialBalance">⚖️ تحديث</button>
+                        </div>
+                        <div class="data-table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th>دائن</th><th>مدين</th><th>اسم الحساب</th><th>كود الحساب</th></tr></thead>
+                                <tbody>
+                                    @foreach (var r in trialRows)
+                                    {
+                                        @if (r.IsTotal)
+                                        {
+                                            <tr class="total-row"><td><b>@r.Credit</b></td><td><b>@r.Debit</b></td><td><b>@r.Name</b></td><td></td></tr>
+                                        }
+                                        else if (string.IsNullOrEmpty(r.Name))
+                                        {
+                                            <tr><td colspan="4">&nbsp;</td></tr>
+                                        }
+                                        else
+                                        {
+                                            <tr><td>@r.Credit</td><td>@r.Debit</td><td>@r.Name</td><td class="muted">@r.Code</td></tr>
+                                        }
+                                    }
+                                    @if (trialRows.Count == 0)
+                                    {
+                                        <tr><td colspan="4" class="empty-row">مفيش أرصدة لعرضها</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون (تجربة)", "🧪"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.InventoryCountBlazor, "جرد المخزن (تجربة)", "🧪"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.MaintenanceBlazor,"الصيانة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.CustomersBlazor,"العملاء (تجربة)", "🧪"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.SuppliersBlazor,"الموردين (تجربة)", "🧪"),
+        (MainShell.PageKeys.PurchasesBlazor,"المشتريات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.TreasuryBlazor, "الخزينة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.AccountsBlazor, "الحسابات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor,
+                MainShell.PageKeys.InventoryCount, MainShell.PageKeys.InventoryCountBlazor, MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private string? errorMessage;
+    private string? successMessage;
+    private string activeTab = "Tree";
+
+    // ---------- شجرة الحسابات ----------
+    private class AccountRow { public required string Code; public required string Name; }
+    private List<AccountRow> accounts = new();
+    private string treeSearch = "";
+    private bool showAccountForm;
+    private string? editingCode;
+    private string accCode = "", accName = "";
+
+    private List<AccountRow> FilteredAccounts =>
+        string.IsNullOrWhiteSpace(treeSearch)
+            ? accounts
+            : accounts.Where(a => a.Name.Contains(treeSearch, StringComparison.OrdinalIgnoreCase) || a.Code.Contains(treeSearch, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    // ---------- قائمة الدخل ----------
+    private class IncomeRow { public required string Label; public required string Amount; }
+    private List<IncomeRow> incomeRows = new();
+    private DateTime incomeFrom = DateTime.Now.AddMonths(-1);
+    private DateTime incomeTo = DateTime.Now;
+
+    // ---------- ميزان المراجعة ----------
+    private class TrialRow { public string Code = ""; public string Name = ""; public string Debit = ""; public string Credit = ""; public bool IsTotal; }
+    private List<TrialRow> trialRows = new();
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        if (AuthManager.IsAdmin)
+            LoadAccounts();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private void SwitchTab(string tab)
+    {
+        activeTab = tab;
+        errorMessage = null;
+        successMessage = null;
+        if (tab == "Income" && incomeRows.Count == 0)
+            LoadIncomeStatement();
+        else if (tab == "Trial" && trialRows.Count == 0)
+            LoadTrialBalance();
+    }
+
+    private static bool IsTotalRow(string label) => label.Contains("إجمالي") || label.Contains("صافي") || label.Contains("مجمل");
+
+    private void LoadAccounts()
+    {
+        accounts.Clear();
+        var dt = AccountsRepository.GetAccountsTreeGrid();
+        foreach (DataRow row in dt.Rows)
+            accounts.Add(new AccountRow { Code = row["كود الحساب"].ToString() ?? "", Name = row["اسم الحساب"].ToString() ?? "" });
+    }
+
+    private void LoadIncomeStatement()
+    {
+        incomeRows.Clear();
+        var dt = AccountsRepository.GetIncomeStatement(incomeFrom, incomeTo);
+        foreach (DataRow row in dt.Rows)
+            incomeRows.Add(new IncomeRow { Label = row["البند"].ToString() ?? "", Amount = row["المبلغ"].ToString() ?? "" });
+    }
+
+    private void LoadTrialBalance()
+    {
+        trialRows.Clear();
+        var dt = AccountsRepository.GetTrialBalance();
+        foreach (DataRow row in dt.Rows)
+        {
+            string name = row["اسم الحساب"].ToString() ?? "";
+            trialRows.Add(new TrialRow
+            {
+                Code = row["كود الحساب"].ToString() ?? "",
+                Name = name,
+                Debit = row["مدين"].ToString() ?? "",
+                Credit = row["دائن"].ToString() ?? "",
+                IsTotal = name == "الإجمالي"
+            });
+        }
+    }
+
+    // ---------- إضافة/تعديل/حذف حساب ----------
+    private void OpenNewAccountForm()
+    {
+        editingCode = null;
+        accCode = accName = "";
+        showAccountForm = true;
+        errorMessage = null;
+    }
+
+    private void OpenEditAccountForm(AccountRow a)
+    {
+        editingCode = a.Code;
+        accCode = a.Code;
+        accName = a.Name;
+        showAccountForm = true;
+        errorMessage = null;
+    }
+
+    private void SaveAccount()
+    {
+        errorMessage = null;
+        if (!int.TryParse(accCode, out var code))
+        {
+            errorMessage = "كود الحساب لازم يكون رقم.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(accName))
+        {
+            errorMessage = "اسم الحساب مطلوب.";
+            return;
+        }
+
+        try
+        {
+            if (editingCode == null)
+            {
+                if (AccountsRepository.AccountCodeExists(code))
+                {
+                    errorMessage = "كود الحساب ده موجود بالفعل.";
+                    return;
+                }
+                AccountsRepository.AddAccount(code, accName.Trim());
+                successMessage = "تم إضافة الحساب بنجاح.";
+            }
+            else
+            {
+                AccountsRepository.UpdateAccountName(code, accName.Trim());
+                successMessage = "تم تعديل الحساب بنجاح.";
+            }
+            showAccountForm = false;
+            LoadAccounts();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void DeleteAccount(AccountRow a)
+    {
+        errorMessage = null;
+        if (!int.TryParse(a.Code, out var code)) return;
+
+        if (AccountsRepository.GetAccountUsageCount(code) > 0)
+        {
+            errorMessage = "لا يمكن حذف هذا الحساب لأنه مُستخدم فعليًا في حركات أو قيود مسجّلة.";
+            return;
+        }
+
+        try
+        {
+            AccountsRepository.DeleteAccount(code);
+            successMessage = "تم حذف الحساب.";
+            LoadAccounts();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}

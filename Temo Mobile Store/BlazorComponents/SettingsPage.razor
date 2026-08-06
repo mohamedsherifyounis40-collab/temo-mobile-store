@@ -1,0 +1,754 @@
+@using System.Data
+@using System.Globalization
+@using System.IO
+@using System.Drawing
+@using System.Drawing.Imaging
+@using System.Windows.Forms
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.SettingsBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>⚙️ الإعدادات</h1>
+                    <div class="breadcrumb">الإعدادات &gt; بيانات المحل، النسخ الاحتياطي، والمستخدمين</div>
+                </div>
+            </div>
+
+            @if (!AuthManager.IsAdmin)
+            {
+                <div class="alert alert-error">⚠️ الشاشة دي للمدير بس - مش عندك صلاحية الوصول ليها.</div>
+            }
+            else
+            {
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-error">⚠️ @errorMessage</div>
+                }
+                @if (!string.IsNullOrEmpty(successMessage))
+                {
+                    <div class="alert alert-success">✅ @successMessage</div>
+                }
+
+                <div class="list-tabs">
+                    <button class="list-tab @(activeTab == "StoreSettings" ? "active" : "")" @onclick='() => SwitchTab("StoreSettings")'>⚙️ إعدادات المحل</button>
+                    <button class="list-tab @(activeTab == "Backup" ? "active" : "")" @onclick='() => SwitchTab("Backup")'>💾 النسخ الاحتياطي</button>
+                    <button class="list-tab @(activeTab == "Users" ? "active" : "")" @onclick='() => SwitchTab("Users")'>👤 إدارة المستخدمين</button>
+                </div>
+
+                @if (activeTab == "StoreSettings")
+                {
+                    <div class="grid-mid-settings">
+                        <div class="card">
+                            <div class="card-title">🖼️ شعار المحل</div>
+                            <div class="logo-preview-box">
+                                @if (LogoDataUrl != null)
+                                {
+                                    <img src="@LogoDataUrl" alt="شعار المحل" />
+                                }
+                                else
+                                {
+                                    <span class="empty">مفيش شعار حاليًا</span>
+                                }
+                            </div>
+                            <InputFile OnChange="OnLogoSelected" accept=".png,.jpg,.jpeg,.bmp" />
+                            @if (logoBytes != null)
+                            {
+                                <button class="btn btn-danger-outline" style="margin-top:10px; width:100%" @onclick="RemoveLogo">🗑️ إزالة الشعار</button>
+                            }
+                        </div>
+
+                        <div class="card">
+                            <div class="card-title">⚙️ بيانات المحل</div>
+                            <div class="form-grid">
+                                <div>
+                                    <label class="field-label">اسم المحل</label>
+                                    <input class="field-input" value="@storeName" @oninput="e => storeName = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">رقم التليفون</label>
+                                    <input class="field-input" value="@storePhone" @oninput="e => storePhone = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">رقم الواتساب (لو مختلف عن التليفون)</label>
+                                    <input class="field-input" value="@storeWhatsApp" @oninput="e => storeWhatsApp = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                            </div>
+                            <label class="field-label">العنوان</label>
+                            <textarea class="field-input" style="min-height:70px" value="@storeAddress" @oninput="e => storeAddress = e.Value?.ToString() ?? string.Empty"></textarea>
+                            <div class="form-actions" style="margin-top:12px">
+                                <button class="btn btn-primary" @onclick="SaveStoreSettings">💾 حفظ الإعدادات</button>
+                            </div>
+                            <div class="muted" style="margin-top:10px; font-size:12px">ℹ️ البيانات دي هتظهر تلقائيًا في رأس وذيل فاتورة البيع المطبوعة.</div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top:16px">
+                        <div class="card-title">🌐 مزامنة موقع الكتالوج</div>
+                        <div class="muted" style="font-size:12px; margin-bottom:10px">لو عندك موقع كتالوج منفصل بيعرض منتجاتك للعملاء، حط رابطه هنا وفعّل المزامنة - البرنامج هيبعتله قائمة المنتجات والأسعار والتوفر تلقائيًا كل 5 دقايق.</div>
+                        <div class="form-grid">
+                            <div>
+                                <label class="field-label">رابط الموقع</label>
+                                <input class="field-input" value="@syncUrl" placeholder="https://your-catalog-site.example.com" @oninput="e => syncUrl = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div>
+                                <label class="field-label">المفتاح السري (Secret)</label>
+                                <input class="field-input" type="password" value="@syncSecret" @oninput="e => syncSecret = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                        </div>
+                        <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px">
+                            <input type="checkbox" checked="@syncEnabled" @onchange="e => syncEnabled = (bool)(e.Value ?? false)" />
+                            تفعيل المزامنة التلقائية
+                        </label>
+                        <div class="form-actions" style="margin-top:12px; align-items:center">
+                            <button class="btn btn-primary" @onclick="SaveCatalogSync">💾 حفظ إعدادات المزامنة</button>
+                            <button class="btn btn-outline" @onclick="SyncNow">🔄 مزامنة الآن</button>
+                            @if (!string.IsNullOrEmpty(syncStatusMessage))
+                            {
+                                <span style="color:@(syncStatusIsError ? "var(--color-red)" : "var(--color-green)"); font-size:13px">@syncStatusMessage</span>
+                            }
+                        </div>
+                    </div>
+                }
+                else if (activeTab == "Backup")
+                {
+                    <div class="card">
+                        <div class="card-title">💾 النسخ الاحتياطي والاسترجاع</div>
+                        <div class="muted" style="font-size:13px">@backupStatusText</div>
+                        <div style="font-size:13px; color:@(cloudIsConnected ? "var(--color-green)" : "var(--color-red)")">@cloudStatusText</div>
+
+                        <div class="form-actions" style="margin-top:14px; flex-wrap:wrap">
+                            <button class="btn btn-primary" @onclick="CreateBackupNow">💾 عمل نسخة احتياطية الآن</button>
+                            <button class="btn btn-outline" @onclick="RequestRestore">⏪ استرجاع النسخة المحددة</button>
+                            <button class="btn btn-danger-outline" @onclick="DeleteBackup">🗑️ حذف النسخة المحددة</button>
+                            <button class="btn btn-outline" @onclick="OpenBackupFolder">📂 فتح مجلد النسخ</button>
+                        </div>
+
+                        @if (pendingRestorePath != null)
+                        {
+                            <div class="restore-warning">
+                                <div class="restore-warning-title">⚠️ هيتم استبدال كل بيانات البرنامج الحالية بالنسخة دي: @pendingRestoreFileName</div>
+                                <div>أي بيانات اتسجلت بعد تاريخ النسخة دي هتضيع نهائيًا، والبرنامج هيقفل ويفتح تاني فورًا عشان البيانات المسترجعة تظهر صح. متأكد إنك عايز تكمل؟</div>
+                                <div class="restore-warning-actions">
+                                    <button class="btn btn-danger-outline" @onclick="ConfirmRestore">✅ تأكيد الاسترجاع النهائي</button>
+                                    <button class="btn btn-outline" @onclick="CancelRestore">إلغاء</button>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="data-table-wrap" style="margin-top:14px">
+                            <table class="data-table">
+                                <thead><tr><th>اسم الملف</th><th>التاريخ والوقت</th><th>الحجم</th></tr></thead>
+                                <tbody>
+                                    @foreach (var b in backups)
+                                    {
+                                        <tr class="@(selectedBackupPath == b.FullPath ? "row-selected" : "")" @onclick="() => SelectBackup(b)">
+                                            <td>@b.FileName</td><td class="muted">@b.DateText</td><td>@b.SizeText</td>
+                                        </tr>
+                                    }
+                                    @if (backups.Count == 0)
+                                    {
+                                        <tr><td colspan="3" class="empty-row">لا توجد نسخ احتياطية بعد</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="muted" style="margin-top:10px; font-size:12px">ℹ️ البرنامج بياخد نسخة احتياطية تلقائية عند فتح البرنامج وعند قفله، وبيحتفظ بآخر 30 نسخة تلقائيًا.</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="grid-mid-settings">
+                        <div class="card">
+                            <div class="card-title">👤 @(editingUserId == null ? "إضافة مستخدم جديد" : "تعديل مستخدم")</div>
+                            <div class="form-grid">
+                                <div>
+                                    <label class="field-label">اسم المستخدم</label>
+                                    <input class="field-input" value="@newUsername" @oninput="e => newUsername = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">@(editingUserId == null ? "كلمة المرور" : "كلمة المرور (سيبها فاضية لو مش عايز تغيّرها)")</label>
+                                    <input class="field-input" type="password" value="@newPassword" @oninput="e => newPassword = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div>
+                                    <label class="field-label">الدور</label>
+                                    <select class="field-input" @bind="newRole">
+                                        <option value="Employee">Employee</option>
+                                        <option value="Admin">Admin</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-primary" @onclick="SaveUser">💾 @(editingUserId == null ? "إضافة مستخدم جديد" : "حفظ التعديل")</button>
+                                @if (editingUserId != null)
+                                {
+                                    <button class="btn btn-outline" @onclick="OpenNewUserForm">إلغاء</button>
+                                }
+                            </div>
+                            <div class="muted" style="margin-top:12px; font-size:12px">
+                                ℹ️ Admin: يشوف ويعمل كل حاجة في البرنامج.<br />
+                                Employee: يقدر يبيع ويسجّل مصروفات وحركات بس، من غير تعديل أو إلغاء أو حذف.
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-title">👥 المستخدمين المسجّلين</div>
+                            <div class="data-table-wrap">
+                                <table class="data-table">
+                                    <thead><tr><th></th><th>اسم المستخدم</th><th>الدور</th><th>تاريخ الإنشاء</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var u in users)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <div class="row-actions">
+                                                        <button class="row-action-btn edit" title="تعديل" @onclick="() => OpenEditUserForm(u)">✏️</button>
+                                                        <button class="row-action-btn delete" title="حذف" @onclick="() => DeleteUser(u)">🗑</button>
+                                                    </div>
+                                                </td>
+                                                <td>@u.Username</td>
+                                                <td>@u.Role</td>
+                                                <td class="muted">@u.CreatedAt</td>
+                                            </tr>
+                                        }
+                                        @if (users.Count == 0)
+                                        {
+                                            <tr><td colspan="4" class="empty-row">مفيش مستخدمين مسجّلين</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون (تجربة)", "🧪"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.InventoryCountBlazor, "جرد المخزن (تجربة)", "🧪"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.MaintenanceBlazor,"الصيانة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.CustomersBlazor,"العملاء (تجربة)", "🧪"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.SuppliersBlazor,"الموردين (تجربة)", "🧪"),
+        (MainShell.PageKeys.PurchasesBlazor,"المشتريات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.TreasuryBlazor, "الخزينة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.AccountsBlazor, "الحسابات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor,
+                MainShell.PageKeys.InventoryCount, MainShell.PageKeys.InventoryCountBlazor,
+                MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private string? errorMessage;
+    private string? successMessage;
+    private string activeTab = "StoreSettings";
+
+    // ---------- إعدادات المحل ----------
+    private string storeName = "", storePhone = "", storeAddress = "", storeWhatsApp = "";
+    private byte[]? logoBytes;
+    private string? LogoDataUrl => logoBytes != null && logoBytes.Length > 0 ? $"data:image/png;base64,{Convert.ToBase64String(logoBytes)}" : null;
+
+    private string syncUrl = "", syncSecret = "";
+    private bool syncEnabled;
+    private string? syncStatusMessage;
+    private bool syncStatusIsError;
+
+    // ---------- النسخ الاحتياطي ----------
+    private class BackupRow { public string FileName = ""; public string DateText = ""; public string SizeText = ""; public string FullPath = ""; }
+    private List<BackupRow> backups = new();
+    private string backupStatusText = "";
+    private string cloudStatusText = "";
+    private bool cloudIsConnected;
+    private string? selectedBackupPath;
+    private string? pendingRestorePath;
+    private string? pendingRestoreFileName;
+
+    // ---------- إدارة المستخدمين ----------
+    private class UserRow { public int Id; public string Username = ""; public string Role = ""; public string CreatedAt = ""; }
+    private List<UserRow> users = new();
+    private int? editingUserId;
+    private string newUsername = "", newPassword = "", newRole = "Employee";
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        if (AuthManager.IsAdmin)
+        {
+            LoadStoreSettings();
+            LoadCatalogSync();
+        }
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private void SwitchTab(string tab)
+    {
+        activeTab = tab;
+        errorMessage = null;
+        successMessage = null;
+
+        if (tab == "Backup") { pendingRestorePath = null; LoadBackups(); }
+        else if (tab == "Users") LoadUsers();
+    }
+
+    // ==========================================================================
+    // إعدادات المحل
+    // ==========================================================================
+    private void LoadStoreSettings()
+    {
+        UIHelpers.LoadStoreSettings(out storeName, out storePhone, out storeAddress, out var logo, out storeWhatsApp);
+        logoBytes = logo;
+    }
+
+    private void LoadCatalogSync()
+    {
+        var (url, secret, enabled) = SettingsRepository.GetCatalogSyncSettings();
+        syncUrl = url ?? "";
+        syncSecret = secret ?? "";
+        syncEnabled = enabled;
+    }
+
+    private async Task OnLogoSelected(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        try
+        {
+            var file = e.File;
+            byte[] imageBytes;
+            using (var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024))
+            using (var ms = new MemoryStream())
+            {
+                await stream.CopyToAsync(ms);
+                imageBytes = ms.ToArray();
+            }
+
+            using (var msOriginal = new MemoryStream(imageBytes))
+            using (var original = Image.FromStream(msOriginal))
+            {
+                int maxSize = 500;
+                int width, height;
+                if (original.Width > original.Height) { width = maxSize; height = (int)(original.Height * (maxSize / (double)original.Width)); }
+                else { height = maxSize; width = (int)(original.Width * (maxSize / (double)original.Height)); }
+
+                using (var resized = new Bitmap(original, new Size(width, height)))
+                using (var msResized = new MemoryStream())
+                {
+                    resized.Save(msResized, ImageFormat.Png);
+                    logoBytes = msResized.ToArray();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "مش قادر يفتح الصورة دي: " + ex.Message;
+        }
+    }
+
+    private void RemoveLogo() => logoBytes = null;
+
+    private void SaveStoreSettings()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (string.IsNullOrWhiteSpace(storeName))
+        {
+            errorMessage = "اسم المحل لازم يتكتب.";
+            return;
+        }
+
+        try
+        {
+            SettingsRepository.SaveStoreSettings(storeName.Trim(), storePhone.Trim(), storeAddress.Trim(), logoBytes, storeWhatsApp.Trim());
+            LoadStoreSettings();
+            successMessage = "تم حفظ إعدادات المحل بنجاح ✅";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حصل خطأ أثناء حفظ الإعدادات: " + ex.Message;
+        }
+    }
+
+    private void SaveCatalogSync()
+    {
+        try
+        {
+            SettingsRepository.SaveCatalogSyncSettings(syncUrl.Trim(), syncSecret.Trim(), syncEnabled);
+            syncStatusIsError = false;
+            syncStatusMessage = "تم الحفظ ✅";
+        }
+        catch (Exception ex)
+        {
+            syncStatusIsError = true;
+            syncStatusMessage = "حصل خطأ: " + ex.Message;
+        }
+    }
+
+    private async Task SyncNow()
+    {
+        try { SettingsRepository.SaveCatalogSyncSettings(syncUrl.Trim(), syncSecret.Trim(), syncEnabled); }
+        catch { /* هيتلقط تاني في SyncNowAsync لو فيه مشكلة حقيقية */ }
+
+        syncStatusIsError = false;
+        syncStatusMessage = "جاري المزامنة...";
+        StateHasChanged();
+
+        var (success, message) = await WebCatalogSyncService.SyncNowAsync();
+        syncStatusIsError = !success;
+        syncStatusMessage = message;
+    }
+
+    // ==========================================================================
+    // النسخ الاحتياطي
+    // ==========================================================================
+    private void LoadBackups()
+    {
+        BackupManager.EnsureBackupFolderExists();
+        backups.Clear();
+
+        var files = Directory.GetFiles(BackupManager.BackupFolderPath, "*.db")
+            .Select(f => new FileInfo(f))
+            .OrderByDescending(f => f.CreationTime)
+            .ToList();
+
+        foreach (var f in files)
+        {
+            double sizeKb = f.Length / 1024.0;
+            string sizeText = sizeKb >= 1024 ? $"{(sizeKb / 1024.0):N2} MB" : $"{sizeKb:N0} KB";
+            backups.Add(new BackupRow { FileName = f.Name, DateText = f.CreationTime.ToString("yyyy-MM-dd HH:mm:ss"), SizeText = sizeText, FullPath = f.FullName });
+        }
+
+        backupStatusText = backups.Count > 0
+            ? $"آخر نسخة احتياطية: {backups[0].DateText}   |   عدد النسخ المحفوظة: {backups.Count}"
+            : "لا توجد نسخ احتياطية بعد.";
+
+        string? cloudFolder = BackupManager.GetCloudBackupFolder();
+        cloudIsConnected = cloudFolder != null;
+        cloudStatusText = cloudFolder != null
+            ? $"☁️ متصل بخدمة تخزين سحابي، وبيتحفظ فيها نسخة إضافية تلقائيًا: {cloudFolder}"
+            : "☁️ مفيش Google Drive أو OneDrive متزامن على الجهاز ده حاليًا، فالنسخ بتتحفظ محليًا بس.";
+    }
+
+    private void SelectBackup(BackupRow b)
+    {
+        selectedBackupPath = b.FullPath;
+        pendingRestorePath = null;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private void CreateBackupNow()
+    {
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            BackupManager.CreateBackupFile();
+            BackupManager.PruneOldBackups();
+            LoadBackups();
+            successMessage = "تم عمل نسخة احتياطية بنجاح ✅";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حصل خطأ أثناء عمل النسخة الاحتياطية: " + ex.Message;
+        }
+    }
+
+    private void RequestRestore()
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (selectedBackupPath == null)
+        {
+            errorMessage = "من فضلك اختار نسخة احتياطية من الجدول أولاً.";
+            return;
+        }
+        pendingRestorePath = selectedBackupPath;
+        pendingRestoreFileName = backups.FirstOrDefault(b => b.FullPath == selectedBackupPath)?.FileName ?? "";
+    }
+
+    private void CancelRestore() => pendingRestorePath = null;
+
+    private void ConfirmRestore()
+    {
+        if (pendingRestorePath == null) return;
+        try
+        {
+            BackupManager.CreateBackupFile();
+            string dbFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TemoStoreDB.db");
+            File.Copy(pendingRestorePath, dbFilePath, true);
+            Application.Restart();
+            Environment.Exit(0);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حصل خطأ أثناء الاسترجاع: " + ex.Message;
+            pendingRestorePath = null;
+        }
+    }
+
+    private void DeleteBackup()
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (selectedBackupPath == null)
+        {
+            errorMessage = "من فضلك اختار نسخة احتياطية من الجدول أولاً.";
+            return;
+        }
+
+        try
+        {
+            File.Delete(selectedBackupPath);
+            selectedBackupPath = null;
+            LoadBackups();
+            successMessage = "تم حذف النسخة الاحتياطية.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "حصل خطأ أثناء الحذف: " + ex.Message;
+        }
+    }
+
+    private void OpenBackupFolder()
+    {
+        try
+        {
+            BackupManager.EnsureBackupFolderExists();
+            System.Diagnostics.Process.Start("explorer.exe", BackupManager.BackupFolderPath);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "مش قادر يفتح المجلد: " + ex.Message;
+        }
+    }
+
+    // ==========================================================================
+    // إدارة المستخدمين
+    // ==========================================================================
+    private void LoadUsers()
+    {
+        users.Clear();
+        var dt = SettingsRepository.GetUsersGrid();
+        foreach (DataRow r in dt.Rows)
+        {
+            users.Add(new UserRow
+            {
+                Id = Convert.ToInt32(r["Id"]),
+                Username = r["اسم المستخدم"].ToString() ?? "",
+                Role = r["الدور"].ToString() ?? "",
+                CreatedAt = r["تاريخ الإنشاء"].ToString() ?? ""
+            });
+        }
+    }
+
+    private void OpenNewUserForm()
+    {
+        editingUserId = null;
+        newUsername = "";
+        newPassword = "";
+        newRole = "Employee";
+        errorMessage = null;
+    }
+
+    private void OpenEditUserForm(UserRow u)
+    {
+        editingUserId = u.Id;
+        newUsername = u.Username;
+        newPassword = "";
+        newRole = u.Role;
+        errorMessage = null;
+    }
+
+    private void SaveUser()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (editingUserId == null)
+        {
+            if (string.IsNullOrWhiteSpace(newUsername) || string.IsNullOrWhiteSpace(newPassword))
+            {
+                errorMessage = "من فضلك أدخل اسم مستخدم وكلمة مرور.";
+                return;
+            }
+
+            try
+            {
+                if (SettingsRepository.UsernameExists(newUsername.Trim()))
+                {
+                    errorMessage = "اسم المستخدم ده مستخدم بالفعل.";
+                    return;
+                }
+                SettingsRepository.AddUser(newUsername.Trim(), newPassword, newRole);
+                successMessage = "تم إضافة المستخدم بنجاح.";
+                OpenNewUserForm();
+                LoadUsers();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+            }
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(newUsername))
+            {
+                errorMessage = "اسم المستخدم مايفضلش فاضي.";
+                return;
+            }
+
+            try
+            {
+                var existing = SettingsRepository.GetUser(editingUserId.Value);
+                if (existing == null)
+                {
+                    errorMessage = "لم يتم العثور على المستخدم.";
+                    return;
+                }
+                if (SettingsRepository.UsernameExists(newUsername.Trim(), editingUserId.Value))
+                {
+                    errorMessage = "اسم المستخدم ده مستخدم بالفعل لحساب تاني.";
+                    return;
+                }
+                if (existing.Role == "Admin" && newRole != "Admin" && SettingsRepository.CountAdmins() <= 1)
+                {
+                    errorMessage = "لا يمكن تغيير دور آخر حساب أدمن في النظام.";
+                    return;
+                }
+
+                SettingsRepository.UpdateUser(editingUserId.Value, newUsername.Trim(), newRole, string.IsNullOrEmpty(newPassword) ? null : newPassword);
+                successMessage = "تم تعديل المستخدم بنجاح.";
+                OpenNewUserForm();
+                LoadUsers();
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+            }
+        }
+    }
+
+    private void DeleteUser(UserRow u)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var user = SettingsRepository.GetUser(u.Id);
+            if (user == null)
+            {
+                errorMessage = "لم يتم العثور على المستخدم.";
+                return;
+            }
+            if (user.Username == AuthManager.CurrentUsername)
+            {
+                errorMessage = "لا يمكنك حذف حسابك اللي داخل بيه دلوقتي.";
+                return;
+            }
+            if (user.Role == "Admin" && SettingsRepository.CountAdmins() <= 1)
+            {
+                errorMessage = "لا يمكن حذف آخر حساب أدمن في النظام.";
+                return;
+            }
+
+            SettingsRepository.DeleteUser(u.Id);
+            successMessage = "تم حذف المستخدم بنجاح.";
+            if (editingUserId == u.Id) OpenNewUserForm();
+            LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}

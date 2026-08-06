@@ -33,6 +33,7 @@ namespace TemoStore.Data
             Employees = new EmployeeRepository(_conn, _tx);
             Attendance = new AttendanceRecordRepository(_conn, _tx);
             Accounts = new AccountRepository(_conn, _tx);
+            Closures = new ClosureRepository(_conn, _tx);
         }
 
         public IProductRepository Products { get; }
@@ -49,6 +50,7 @@ namespace TemoStore.Data
         public IEmployeeRepository Employees { get; }
         public IAttendanceRepository Attendance { get; }
         public IAccountRepository Accounts { get; }
+        public IClosureRepository Closures { get; }
 
         public void Commit()
         {

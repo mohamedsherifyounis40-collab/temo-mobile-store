@@ -22,6 +22,37 @@ namespace Temo_Mobile_Store
     {
         // ---------- المخزون (منتجات عادية غير مسلسلة) ----------
 
+        // صورة منتج (اختيارية، تجميلية بس) - بتتحفظ/تتقرأ مباشرة من غير ما تعدّي على
+        // CoreEngine (زي إضافة/تعديل المنتج نفسه) لأنها مش عملية تجارية محتاجة تدقيق/محاسبة،
+        // نفس مبدأ StoreSettings.LogoImage بالظبط
+        public static void UpdateProductImage(string barcode, byte[] image)
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("UPDATE Products SET ProductImage = @Image WHERE Barcode = @Barcode", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Image", (object)image ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Barcode", barcode);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public static byte[] GetProductImage(string barcode)
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("SELECT ProductImage FROM Products WHERE Barcode = @Barcode", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Barcode", barcode);
+                    object result = cmd.ExecuteScalar();
+                    return result == null || result == DBNull.Value ? null : (byte[])result;
+                }
+            }
+        }
+
         public static DataTable GetAccessoryProducts()
         {
             DataTable dt = new DataTable();

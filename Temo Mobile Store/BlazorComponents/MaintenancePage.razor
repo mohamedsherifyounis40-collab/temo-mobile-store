@@ -1,0 +1,477 @@
+@using System.Data
+@using System.Globalization
+@using TemoStore.Core.Commands
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.MaintenanceBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>🔧 الصيانة</h1>
+                    <div class="breadcrumb">الصيانة &gt; تذاكر الصيانة</div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error">⚠️ @errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">✅ @successMessage</div>
+            }
+
+            <div class="kpi-strip">
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-blue">🔧</span>
+                    <div>
+                        <div class="kpi-chip-value">@tickets.Count</div>
+                        <div class="kpi-chip-label">عدد التذاكر</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-orange">⏳</span>
+                    <div>
+                        <div class="kpi-chip-value">@tickets.Count(t => t.Status == "مستلم" || t.Status == "جاري الفحص")</div>
+                        <div class="kpi-chip-label">قيد المعالجة</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-green">📦</span>
+                    <div>
+                        <div class="kpi-chip-value">@tickets.Count(t => t.Status == "جاهز للتسليم")</div>
+                        <div class="kpi-chip-label">جاهزة للتسليم</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-purple">💰</span>
+                    <div>
+                        <div class="kpi-chip-value">@tickets.Where(t => t.Status == "تم التسليم").Sum(t => t.ActualCost).ToString("N0") ج.م</div>
+                        <div class="kpi-chip-label">إجمالي إيراد الصيانة</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="list-toolbar">
+                    <select class="field-input" style="max-width:220px" value="@statusFilter" @onchange="OnStatusFilterChanged">
+                        <option value="الكل">الكل</option>
+                        <option value="مستلم">مستلم</option>
+                        <option value="جاري الفحص">جاري الفحص</option>
+                        <option value="جاهز للتسليم">جاهز للتسليم</option>
+                        <option value="تم التسليم">تم التسليم</option>
+                        <option value="ملغي">ملغي</option>
+                    </select>
+                    <button class="btn btn-primary" @onclick="OpenReceiveForm">➕ استلام جهاز جديد</button>
+                </div>
+
+                @if (showReceiveForm)
+                {
+                    <div class="form-panel">
+                        <div class="form-panel-title">استلام جهاز جديد للصيانة</div>
+                        <div class="form-grid">
+                            <div>
+                                <label class="field-label">اسم العميل</label>
+                                <input class="field-input" value="@custName" @oninput="e => custName = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div>
+                                <label class="field-label">رقم التليفون</label>
+                                <input class="field-input" value="@custPhone" @oninput="e => custPhone = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div>
+                                <label class="field-label">الجهاز</label>
+                                <input class="field-input" value="@deviceInfo" @oninput="e => deviceInfo = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div>
+                                <label class="field-label">وصف العطل</label>
+                                <input class="field-input" value="@issueDescription" @oninput="e => issueDescription = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div>
+                                <label class="field-label">التكلفة التقديرية</label>
+                                <input class="field-input" type="number" value="@estimatedCost" @oninput="e => estimatedCost = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" @onclick="SaveReceive">💾 استلام</button>
+                            <button class="btn btn-outline" @onclick="() => showReceiveForm = false">إلغاء</button>
+                        </div>
+                    </div>
+                }
+
+                @if (statusTicketId != null)
+                {
+                    <div class="form-panel">
+                        <div class="form-panel-title">تحديث حالة تذكرة: @statusTicketDevice</div>
+                        <div class="form-grid">
+                            <div>
+                                <label class="field-label">الحالة الجديدة</label>
+                                <select class="field-input" value="@newStatus" @onchange="e => newStatus = e.Value?.ToString() ?? string.Empty">
+                                    <option value="مستلم">مستلم</option>
+                                    <option value="جاري الفحص">جاري الفحص</option>
+                                    <option value="جاهز للتسليم">جاهز للتسليم</option>
+                                    <option value="ملغي">ملغي</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" @onclick="SaveStatus">💾 تحديث</button>
+                            <button class="btn btn-outline" @onclick="() => statusTicketId = null">إلغاء</button>
+                        </div>
+                    </div>
+                }
+
+                @if (deliverTicketId != null)
+                {
+                    <div class="form-panel">
+                        <div class="form-panel-title">تسليم الجهاز وتحصيل الأجرة: @deliverTicketDevice</div>
+                        <div class="form-grid">
+                            <div>
+                                <label class="field-label">التكلفة الفعلية</label>
+                                <input class="field-input" type="number" value="@actualCost" @oninput="e => actualCost = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div>
+                                <label class="field-label">وسيلة الدفع</label>
+                                <select class="field-input" value="@deliverMethod" @onchange="e => deliverMethod = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">اختر وسيلة</option>
+                                    @foreach (var m in UIHelpers.PaymentMethods)
+                                    {
+                                        <option value="@m">@m</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" @onclick="SaveDeliver">💾 تسليم</button>
+                            <button class="btn btn-outline" @onclick="() => deliverTicketId = null">إلغاء</button>
+                        </div>
+                    </div>
+                }
+
+                <div class="data-table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr><th></th><th>تاريخ التسليم</th><th>الحالة</th><th>الفعلي</th><th>التقديري</th><th>تاريخ الاستلام</th><th>العطل</th><th>الجهاز</th><th>التليفون</th><th>العميل</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var t in tickets)
+                            {
+                                bool closed = t.Status == "تم التسليم" || t.Status == "ملغي";
+                                <tr>
+                                    <td>
+                                        <div class="row-actions">
+                                            <button class="row-action-btn edit" disabled="@(!AuthManager.IsAdmin || closed)" title="تحديث الحالة" @onclick="() => OpenStatusForm(t)">🔄</button>
+                                            <button class="row-action-btn" disabled="@(!AuthManager.IsAdmin || closed)" title="تسليم" @onclick="() => OpenDeliverForm(t)">✅</button>
+                                        </div>
+                                    </td>
+                                    <td class="muted">@t.DeliveredDate</td>
+                                    <td>@t.Status</td>
+                                    <td>@t.ActualCostText</td>
+                                    <td>@t.EstimatedCostText</td>
+                                    <td class="muted">@t.ReceivedDate</td>
+                                    <td>@t.IssueDescription</td>
+                                    <td>@t.DeviceInfo</td>
+                                    <td class="muted">@t.CustomerPhone</td>
+                                    <td>@t.CustomerName</td>
+                                </tr>
+                            }
+                            @if (tickets.Count == 0)
+                            {
+                                <tr><td colspan="10" class="empty-row">مفيش تذاكر مطابقة</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون (تجربة)", "🧪"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.MaintenanceBlazor,"الصيانة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.CustomersBlazor,"العملاء (تجربة)", "🧪"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.SuppliersBlazor,"الموردين (تجربة)", "🧪"),
+        (MainShell.PageKeys.PurchasesBlazor,"المشتريات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCount, MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private string? errorMessage;
+    private string? successMessage;
+
+    private class TicketRow
+    {
+        public int Id { get; set; }
+        public required string CustomerName { get; set; }
+        public string CustomerPhone { get; set; } = "";
+        public required string DeviceInfo { get; set; }
+        public string IssueDescription { get; set; } = "";
+        public string ReceivedDate { get; set; } = "";
+        public string EstimatedCostText { get; set; } = "";
+        public string ActualCostText { get; set; } = "";
+        public decimal ActualCost => decimal.TryParse(ActualCostText, NumberStyles.Number, CultureInfo.InvariantCulture, out var v) ? v : 0;
+        public required string Status { get; set; }
+        public string DeliveredDate { get; set; } = "";
+    }
+
+    private List<TicketRow> tickets = new();
+    private string statusFilter = "الكل";
+
+    private bool showReceiveForm;
+    private string custName = "", custPhone = "", deviceInfo = "", issueDescription = "", estimatedCost = "";
+
+    private int? statusTicketId;
+    private string statusTicketDevice = "";
+    private string newStatus = "مستلم";
+
+    private int? deliverTicketId;
+    private string deliverTicketDevice = "";
+    private string actualCost = "", deliverMethod = "";
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        LoadTickets();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private void LoadTickets()
+    {
+        tickets.Clear();
+        var dt = MaintenanceRepository.GetMaintenanceTickets(statusFilter);
+        foreach (DataRow row in dt.Rows)
+        {
+            tickets.Add(new TicketRow
+            {
+                Id = Convert.ToInt32(row["TicketId"]),
+                CustomerName = row["العميل"].ToString() ?? "",
+                CustomerPhone = row["التليفون"]?.ToString() ?? "",
+                DeviceInfo = row["الجهاز"].ToString() ?? "",
+                IssueDescription = row["العطل"]?.ToString() ?? "",
+                ReceivedDate = row["تاريخ الاستلام"].ToString() ?? "",
+                EstimatedCostText = row["التقديري"].ToString() ?? "",
+                ActualCostText = row["الفعلي"].ToString() ?? "",
+                Status = row["الحالة"].ToString() ?? "",
+                DeliveredDate = row["تاريخ التسليم"].ToString() ?? ""
+            });
+        }
+    }
+
+    private void OnStatusFilterChanged(ChangeEventArgs e)
+    {
+        statusFilter = e.Value?.ToString() ?? "الكل";
+        LoadTickets();
+    }
+
+    // ---------- استلام جهاز جديد ----------
+    private void OpenReceiveForm()
+    {
+        showReceiveForm = true;
+        statusTicketId = null;
+        deliverTicketId = null;
+        custName = custPhone = deviceInfo = issueDescription = estimatedCost = "";
+        errorMessage = null;
+    }
+
+    private void SaveReceive()
+    {
+        errorMessage = null;
+        if (string.IsNullOrWhiteSpace(custName) || string.IsNullOrWhiteSpace(deviceInfo))
+        {
+            errorMessage = "اسم العميل والجهاز مطلوبين.";
+            return;
+        }
+        decimal.TryParse(estimatedCost, out var cost);
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new ReceiveDeviceCommand
+            {
+                CustomerName = custName.Trim(),
+                CustomerPhone = string.IsNullOrWhiteSpace(custPhone) ? null : custPhone.Trim(),
+                DeviceInfo = deviceInfo.Trim(),
+                IssueDescription = string.IsNullOrWhiteSpace(issueDescription) ? null : issueDescription.Trim(),
+                EstimatedCost = cost,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم استلام الجهاز بنجاح.";
+            showReceiveForm = false;
+            LoadTickets();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    // ---------- تحديث الحالة ----------
+    private void OpenStatusForm(TicketRow t)
+    {
+        statusTicketId = t.Id;
+        statusTicketDevice = t.DeviceInfo;
+        newStatus = t.Status == "تم التسليم" || t.Status == "ملغي" ? "مستلم" : t.Status;
+        showReceiveForm = false;
+        deliverTicketId = null;
+        errorMessage = null;
+    }
+
+    private void SaveStatus()
+    {
+        errorMessage = null;
+        if (statusTicketId == null) return;
+        try
+        {
+            AppServices.CoreEngine.Execute(new UpdateMaintenanceStatusCommand
+            {
+                TicketId = statusTicketId.Value,
+                NewStatus = newStatus,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم تحديث حالة التذكرة.";
+            statusTicketId = null;
+            LoadTickets();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    // ---------- تسليم وتحصيل ----------
+    private void OpenDeliverForm(TicketRow t)
+    {
+        deliverTicketId = t.Id;
+        deliverTicketDevice = t.DeviceInfo;
+        actualCost = t.EstimatedCostText;
+        deliverMethod = "";
+        showReceiveForm = false;
+        statusTicketId = null;
+        errorMessage = null;
+    }
+
+    private void SaveDeliver()
+    {
+        errorMessage = null;
+        if (deliverTicketId == null) return;
+        if (!decimal.TryParse(actualCost, out var cost) || cost < 0)
+        {
+            errorMessage = "التكلفة الفعلية غير صحيحة.";
+            return;
+        }
+        if (string.IsNullOrEmpty(deliverMethod))
+        {
+            errorMessage = "اختر وسيلة الدفع.";
+            return;
+        }
+        if (UIHelpers.IsTodayClosed(deliverMethod))
+        {
+            errorMessage = "تم إقفال اليوم بالفعل، لا يمكن تسليم جهاز وتحصيل أجرة جديدة.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new DeliverMaintenanceDeviceCommand
+            {
+                TicketId = deliverTicketId.Value,
+                ActualCost = cost,
+                Method = deliverMethod,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم تسليم الجهاز وتحصيل الأجرة بنجاح.";
+            deliverTicketId = null;
+            LoadTickets();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}

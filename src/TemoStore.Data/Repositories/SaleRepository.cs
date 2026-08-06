@@ -18,7 +18,7 @@ namespace TemoStore.Data.Repositories
         public int Insert(SaleRecord sale)
         {
             using (var cmd = new SqliteCommand(
-                "INSERT INTO Sales (Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, IMEI, PaymentMethod, SalesInvoiceId) VALUES (@Barcode, @ProductName, @CostPrice, @Price, @QuantitySold, @Total, @CustomerId, @PaymentType, @IMEI, @PaymentMethod, @SalesInvoiceId)", _conn, _tx))
+                "INSERT INTO Sales (Barcode, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, AmountPaid, CustomerId, PaymentType, IMEI, PaymentMethod, SalesInvoiceId) VALUES (@Barcode, @ProductName, @CostPrice, @Price, @QuantitySold, @Total, @Discount, @Tax, @AmountPaid, @CustomerId, @PaymentType, @IMEI, @PaymentMethod, @SalesInvoiceId)", _conn, _tx))
             {
                 cmd.Parameters.AddWithValue("@Barcode", sale.Barcode);
                 cmd.Parameters.AddWithValue("@ProductName", sale.ProductName);
@@ -26,6 +26,9 @@ namespace TemoStore.Data.Repositories
                 cmd.Parameters.AddWithValue("@Price", sale.Price);
                 cmd.Parameters.AddWithValue("@QuantitySold", sale.QuantitySold);
                 cmd.Parameters.AddWithValue("@Total", sale.Total);
+                cmd.Parameters.AddWithValue("@Discount", sale.Discount);
+                cmd.Parameters.AddWithValue("@Tax", sale.Tax);
+                cmd.Parameters.AddWithValue("@AmountPaid", sale.AmountPaid);
                 cmd.Parameters.AddWithValue("@CustomerId", (object?)sale.CustomerId ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@PaymentType", sale.PaymentType);
                 cmd.Parameters.AddWithValue("@IMEI", (object?)sale.Imei ?? DBNull.Value);
@@ -45,10 +48,20 @@ namespace TemoStore.Data.Repositories
             cmd.ExecuteNonQuery();
         }
 
+        // بيتسجل على أول صنف بس في الفاتورة (زي SalesInvoiceId) - المبلغ ده على مستوى
+        // الفاتورة كلها، معرفتش قيمته الفعلية إلا بعد ما كل أسطر الفاتورة تتضاف وتتجمع
+        public void SetAmountPaid(int invoiceId, decimal amountPaid)
+        {
+            using var cmd = new SqliteCommand("UPDATE Sales SET AmountPaid = @AmountPaid WHERE SaleID = @Id", _conn, _tx);
+            cmd.Parameters.AddWithValue("@AmountPaid", amountPaid);
+            cmd.Parameters.AddWithValue("@Id", invoiceId);
+            cmd.ExecuteNonQuery();
+        }
+
         public IReadOnlyList<SaleRecord> GetByInvoiceId(int invoiceId)
         {
             var results = new List<SaleRecord>();
-            using var cmd = new SqliteCommand("SELECT SaleID, Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId FROM Sales WHERE SalesInvoiceId = @InvoiceId ORDER BY SaleID ASC", _conn, _tx);
+            using var cmd = new SqliteCommand("SELECT SaleID, Barcode, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, AmountPaid, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId FROM Sales WHERE SalesInvoiceId = @InvoiceId ORDER BY SaleID ASC", _conn, _tx);
             cmd.Parameters.AddWithValue("@InvoiceId", invoiceId);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -62,6 +75,9 @@ namespace TemoStore.Data.Repositories
                     Price = Convert.ToDecimal(reader["Price"]),
                     QuantitySold = Convert.ToInt32(reader["QuantitySold"]),
                     Total = Convert.ToDecimal(reader["Total"]),
+                    Discount = reader["Discount"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["Discount"]),
+                    Tax = reader["Tax"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["Tax"]),
+                    AmountPaid = reader["AmountPaid"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["AmountPaid"]),
                     CustomerId = reader["CustomerId"] == DBNull.Value ? null : Convert.ToInt32(reader["CustomerId"]),
                     PaymentType = reader["PaymentType"] == DBNull.Value ? "" : reader["PaymentType"].ToString()!,
                     PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
@@ -75,7 +91,7 @@ namespace TemoStore.Data.Repositories
 
         public SaleRecord? GetById(int saleId)
         {
-            using var cmd = new SqliteCommand("SELECT Barcode, ProductName, CostPrice, Price, QuantitySold, Total, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId FROM Sales WHERE SaleID = @Id", _conn, _tx);
+            using var cmd = new SqliteCommand("SELECT Barcode, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, AmountPaid, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId FROM Sales WHERE SaleID = @Id", _conn, _tx);
             cmd.Parameters.AddWithValue("@Id", saleId);
             using var reader = cmd.ExecuteReader();
             if (!reader.Read()) return null;
@@ -88,6 +104,9 @@ namespace TemoStore.Data.Repositories
                 Price = Convert.ToDecimal(reader["Price"]),
                 QuantitySold = Convert.ToInt32(reader["QuantitySold"]),
                 Total = Convert.ToDecimal(reader["Total"]),
+                Discount = reader["Discount"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["Discount"]),
+                Tax = reader["Tax"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["Tax"]),
+                AmountPaid = reader["AmountPaid"] == DBNull.Value ? 0 : Convert.ToDecimal(reader["AmountPaid"]),
                 CustomerId = reader["CustomerId"] == DBNull.Value ? null : Convert.ToInt32(reader["CustomerId"]),
                 PaymentType = reader["PaymentType"] == DBNull.Value ? "" : reader["PaymentType"].ToString()!,
                 PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),

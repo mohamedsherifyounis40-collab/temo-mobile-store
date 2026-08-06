@@ -1,0 +1,6 @@
+/* شاشة الموردين الجديدة (Blazor Hybrid) - تخصيصات خاصة بالشاشة دي بس، فوق list-template.css */
+
+.accent-blue { color: var(--color-accent); }
+.accent-green { color: var(--color-green); }
+.accent-red { color: var(--color-red); }
+.accent-purple { color: var(--color-purple); }

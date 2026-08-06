@@ -12,7 +12,9 @@ namespace TemoStore.Engines.Handlers
         public const int Inventory = 1200;
         public const int Customers = 1300;
         public const int Suppliers = 2100;
+        public const int TaxPayable = 2200;
         public const int SalesRevenue = 4100;
+        public const int SalesDiscounts = 4110;    // حساب مقابل (Contra-Revenue) - خصومات ممنوحة على المبيعات
         public const int MaintenanceRevenue = 4200;
         public const int Cogs = 5500;
         public const int Salaries = 5400;
@@ -71,7 +73,9 @@ namespace TemoStore.Engines.Handlers
             var saleIds = new List<int>();
             var lineCosts = new List<decimal>();
             var affectedBarcodes = new List<string>();
-            decimal grandTotal = 0;
+            decimal grandTotal = 0;      // إجمالي الفاتورة قبل الخصم (Gross) - بيتسجل كإيراد كامل في الدفتر
+            decimal totalDiscount = 0;   // إجمالي الخصم على كل الأصناف
+            decimal totalTax = 0;        // إجمالي الضريبة على كل الأصناف
             decimal totalCost = 0;
             int invoiceId = 0;
 
@@ -88,6 +92,8 @@ namespace TemoStore.Engines.Handlers
                     Price = line.UnitPrice,
                     QuantitySold = line.Quantity,
                     Total = line.Total,
+                    Discount = line.Discount,
+                    Tax = line.Tax,
                     CustomerId = command.CustomerId,
                     PaymentType = command.PaymentType,
                     PaymentMethod = command.PaymentType == "Cash" ? command.PaymentMethod : null,
@@ -109,19 +115,42 @@ namespace TemoStore.Engines.Handlers
                 lineCosts.Add(lineCost);
                 affectedBarcodes.Add(line.Barcode);
                 grandTotal += line.Total;
+                totalDiscount += line.Discount;
+                totalTax += line.Tax;
                 totalCost += lineCost;
             }
 
+            // الصافي الفعلي اللي بيتحصّل كاش أو بيتسجل على العميل - بعد خصم الخصومات وإضافة الضريبة
+            decimal netAmount = grandTotal - totalDiscount;
+            decimal amountDue = netAmount + totalTax;
+
+            // "المدفوع"/"الباقي" (فكة) - حاسبة بس، ومعندهاش أي أثر على المبلغ اللي بيتقبض
+            // فعليًا في الخزينة (اللي دايمًا = amountDue بالظبط) لأن الفكة بترجع للعميل فورًا
+            decimal amountPaid = 0;
+            decimal changeDue = 0;
             if (command.PaymentType == "Cash")
-                _cashDrawer.Credit(command.PaymentMethod!, grandTotal, $"قبض كاش من عملية بيع رقم {invoiceId}", uow, saleId: invoiceId, accountCode: AccountCodes.SalesRevenue);
+            {
+                amountPaid = command.AmountPaid ?? amountDue;
+                changeDue = amountPaid - amountDue;
+            }
 
-            decimal profit = _profit.CalculateProfit(grandTotal, totalCost);
+            if (command.PaymentType == "Cash")
+                _cashDrawer.Credit(command.PaymentMethod!, amountDue, $"قبض كاش من عملية بيع رقم {invoiceId}", uow, saleId: invoiceId, accountCode: AccountCodes.SalesRevenue);
 
+            decimal profit = _profit.CalculateProfit(netAmount, totalCost);
+
+            // الإيراد بيتسجل كامل (Gross) في SalesRevenue، والخصم بيتسجل منفصل في حساب مقابل
+            // (SalesDiscounts) عشان الدفتر يوضّح الإيراد الكامل والخصومات الممنوحة كل واحد لوحده.
+            // الضريبة مش إيراد للمحل - بتتسجل كالتزام (TaxPayable) لحد ما تتورد لمصلحة الضرائب.
             var journalLines = new List<JournalLineRequest>
             {
-                new() { AccountCode = command.PaymentType == "Cash" ? AccountCodes.ForPaymentMethod(command.PaymentMethod!) : AccountCodes.Customers, Debit = grandTotal, Credit = 0 },
+                new() { AccountCode = command.PaymentType == "Cash" ? AccountCodes.ForPaymentMethod(command.PaymentMethod!) : AccountCodes.Customers, Debit = amountDue, Credit = 0 },
                 new() { AccountCode = AccountCodes.SalesRevenue, Debit = 0, Credit = grandTotal }
             };
+            if (totalDiscount > 0)
+                journalLines.Add(new JournalLineRequest { AccountCode = AccountCodes.SalesDiscounts, Debit = totalDiscount, Credit = 0 });
+            if (totalTax > 0)
+                journalLines.Add(new JournalLineRequest { AccountCode = AccountCodes.TaxPayable, Debit = 0, Credit = totalTax });
             if (totalCost > 0)
             {
                 journalLines.Add(new JournalLineRequest { AccountCode = AccountCodes.Cogs, Debit = totalCost, Credit = 0 });
@@ -134,6 +163,8 @@ namespace TemoStore.Engines.Handlers
             var integrity = _integrity.CheckBeforeCommit(uow, affectedBarcodes, affectedMethods);
             if (!integrity.Passed)
                 throw new InvalidOperationException(string.Join("؛ ", integrity.Violations));
+
+            uow.Sales.SetAmountPaid(invoiceId, amountPaid);
 
             var firstSaleRecord = uow.Sales.GetById(invoiceId)!;
             int dailyInvoiceNumber = uow.Sales.GetDailyInvoiceNumber(invoiceId, firstSaleRecord.SaleDate);
@@ -158,7 +189,16 @@ namespace TemoStore.Engines.Handlers
                 });
             }
 
-            return new SaleResult { SaleId = saleIds[0], SalesInvoiceId = invoiceId, SaleIds = saleIds, DailyInvoiceNumber = dailyInvoiceNumber };
+            return new SaleResult
+            {
+                SaleId = saleIds[0],
+                SalesInvoiceId = invoiceId,
+                SaleIds = saleIds,
+                DailyInvoiceNumber = dailyInvoiceNumber,
+                TaxTotal = totalTax,
+                AmountPaid = amountPaid,
+                ChangeDue = changeDue
+            };
         }
     }
 
@@ -284,20 +324,29 @@ namespace TemoStore.Engines.Handlers
                 _inventory.MarkImeiInStock(sale.Imei, uow);
 
             // عكس أثر البيع بالكامل في الدفتر - الإيراد والتكلفة/المخزون بيترجعوا دايمًا
-            // بغض النظر عن نوع البيع، والفرق الوحيد هو الطرف التاني للإيراد (كاش أو عميل)
+            // بغض النظر عن نوع البيع، والفرق الوحيد هو الطرف التاني للإيراد (كاش أو عميل).
+            // لو كان فيه خصم، بيترجع هو كمان (عكس القيد الأصلي بالظبط): الإيراد الكامل بيترجع،
+            // وحساب الخصومات بيترجع، ولو كان فيه ضريبة بترجع هي كمان من TaxPayable، والصافي
+            // شامل الضريبة (اللي فعليًا اتحصّل/اتسجل على العميل) هو اللي بيرجع كاش/عميل
+            var netAmount = sale.Total - sale.Discount;
+            var amountDue = netAmount + sale.Tax;
             var lines = new List<JournalLineRequest>();
 
             if (sale.Total != 0)
             {
                 lines.Add(new() { AccountCode = AccountCodes.SalesRevenue, Debit = sale.Total, Credit = 0 });
+                if (sale.Discount > 0)
+                    lines.Add(new() { AccountCode = AccountCodes.SalesDiscounts, Debit = 0, Credit = sale.Discount });
+                if (sale.Tax > 0)
+                    lines.Add(new() { AccountCode = AccountCodes.TaxPayable, Debit = sale.Tax, Credit = 0 });
                 if (sale.PaymentType == "Cash" && sale.PaymentMethod != null)
-                    lines.Add(new() { AccountCode = AccountCodes.ForPaymentMethod(sale.PaymentMethod), Debit = 0, Credit = sale.Total });
+                    lines.Add(new() { AccountCode = AccountCodes.ForPaymentMethod(sale.PaymentMethod), Debit = 0, Credit = amountDue });
                 else
-                    lines.Add(new() { AccountCode = AccountCodes.Customers, Debit = 0, Credit = sale.Total });
+                    lines.Add(new() { AccountCode = AccountCodes.Customers, Debit = 0, Credit = amountDue });
             }
 
-            if (sale.PaymentType == "Cash" && sale.PaymentMethod != null && sale.Total != 0)
-                _cashDrawer.Debit(sale.PaymentMethod, sale.Total, $"قيد عكسي - إلغاء عملية بيع رقم {command.SaleId}", uow, saleId: command.SaleId, accountCode: AccountCodes.SalesRevenue);
+            if (sale.PaymentType == "Cash" && sale.PaymentMethod != null && amountDue != 0)
+                _cashDrawer.Debit(sale.PaymentMethod, amountDue, $"قيد عكسي - إلغاء عملية بيع رقم {command.SaleId}", uow, saleId: command.SaleId, accountCode: AccountCodes.SalesRevenue);
 
             decimal cost = sale.CostPrice * sale.QuantitySold;
             if (cost > 0)

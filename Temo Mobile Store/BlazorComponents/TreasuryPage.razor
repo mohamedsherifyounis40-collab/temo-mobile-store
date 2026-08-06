@@ -1,0 +1,832 @@
+@using System.Data
+@using System.Globalization
+@using TemoStore.Core.Commands
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.TreasuryBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>🏦 الخزينة</h1>
+                    <div class="breadcrumb">الخزينة &gt; الأرصدة والعمليات</div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error">⚠️ @errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">✅ @successMessage</div>
+            }
+
+            <div class="card balances-card">
+                <div class="card-title">💰 أرصدة وسائل الدفع</div>
+                <div class="balances-row">
+                    @foreach (var b in balances)
+                    {
+                        <div class="balance-chip">
+                            <span class="balance-icon">@PaymentIcon(b.Method)</span>
+                            <div>
+                                <div class="balance-value">@b.Balance.ToString("N2") ج.م</div>
+                                <div class="balance-label">@b.Method</div>
+                            </div>
+                        </div>
+                    }
+                    <div class="balance-chip balance-total">
+                        <span class="balance-icon">Σ</span>
+                        <div>
+                            <div class="balance-value">@balances.Sum(b => b.Balance).ToString("N2") ج.م</div>
+                            <div class="balance-label">الإجمالي</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="list-tabs">
+                <button class="list-tab @(opType == "Expense" ? "active" : "")" @onclick='() => SwitchOp("Expense")'>🧾 مصروف</button>
+                <button class="list-tab @(opType == "Movement" ? "active" : "")" @onclick='() => SwitchOp("Movement")'>💵 حركة يدوية</button>
+                <button class="list-tab @(opType == "Transfer" ? "active" : "")" @onclick='() => SwitchOp("Transfer")'>🔁 تحويل بين وسائل</button>
+            </div>
+
+            <div class="card">
+                @if (opType == "Expense")
+                {
+                    <div class="form-panel-title">تسجيل مصروف</div>
+                    <div class="form-grid">
+                        <div>
+                            <label class="field-label">بند المصروف</label>
+                            <select class="field-input" value="@expenseAccountCode" @onchange="e => expenseAccountCode = e.Value?.ToString() ?? string.Empty">
+                                <option value="">اختر بند</option>
+                                @foreach (var a in accounts)
+                                {
+                                    <option value="@a.Code">@a.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label">المبلغ</label>
+                            <input class="field-input" type="number" value="@expenseAmount" @oninput="e => expenseAmount = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                        <div>
+                            <label class="field-label">وسيلة الدفع</label>
+                            <select class="field-input" value="@expenseMethod" @onchange="e => expenseMethod = e.Value?.ToString() ?? string.Empty">
+                                <option value="">اختر وسيلة</option>
+                                @foreach (var m in UIHelpers.PaymentMethods)
+                                {
+                                    <option value="@m">@m</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" @onclick="SaveExpense">💾 تسجيل المصروف</button>
+                    </div>
+                }
+                else if (opType == "Movement")
+                {
+                    <div class="form-panel-title">حركة يدوية (قبض/صرف)</div>
+                    <div class="form-grid">
+                        <div>
+                            <label class="field-label">النوع</label>
+                            <select class="field-input" @bind="movementType">
+                                <option value="قبض">قبض</option>
+                                <option value="صرف">صرف</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label">وسيلة الدفع</label>
+                            <select class="field-input" value="@movementMethod" @onchange="e => movementMethod = e.Value?.ToString() ?? string.Empty">
+                                <option value="">اختر وسيلة</option>
+                                @foreach (var m in UIHelpers.PaymentMethods)
+                                {
+                                    <option value="@m">@m</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label">المبلغ</label>
+                            <input class="field-input" type="number" value="@movementAmount" @oninput="e => movementAmount = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                        <div>
+                            <label class="field-label">مرجع (اختياري)</label>
+                            <input class="field-input" value="@movementReference" @oninput="e => movementReference = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                        <div>
+                            <label class="field-label">وصف (اختياري)</label>
+                            <input class="field-input" value="@movementDescription" @oninput="e => movementDescription = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" @onclick="SaveMovement">💾 تسجيل الحركة</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="form-panel-title">تحويل بين وسائل الدفع</div>
+                    <div class="form-grid">
+                        <div>
+                            <label class="field-label">من</label>
+                            <select class="field-input" value="@transferFrom" @onchange="e => transferFrom = e.Value?.ToString() ?? string.Empty">
+                                <option value="">اختر وسيلة</option>
+                                @foreach (var m in UIHelpers.PaymentMethods)
+                                {
+                                    <option value="@m">@m</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label">إلى</label>
+                            <select class="field-input" value="@transferTo" @onchange="e => transferTo = e.Value?.ToString() ?? string.Empty">
+                                <option value="">اختر وسيلة</option>
+                                @foreach (var m in UIHelpers.PaymentMethods)
+                                {
+                                    <option value="@m">@m</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label">المبلغ</label>
+                            <input class="field-input" type="number" value="@transferAmount" @oninput="e => transferAmount = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                        <div>
+                            <label class="field-label">وصف (اختياري)</label>
+                            <input class="field-input" value="@transferDescription" @oninput="e => transferDescription = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn-primary" @onclick="SaveTransfer">💾 تحويل</button>
+                    </div>
+                }
+            </div>
+
+            <div class="grid-mid-treasury">
+                <div class="card">
+                    <div class="card-title">🧾 سجل المصروفات</div>
+                    <div class="data-table-wrap">
+                        <table class="data-table">
+                            <thead><tr><th>التاريخ</th><th>الوسيلة</th><th>المبلغ</th><th>البند</th>@if (AuthManager.IsAdmin){<th>إجراءات</th>}</tr></thead>
+                            <tbody>
+                                @foreach (var e in expenses)
+                                {
+                                    <tr>
+                                        <td class="muted">@e.Date</td>
+                                        <td>@e.Method</td>
+                                        <td>@e.Amount</td>
+                                        <td>@e.AccountName</td>
+                                        @if (AuthManager.IsAdmin)
+                                        {
+                                            <td>
+                                                <button class="btn btn-outline btn-sm" @onclick="() => StartEditExpense(e)">✏️</button>
+                                                <button class="btn btn-danger-outline btn-sm" @onclick="() => RequestDeleteExpense(e.Id, e.Date)">❌</button>
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                                @if (expenses.Count == 0)
+                                {
+                                    <tr><td colspan="5" class="empty-row">مفيش مصروفات مسجّلة</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (editingExpenseId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">تعديل المصروف رقم @editingExpenseId</div>
+                            <select class="field-input" value="@editExpenseAccountCode" @onchange="e => editExpenseAccountCode = e.Value?.ToString() ?? string.Empty">
+                                @foreach (var a in accounts)
+                                {
+                                    <option value="@a.Code">@a.Name</option>
+                                }
+                            </select>
+                            <input class="field-input" type="number" value="@editExpenseAmount" @oninput="e => editExpenseAmount = e.Value?.ToString() ?? string.Empty" />
+                            <select class="field-input" value="@editExpenseMethod" @onchange="e => editExpenseMethod = e.Value?.ToString() ?? string.Empty">
+                                @foreach (var m in UIHelpers.PaymentMethods)
+                                {
+                                    <option value="@m">@m</option>
+                                }
+                            </select>
+                            <button class="btn btn-primary btn-sm" @onclick="SaveEditExpense">💾 حفظ التعديل</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => editingExpenseId = null">إلغاء</button>
+                        </div>
+                    }
+
+                    @if (pendingDeleteExpenseId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">⚠️ متأكد من حذف المصروف رقم @pendingDeleteExpenseId نهائيًا؟</div>
+                            <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmDeleteExpense">✅ تأكيد الحذف</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => pendingDeleteExpenseId = null">تراجع</button>
+                        </div>
+                    }
+                </div>
+
+                <div class="card">
+                    <div class="card-title">💵 سجل الحركات</div>
+                    <div class="data-table-wrap">
+                        <table class="data-table">
+                            <thead><tr><th>التاريخ</th><th>الوصف</th><th>المرجع</th><th>المبلغ</th><th>الوسيلة</th><th>النوع</th>@if (AuthManager.IsAdmin){<th>إجراءات</th>}</tr></thead>
+                            <tbody>
+                                @foreach (var m in movements)
+                                {
+                                    <tr>
+                                        <td class="muted">@m.Date</td>
+                                        <td>@m.Description</td>
+                                        <td class="muted">@m.Reference</td>
+                                        <td>@m.Amount</td>
+                                        <td>@m.Method</td>
+                                        <td>@m.Type</td>
+                                        @if (AuthManager.IsAdmin)
+                                        {
+                                            <td>
+                                                <button class="btn btn-outline btn-sm" @onclick="() => StartEditMovement(m.Id)">✏️</button>
+                                                <button class="btn btn-danger-outline btn-sm" @onclick="() => RequestCancelMovement(m.Id)">❌</button>
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                                @if (movements.Count == 0)
+                                {
+                                    <tr><td colspan="7" class="empty-row">مفيش حركات مسجّلة</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (editingMovementId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">تعديل الحركة رقم @editingMovementId</div>
+                            <select class="field-input" @bind="editMovementType">
+                                <option value="قبض">قبض</option>
+                                <option value="صرف">صرف</option>
+                            </select>
+                            <select class="field-input" value="@editMovementMethod" @onchange="e => editMovementMethod = e.Value?.ToString() ?? string.Empty">
+                                @foreach (var mth in UIHelpers.PaymentMethods)
+                                {
+                                    <option value="@mth">@mth</option>
+                                }
+                            </select>
+                            <input class="field-input" type="number" value="@editMovementAmount" @oninput="e => editMovementAmount = e.Value?.ToString() ?? string.Empty" />
+                            <input class="field-input" placeholder="مرجع" value="@editMovementReference" @oninput="e => editMovementReference = e.Value?.ToString() ?? string.Empty" />
+                            <input class="field-input" placeholder="وصف" value="@editMovementDescription" @oninput="e => editMovementDescription = e.Value?.ToString() ?? string.Empty" />
+                            <button class="btn btn-primary btn-sm" @onclick="SaveEditMovement">💾 حفظ التعديل</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => editingMovementId = null">إلغاء</button>
+                        </div>
+                    }
+
+                    @if (pendingCancelMovementId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">
+                                ⚠️ @(pendingCancelIsTransferLeg
+                                    ? "الحركة دي جزء من عملية تحويل بين وسائل الدفع. متأكد من إلغاء التحويل بالكامل؟ الحركتين (الصرف والقبض) هيترجعوا مع بعض."
+                                    : "متأكد من إلغاء الحركة رقم " + pendingCancelMovementId + "؟ هيتم عكس أثرها على الرصيد.")
+                            </div>
+                            <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmCancelMovement">✅ تأكيد الإلغاء</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => pendingCancelMovementId = null">تراجع</button>
+                        </div>
+                    }
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون (تجربة)", "🧪"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.MaintenanceBlazor,"الصيانة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.CustomersBlazor,"العملاء (تجربة)", "🧪"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.SuppliersBlazor,"الموردين (تجربة)", "🧪"),
+        (MainShell.PageKeys.PurchasesBlazor,"المشتريات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.TreasuryBlazor, "الخزينة (تجربة)", "🧪"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCount, MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private string? errorMessage;
+    private string? successMessage;
+
+    private class BalanceRow { public required string Method; public decimal Balance; }
+    private class AccountOption { public string Code = ""; public required string Name; }
+    private class ExpenseRow { public int Id; public required string Date; public int AccountCode; public required string Method; public required string Amount; public required string AccountName; }
+    private class MovementRow { public int Id; public required string Date; public required string Type; public required string Method; public required string Amount; public string Reference = ""; public string Description = ""; }
+
+    private List<BalanceRow> balances = new();
+    private List<AccountOption> accounts = new();
+    private List<ExpenseRow> expenses = new();
+    private List<MovementRow> movements = new();
+
+    private string opType = "Expense";
+
+    private string expenseAccountCode = "", expenseAmount = "", expenseMethod = "";
+    private string movementType = "قبض", movementMethod = "", movementAmount = "", movementReference = "", movementDescription = "";
+    private string transferFrom = "", transferTo = "", transferAmount = "", transferDescription = "";
+
+    // ---------- تعديل/حذف/إلغاء مصروف أو حركة سابقة - نفس منطق TreasuryPageControl بالظبط ----------
+    private int? editingExpenseId;
+    private string editExpenseDate = "";
+    private string editExpenseAccountCode = "", editExpenseAmount = "", editExpenseMethod = "";
+    private int? pendingDeleteExpenseId;
+    private string pendingDeleteExpenseDate = "";
+
+    private int? editingMovementId;
+    private string editMovementType = "", editMovementMethod = "", editMovementAmount = "", editMovementReference = "", editMovementDescription = "";
+    private int? pendingCancelMovementId;
+    private bool pendingCancelIsTransferLeg;
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        LoadAll();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private void SwitchOp(string op)
+    {
+        opType = op;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private static string PaymentIcon(string method) => method switch
+    {
+        "نقدي" => "💵",
+        "فوري" => "⚡",
+        "أمان" => "🛡️",
+        "سهولة" => "🟢",
+        "فودافون كاش" => "📱",
+        "إنستاباي" => "🔷",
+        _ => "💳"
+    };
+
+    private void LoadAll()
+    {
+        balances.Clear();
+        foreach (var m in UIHelpers.PaymentMethods)
+            balances.Add(new BalanceRow { Method = m, Balance = TreasuryRepository.GetPaymentMethodBalance(m) });
+
+        accounts.Clear();
+        var accDt = TreasuryRepository.GetAccountsTree();
+        foreach (DataRow row in accDt.Rows)
+            accounts.Add(new AccountOption { Code = row["AccountCode"].ToString() ?? "", Name = row["AccountName"].ToString() ?? "" });
+
+        expenses.Clear();
+        var expDt = TreasuryRepository.GetExpenses();
+        foreach (DataRow row in expDt.Rows)
+        {
+            expenses.Add(new ExpenseRow
+            {
+                Id = Convert.ToInt32(row["رقم الحركة"]),
+                Date = row["التاريخ والوقت ⏰"].ToString() ?? "",
+                AccountCode = Convert.ToInt32(row["كود الحساب"]),
+                Method = row["وسيلة الدفع"].ToString() ?? "",
+                Amount = Convert.ToDecimal(row["المبلغ ج.م"]).ToString("N2"),
+                AccountName = row["اسم بند المصروف"].ToString() ?? ""
+            });
+        }
+        expenses.Reverse();
+
+        movements.Clear();
+        var movDt = TreasuryRepository.GetCashMovements();
+        foreach (DataRow row in movDt.Rows)
+        {
+            movements.Add(new MovementRow
+            {
+                Id = Convert.ToInt32(row["Id"]),
+                Date = row["التاريخ والوقت"].ToString() ?? "",
+                Type = row["النوع"].ToString() ?? "",
+                Method = row["الوسيلة"].ToString() ?? "",
+                Amount = Convert.ToDecimal(row["المبلغ"]).ToString("N2"),
+                Reference = row["المرجع"]?.ToString() ?? "",
+                Description = row["الوصف"]?.ToString() ?? ""
+            });
+        }
+        movements.Reverse();
+    }
+
+    private void SaveExpense()
+    {
+        errorMessage = null;
+        if (!int.TryParse(expenseAccountCode, out var accountCode))
+        {
+            errorMessage = "اختر بند المصروف.";
+            return;
+        }
+        if (!decimal.TryParse(expenseAmount, out var amount) || amount <= 0)
+        {
+            errorMessage = "المبلغ لازم يكون أكبر من صفر.";
+            return;
+        }
+        if (string.IsNullOrEmpty(expenseMethod))
+        {
+            errorMessage = "اختر وسيلة الدفع.";
+            return;
+        }
+        if (UIHelpers.IsTodayClosed(expenseMethod))
+        {
+            errorMessage = "تم إقفال اليوم بالفعل، لا يمكن تسجيل مصروف جديد.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new RecordExpenseCommand
+            {
+                AccountCode = accountCode,
+                Amount = amount,
+                PaymentMethod = expenseMethod,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم تسجيل المصروف بنجاح.";
+            expenseAccountCode = expenseAmount = expenseMethod = "";
+            LoadAll();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void SaveMovement()
+    {
+        errorMessage = null;
+        if (string.IsNullOrEmpty(movementMethod))
+        {
+            errorMessage = "اختر وسيلة الدفع.";
+            return;
+        }
+        if (!decimal.TryParse(movementAmount, out var amount) || amount <= 0)
+        {
+            errorMessage = "المبلغ لازم يكون أكبر من صفر.";
+            return;
+        }
+        if (UIHelpers.IsTodayClosed(movementMethod))
+        {
+            errorMessage = "تم إقفال اليوم بالفعل، لا يمكن تسجيل حركة جديدة.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new AddMovementCommand
+            {
+                Type = movementType,
+                Method = movementMethod,
+                Amount = amount,
+                Reference = string.IsNullOrWhiteSpace(movementReference) ? null : movementReference.Trim(),
+                Description = string.IsNullOrWhiteSpace(movementDescription) ? null : movementDescription.Trim(),
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم تسجيل الحركة بنجاح.";
+            movementMethod = movementAmount = movementReference = movementDescription = "";
+            LoadAll();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void SaveTransfer()
+    {
+        errorMessage = null;
+        if (string.IsNullOrEmpty(transferFrom) || string.IsNullOrEmpty(transferTo))
+        {
+            errorMessage = "اختر وسيلتي التحويل.";
+            return;
+        }
+        if (transferFrom == transferTo)
+        {
+            errorMessage = "لازم تختار وسيلتين مختلفتين للتحويل.";
+            return;
+        }
+        if (!decimal.TryParse(transferAmount, out var amount) || amount <= 0)
+        {
+            errorMessage = "المبلغ لازم يكون أكبر من صفر.";
+            return;
+        }
+        if (UIHelpers.IsTodayClosed(transferFrom) || UIHelpers.IsTodayClosed(transferTo))
+        {
+            errorMessage = "تم إقفال اليوم بالفعل لإحدى الوسيلتين، لا يمكن التحويل.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new TransferFundsCommand
+            {
+                FromMethod = transferFrom,
+                ToMethod = transferTo,
+                Amount = amount,
+                Description = string.IsNullOrWhiteSpace(transferDescription) ? null : transferDescription.Trim(),
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم التحويل بنجاح.";
+            transferFrom = transferTo = transferAmount = transferDescription = "";
+            LoadAll();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    // ---------- تعديل/حذف مصروف ----------
+    private void StartEditExpense(ExpenseRow row)
+    {
+        errorMessage = null;
+        successMessage = null;
+        pendingDeleteExpenseId = null;
+        editingExpenseId = row.Id;
+        editExpenseDate = row.Date;
+        editExpenseAccountCode = row.AccountCode.ToString();
+        editExpenseAmount = row.Amount;
+        editExpenseMethod = row.Method;
+    }
+
+    private void SaveEditExpense()
+    {
+        if (!editingExpenseId.HasValue) return;
+        if (!int.TryParse(editExpenseAccountCode, out var accountCode))
+        {
+            errorMessage = "اختر بند المصروف.";
+            return;
+        }
+        if (!decimal.TryParse(editExpenseAmount, out var amount) || amount <= 0)
+        {
+            errorMessage = "المبلغ لازم يكون أكبر من صفر.";
+            return;
+        }
+        if (string.IsNullOrEmpty(editExpenseMethod))
+        {
+            errorMessage = "اختر وسيلة الدفع.";
+            return;
+        }
+        if (UIHelpers.IsDateClosed(DateTime.Parse(editExpenseDate).Date))
+        {
+            errorMessage = "لا يمكن تعديل مصروف تابع ليوم تم إقفاله بالفعل.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new UpdateExpenseCommand { ExpenseId = editingExpenseId.Value, AccountCode = accountCode, Amount = amount, PaymentMethod = editExpenseMethod, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            successMessage = "تم تعديل قيمة المصروف بنجاح.";
+            errorMessage = null;
+            editingExpenseId = null;
+            LoadAll();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void RequestDeleteExpense(int expenseId, string date)
+    {
+        errorMessage = null;
+        editingExpenseId = null;
+        pendingDeleteExpenseId = expenseId;
+        pendingDeleteExpenseDate = date;
+    }
+
+    private void ConfirmDeleteExpense()
+    {
+        if (!pendingDeleteExpenseId.HasValue) return;
+        if (UIHelpers.IsDateClosed(DateTime.Parse(pendingDeleteExpenseDate).Date))
+        {
+            errorMessage = "لا يمكن حذف مصروف تابع ليوم تم إقفاله بالفعل.";
+            pendingDeleteExpenseId = null;
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new DeleteExpenseCommand { ExpenseId = pendingDeleteExpenseId.Value, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            successMessage = "تم حذف حركة المصروف بنجاح.";
+            errorMessage = null;
+            pendingDeleteExpenseId = null;
+            LoadAll();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            pendingDeleteExpenseId = null;
+        }
+    }
+
+    // ---------- تعديل/إلغاء حركة يدوية أو تحويل ----------
+    private void StartEditMovement(int movementId)
+    {
+        errorMessage = null;
+        successMessage = null;
+        pendingCancelMovementId = null;
+
+        var record = TreasuryRepository.GetMovementById(movementId);
+        if (record == null)
+        {
+            errorMessage = "لم يتم العثور على الحركة.";
+            return;
+        }
+        if (UIHelpers.IsDateClosed(DateTime.Parse(record.MovementDate).Date))
+        {
+            errorMessage = "لا يمكن تعديل حركة تابعة ليوم تم إقفاله بالفعل.";
+            return;
+        }
+        if (record.LinkedMovementId != null)
+        {
+            errorMessage = "الحركة دي جزء من عملية تحويل بين وسائل الدفع، مينفعش تتعدل مباشرة. لو عايز تصحح مبلغ التحويل، إلغي التحويل الحالي (هيرجّع الرصيدين) واعمل تحويل جديد صحيح.";
+            return;
+        }
+
+        editingMovementId = movementId;
+        editMovementType = record.MovementType;
+        editMovementMethod = record.PaymentMethod;
+        editMovementAmount = record.Amount.ToString(CultureInfo.InvariantCulture);
+        editMovementReference = record.ReferenceNumber ?? "";
+        editMovementDescription = record.Description ?? "";
+    }
+
+    private void SaveEditMovement()
+    {
+        if (!editingMovementId.HasValue) return;
+        if (string.IsNullOrEmpty(editMovementMethod) || !decimal.TryParse(editMovementAmount, out var newAmount) || newAmount <= 0)
+        {
+            errorMessage = "من فضلك اختر نوع الحركة ووسيلة الدفع وأدخل مبلغ صحيح.";
+            return;
+        }
+
+        var existing = TreasuryRepository.GetMovementById(editingMovementId.Value);
+        if (existing == null)
+        {
+            errorMessage = "لم يتم العثور على الحركة.";
+            editingMovementId = null;
+            return;
+        }
+        if (UIHelpers.IsDateClosed(DateTime.Parse(existing.MovementDate).Date))
+        {
+            errorMessage = "لا يمكن تعديل حركة تابعة ليوم تم إقفاله بالفعل.";
+            return;
+        }
+
+        try
+        {
+            AppServices.CoreEngine.Execute(new UpdateMovementCommand
+            {
+                MovementId = editingMovementId.Value,
+                NewType = editMovementType,
+                NewMethod = editMovementMethod,
+                NewAmount = newAmount,
+                Reference = string.IsNullOrWhiteSpace(editMovementReference) ? null : editMovementReference.Trim(),
+                Description = string.IsNullOrWhiteSpace(editMovementDescription) ? null : editMovementDescription.Trim(),
+                AccountCode = existing.AccountCode,
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = "تم حفظ تعديل الحركة بنجاح.";
+            errorMessage = null;
+            editingMovementId = null;
+            LoadAll();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void RequestCancelMovement(int movementId)
+    {
+        errorMessage = null;
+        editingMovementId = null;
+
+        var existing = TreasuryRepository.GetMovementById(movementId);
+        if (existing == null)
+        {
+            errorMessage = "لم يتم العثور على الحركة.";
+            return;
+        }
+        if (UIHelpers.IsDateClosed(DateTime.Parse(existing.MovementDate).Date))
+        {
+            errorMessage = "لا يمكن إلغاء حركة تابعة ليوم تم إقفاله بالفعل.";
+            return;
+        }
+
+        pendingCancelMovementId = movementId;
+        pendingCancelIsTransferLeg = existing.LinkedMovementId != null;
+    }
+
+    private void ConfirmCancelMovement()
+    {
+        if (!pendingCancelMovementId.HasValue) return;
+        int movementId = pendingCancelMovementId.Value;
+        bool isTransferLeg = pendingCancelIsTransferLeg;
+
+        try
+        {
+            if (isTransferLeg)
+                AppServices.CoreEngine.Execute(new CancelTransferCommand { MovementId = movementId, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            else
+                AppServices.CoreEngine.Execute(new CancelMovementCommand { MovementId = movementId, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+
+            successMessage = isTransferLeg ? "تم إلغاء التحويل بنجاح." : "تم إلغاء الحركة بنجاح.";
+            errorMessage = null;
+            pendingCancelMovementId = null;
+            LoadAll();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            pendingCancelMovementId = null;
+        }
+    }
+}

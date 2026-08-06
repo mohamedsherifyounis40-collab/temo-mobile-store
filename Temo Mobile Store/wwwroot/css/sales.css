@@ -1,0 +1,124 @@
+/* شاشة المبيعات الجديدة (Blazor Hybrid) - أنماط خاصة بالشاشة دي بس (بطاقة الفاتورة،
+   بحث المنتج، السلة، طرق الدفع). الهيكل العام المشترك (Sidebar/Topbar/كروت/أزرار) بقى
+   في shell.css - محمّل قبل الملف ده في index.html. */
+
+.grid-top { display: grid; grid-template-columns: 340px 1fr; gap: 16px; margin-bottom: 16px; align-items: start; }
+@media (max-width: 900px) { .grid-top { grid-template-columns: 1fr; } }
+
+/* ---------- بطاقة الفاتورة ---------- */
+.customer-row { display: flex; gap: 8px; align-items: center; }
+.customer-row .field-input { flex: 1; }
+.btn-icon-add {
+    width: 36px; height: 36px; border-radius: 9px; border: none;
+    background: var(--color-accent); color: #fff; font-size: 18px; font-weight: bold;
+}
+.add-customer-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding: 10px; background: var(--color-bg-app); border-radius: 9px; }
+
+.meta-list { margin-top: 14px; border-top: 1px dashed var(--color-border); padding-top: 10px; }
+.meta-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 5px 0; }
+.meta-row span { color: var(--color-text-muted); }
+
+/* ---------- بحث المنتج ---------- */
+.tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.tab {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-app);
+    border-radius: 9px;
+    font-size: 12.5px;
+    font-weight: bold;
+    color: var(--color-text-muted);
+}
+.tab.active { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+
+.search-results { margin-top: 8px; max-height: 180px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 9px; }
+.search-result-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 12px; border-bottom: 1px solid var(--color-border); font-size: 12.5px;
+}
+.search-result-row:last-child { border-bottom: none; }
+.search-result-row:hover { background: var(--color-bg-app); }
+
+.imei-picker { margin-top: 10px; padding: 10px; background: var(--color-bg-app); border-radius: 9px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.popular-title { margin-top: 16px; }
+.popular-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+.popular-card {
+    flex-shrink: 0;
+    width: 110px;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    text-align: center;
+    background: var(--color-bg-app);
+}
+.popular-card:hover { border-color: var(--color-accent); }
+.popular-icon { font-size: 22px; }
+.popular-name { font-size: 11.5px; font-weight: bold; margin: 4px 0 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.popular-price { font-size: 12px; color: var(--color-accent); font-weight: bold; }
+
+/* ---------- السلة ---------- */
+.cart-card { margin-bottom: 16px; }
+.cart-header { display: flex; justify-content: space-between; align-items: center; }
+.cart-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+.cart-table th {
+    background: var(--color-bg-app);
+    color: var(--color-text-muted);
+    font-weight: bold;
+    padding: 9px 8px;
+    text-align: center;
+}
+.cart-table td { padding: 8px; text-align: center; border-bottom: 1px solid var(--color-border); }
+.cart-table .num { font-weight: bold; }
+.empty-cart { color: var(--color-text-muted); padding: 24px !important; }
+
+.mini-input {
+    width: 70px;
+    padding: 5px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    text-align: center;
+}
+.qty-cell { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.stepper {
+    width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--color-border);
+    background: var(--color-bg-app); font-weight: bold;
+}
+.row-delete { background: none; border: none; color: var(--color-red); font-size: 15px; }
+
+.cart-footer { margin-top: 10px; font-size: 13px; color: var(--color-green); font-weight: bold; }
+
+/* ---------- الصف السفلي ---------- */
+.grid-bottom { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 16px; }
+@media (max-width: 1100px) { .grid-bottom { grid-template-columns: 1fr; } }
+
+.notes-input {
+    width: 100%;
+    min-height: 90px;
+    padding: 10px;
+    border-radius: 9px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-app);
+    resize: vertical;
+    font-size: 13px;
+}
+
+.payment-methods-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.payment-btn {
+    padding: 10px 6px;
+    border-radius: 9px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-app);
+    font-size: 12.5px;
+    font-weight: bold;
+}
+.payment-btn.active { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+.payment-btn:disabled { opacity: 0.45; }
+.quick-discount-title { margin-top: 14px; }
+
+.summary-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; }
+.summary-row span { color: var(--color-text-muted); }
+.summary-row.total { border-top: 1px dashed var(--color-border); margin-top: 6px; padding-top: 10px; font-size: 15px; }
+.summary-row.total b { color: var(--color-accent); }
+.summary-row.change b.negative { color: var(--color-red); }

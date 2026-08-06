@@ -1,0 +1,32 @@
+/* شاشة "التقارير" - أغلب التنسيق جاي من shell.css و list-template.css،
+   الملف ده لعناصر خاصة بالشاشة دي بس (كروت الملخص المالي، كارت إقفال اليوم، وتفاصيل العدّ). */
+
+.grid-mid-reports { display: grid; grid-template-columns: 320px 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid-mid-reports { grid-template-columns: 1fr; } }
+
+.metric-card { text-align: center; }
+.metric-label { font-size: 12px; color: var(--color-text-muted); margin-bottom: 4px; }
+.metric-value { font-size: 20px; font-weight: bold; }
+.metric-value.profit { color: var(--color-accent); }
+.metric-value.cost { color: var(--color-green); }
+.metric-value.expense { color: var(--color-red); }
+
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+@media (max-width: 900px) { .metrics-row { grid-template-columns: repeat(2, 1fr); } }
+
+.denom-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.denom-row .denom-label { width: 80px; font-weight: bold; }
+.denom-row input { max-width: 90px; }
+.denom-row .denom-total { width: 100px; text-align: left; font-weight: bold; color: var(--color-green); }
+.denom-grand-total { margin-top: 10px; font-size: 16px; font-weight: bold; color: var(--color-green); }
+
+.closure-panel {
+    background: var(--color-bg-app);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 14px;
+}
+
+.data-table tbody tr.row-clickable { cursor: pointer; }
+.data-table tbody tr.row-clickable:hover { background: var(--color-bg-app); }

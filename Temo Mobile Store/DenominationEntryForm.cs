@@ -17,17 +17,17 @@ namespace Temo_Mobile_Store
         private readonly Dictionary<string, TextBox> otherMethodBoxes = new Dictionary<string, TextBox>();
         private Label lblGrandTotal;
         private Label lblExpected;
-        private decimal expectedClosingBalance;
-        private Dictionary<string, decimal> otherMethodsExpected;
+        private decimal recordedCashBalance;
+        private Dictionary<string, decimal> otherMethodsRecorded;
 
         public decimal TotalCounted { get; private set; } = 0;
         public Dictionary<decimal, int> DenominationCounts { get; private set; } = new Dictionary<decimal, int>();
         public Dictionary<string, decimal> OtherMethodsActual { get; private set; } = new Dictionary<string, decimal>();
 
-        public DenominationEntryForm(decimal expectedClosing, Dictionary<string, decimal> otherMethodsExpected)
+        public DenominationEntryForm(decimal recordedCash, Dictionary<string, decimal> otherMethodsRecorded)
         {
-            expectedClosingBalance = expectedClosing;
-            this.otherMethodsExpected = otherMethodsExpected;
+            recordedCashBalance = recordedCash;
+            this.otherMethodsRecorded = otherMethodsRecorded;
             this.Text = "تأكيد أرصدة الوسائل - إقفال اليوم";
             this.Size = new Size(460, 780);
             this.StartPosition = FormStartPosition.CenterParent;
@@ -55,7 +55,7 @@ namespace Temo_Mobile_Store
 
             lblExpected = new Label
             {
-                Text = $"الرصيد الختامي المتوقع للنقدي: {expectedClosingBalance:N2} ج.م",
+                Text = $"الرصيد النقدي المسجّل حاليًا: {recordedCashBalance:N2} ج.م",
                 Location = new Point(20, 45),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -113,7 +113,7 @@ namespace Temo_Mobile_Store
 
             Label lblOtherNote = new Label
             {
-                Text = "الأرقام دي متعبّية تلقائي بالرصيد المتوقع، عدّلها لو الرصيد الفعلي في المحفظة/التطبيق مختلف:",
+                Text = "الأرقام دي متعبّية تلقائي بالرصيد المسجّل حاليًا في النظام، عدّلها لو الرصيد الفعلي في المحفظة/التطبيق مختلف:",
                 Location = new Point(20, y),
                 Size = new Size(400, 30),
                 Font = new Font("Segoe UI", 8F),
@@ -122,7 +122,7 @@ namespace Temo_Mobile_Store
             this.Controls.Add(lblOtherNote);
             y += 35;
 
-            foreach (var kvp in otherMethodsExpected)
+            foreach (var kvp in otherMethodsRecorded)
             {
                 Label lblMethodName = new Label { Text = kvp.Key + ":", Location = new Point(230, y + 3), AutoSize = true, Font = new Font("Segoe UI", 9.5F) };
                 TextBox txtBalance = new TextBox { Location = new Point(20, y), Width = 190, Text = kvp.Value.ToString("0.##") };

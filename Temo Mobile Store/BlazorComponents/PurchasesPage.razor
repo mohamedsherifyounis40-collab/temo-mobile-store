@@ -1,0 +1,609 @@
+@using System.Data
+@using System.Globalization
+@using TemoStore.Core.Entities
+@using TemoStore.Core.Commands
+@implements IDisposable
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.PurchasesBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <input class="topbar-search" placeholder="بحث عن منتج بالاسم أو الباركود... (F2)" disabled title="قريبًا" />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <button class="icon-btn" disabled title="قريبًا">🔔</button>
+                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>🚚 فاتورة شراء جديدة</h1>
+                    <div class="breadcrumb">المشتريات &gt; فاتورة شراء جديدة</div>
+                </div>
+                <div class="toolbar">
+                    <button class="btn btn-primary" @onclick="ResetInvoice">➕ فاتورة جديدة</button>
+                    <button class="btn btn-outline" @onclick="ToggleHistory">📋 @(showHistory ? "إخفاء سجل المشتريات" : "سجل المشتريات")</button>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error">⚠️ @errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">✅ @successMessage</div>
+            }
+
+            @if (editingPurchaseId.HasValue)
+            {
+                <div class="alert alert-success">✏️ بتعدّل فاتورة الشراء رقم @editingPurchaseId — عدّل الأصناف في الفاتورة تحت وبعدين اضغط "حفظ التعديل"، أو اضغط "إلغاء التعديل" للرجوع.</div>
+            }
+
+            @if (showHistory)
+            {
+                <div class="card">
+                    <div class="card-title">📋 سجل المشتريات (دوس على "تعديل" أو "إلغاء" لفاتورة شراء)</div>
+                    <table class="cart-table">
+                        <thead>
+                            <tr>
+                                <th>رقم الفاتورة</th>
+                                <th>المورد</th>
+                                <th>الإجمالي</th>
+                                <th>التاريخ</th>
+                                @if (AuthManager.IsAdmin)
+                                {
+                                    <th>إجراءات</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (purchaseHistory != null)
+                            {
+                                foreach (DataRow row in purchaseHistory.Rows)
+                                {
+                                    int rowPurchaseId = Convert.ToInt32(row["PurchaseId"]);
+                                    int rowSupplierId = Convert.ToInt32(row["SupplierId"]);
+                                    <tr>
+                                        <td>@rowPurchaseId</td>
+                                        <td>@row["المورد"]</td>
+                                        <td class="num">@Convert.ToDecimal(row["الإجمالي"]).ToString("N2")</td>
+                                        <td class="muted">@row["التاريخ"]</td>
+                                        @if (AuthManager.IsAdmin)
+                                        {
+                                            <td>
+                                                <button class="btn btn-outline btn-sm" @onclick="() => StartEditPurchase(rowPurchaseId, rowSupplierId)">✏️ تعديل</button>
+                                                <button class="btn btn-danger-outline btn-sm" @onclick="() => RequestCancelPurchase(rowPurchaseId)">❌ إلغاء</button>
+                                            </td>
+                                        }
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+
+                    @if (pendingCancelPurchaseId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">⚠️ متأكد من إلغاء فاتورة الشراء رقم @pendingCancelPurchaseId؟ هيترجع المخزون، وأي مبلغ اتسدد كاش هيرجع للخزينة تلقائيًا.</div>
+                            <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmCancelPurchase">✅ تأكيد الإلغاء</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => pendingCancelPurchaseId = null">تراجع</button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="grid-top">
+                <div class="card">
+                    <div class="card-title">بيانات الفاتورة</div>
+
+                    <label class="field-label">المورد</label>
+                    <select class="field-input" value="@selectedSupplierId" @onchange="e => selectedSupplierId = e.Value?.ToString() ?? string.Empty">
+                        <option value="">اختر مورد</option>
+                        @foreach (var s in suppliers)
+                        {
+                            <option value="@s.Id">@s.Name</option>
+                        }
+                    </select>
+
+                    <label class="field-label">نوع الدفع</label>
+                    <select class="field-input" @bind="paymentType">
+                        <option value="Credit">آجل</option>
+                        <option value="CashNow">كاش فوري</option>
+                    </select>
+
+                    @if (paymentType == "CashNow")
+                    {
+                        <label class="field-label">وسيلة الدفع</label>
+                        <select class="field-input" value="@cashMethod" @onchange="e => cashMethod = e.Value?.ToString() ?? string.Empty">
+                            <option value="">اختر وسيلة</option>
+                            @foreach (var m in UIHelpers.PaymentMethods)
+                            {
+                                <option value="@m">@m</option>
+                            }
+                        </select>
+                    }
+
+                    <div class="meta-list">
+                        <div class="meta-row"><span>التاريخ</span><b>@DateTime.Now.ToString("d MMMM yyyy", arCulture)</b></div>
+                        <div class="meta-row"><span>الوقت</span><b>@DateTime.Now.ToString("hh:mm tt")</b></div>
+                        <div class="meta-row"><span>بواسطة</span><b>@userName</b></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">إضافة صنف</div>
+
+                    <label class="field-label">الباركود</label>
+                    <input class="field-input" placeholder="امسح أو اكتب الباركود (Enter)" value="@barcode" @oninput="OnBarcodeInput" @onkeydown="OnBarcodeKeyDown" />
+
+                    <div class="form-grid" style="margin-top:10px">
+                        <div>
+                            <label class="field-label">اسم المنتج</label>
+                            <input class="field-input" value="@productName" @oninput="e => productName = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                        <div>
+                            <label class="field-label">سعر الشراء (تكلفة)</label>
+                            <input class="field-input" type="number" value="@unitCost" @oninput="e => unitCost = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                        <div>
+                            <label class="field-label">سعر البيع المقترح</label>
+                            <input class="field-input" type="number" value="@salePrice" @oninput="e => salePrice = e.Value?.ToString() ?? string.Empty" />
+                        </div>
+                        @if (!isSerialized)
+                        {
+                            <div>
+                                <label class="field-label">الكمية</label>
+                                <input class="field-input" type="number" value="@qty" @oninput="e => qty = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                        }
+                    </div>
+
+                    <label class="field-label" style="margin-top:10px">
+                        <input type="checkbox" checked="@isSerialized" @onchange="e => isSerialized = (bool)(e.Value ?? false)" />
+                        منتج بسيريال (IMEI)
+                    </label>
+
+                    @if (isSerialized)
+                    {
+                        <label class="field-label">أرقام IMEI (رقم في كل سطر)</label>
+                        <textarea class="notes-input" value="@imeiText" @oninput="e => imeiText = e.Value?.ToString() ?? string.Empty"></textarea>
+                    }
+
+                    <button class="btn btn-primary" style="margin-top:10px" @onclick="AddToCart">➕ إضافة للفاتورة</button>
+                </div>
+            </div>
+
+            <div class="card cart-card">
+                <div class="cart-header">
+                    <div class="card-title">أصناف الفاتورة 📦</div>
+                    <button class="btn btn-danger-outline btn-sm" @onclick="() => cart.Clear()">🗑 مسح الكل</button>
+                </div>
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>الإجمالي</th>
+                            <th>سعر البيع</th>
+                            <th>سعر الشراء</th>
+                            <th>الكمية</th>
+                            <th>الباركود</th>
+                            <th>المنتج</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < cart.Count; i++)
+                        {
+                            var idx = i;
+                            var line = cart[idx];
+                            <tr>
+                                <td><button class="row-delete" @onclick="() => cart.RemoveAt(idx)">🗑</button></td>
+                                <td class="num">@line.LineTotal.ToString("N2")</td>
+                                <td>@line.SalePrice.ToString("N2")</td>
+                                <td>@line.UnitCost.ToString("N2")</td>
+                                <td>@line.Qty</td>
+                                <td class="muted">@(line.Imeis is { Count: > 0 } ? string.Join(", ", line.Imeis) : line.Barcode)</td>
+                                <td>@line.ProductName</td>
+                            </tr>
+                        }
+                        @if (cart.Count == 0)
+                        {
+                            <tr><td colspan="7" class="empty-cart">الفاتورة فاضية — ابحث عن منتج بالباركود وضيفه فوق 👆</td></tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="cart-footer">عدد الأصناف: @cart.Count | إجمالي الفاتورة: @cart.Sum(c => c.LineTotal).ToString("N2") ج.م</div>
+            </div>
+
+            <button class="btn btn-confirm" disabled="@isSaving" @onclick="ConfirmInvoice">
+                ✅ @(isSaving ? "جارِ الحفظ..." : (editingPurchaseId.HasValue ? "حفظ التعديل" : "تأكيد فاتورة الشراء"))
+            </button>
+            @if (editingPurchaseId.HasValue)
+            {
+                <button class="btn btn-outline" @onclick="ResetInvoice">إلغاء التعديل</button>
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.HomeBlazor,     "الرئيسية (تجربة)", "🧪"),
+        (MainShell.PageKeys.Sales,          "المبيعات",   "🛒"),
+        (MainShell.PageKeys.Inventory,      "المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون (تجربة)", "🧪"),
+        (MainShell.PageKeys.InventoryCount, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.Maintenance,    "الصيانة",    "🔧"),
+        (MainShell.PageKeys.Customers,      "العملاء",    "👥"),
+        (MainShell.PageKeys.CustomersBlazor,"العملاء (تجربة)", "🧪"),
+        (MainShell.PageKeys.Suppliers,      "الموردين",   "🚚"),
+        (MainShell.PageKeys.SuppliersBlazor,"الموردين (تجربة)", "🧪"),
+        (MainShell.PageKeys.PurchasesBlazor,"المشتريات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Treasury,       "الخزينة",    "🏦"),
+        (MainShell.PageKeys.Reports,        "التقارير",   "📊"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير (تجربة)", "🧪"),
+        (MainShell.PageKeys.Accounts,       "الحسابات",   "📒"),
+        (MainShell.PageKeys.Attendance,     "الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات (تجربة)", "🧪"),
+        (MainShell.PageKeys.Settings,       "الإعدادات",  "⚙️"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات (تجربة)", "🧪"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.Customers, MainShell.PageKeys.Suppliers, MainShell.PageKeys.Reports, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.Accounts, MainShell.PageKeys.Settings, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCount, MainShell.PageKeys.Attendance, MainShell.PageKeys.AttendanceBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private class SupplierOption { public int Id; public required string Name; }
+    private List<SupplierOption> suppliers = new();
+    private string selectedSupplierId = "";
+    private string paymentType = "Credit";
+    private string cashMethod = "";
+
+    private class CartLine
+    {
+        public required string Barcode { get; set; }
+        public required string ProductName { get; set; }
+        public int Qty { get; set; }
+        public decimal UnitCost { get; set; }
+        public decimal SalePrice { get; set; }
+        public decimal LineTotal => UnitCost * Qty;
+        public bool IsSerialized { get; set; }
+        public List<string>? Imeis { get; set; }
+    }
+
+    private List<CartLine> cart = new();
+
+    private string barcode = "", productName = "", unitCost = "", salePrice = "", qty = "1", imeiText = "";
+    private bool isSerialized;
+
+    private bool isSaving;
+    private string? errorMessage;
+    private string? successMessage;
+
+    // ---------- سجل المشتريات (تعديل/إلغاء فاتورة شراء سابقة) - نفس منطق SuppliersPageControl.BtnEditPurchaseInvoice_Click/BtnCancelPurchaseInvoice_Click ----------
+    private bool showHistory;
+    private DataTable? purchaseHistory;
+    private int? editingPurchaseId;
+    private int? pendingCancelPurchaseId;
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        LoadSuppliers();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+            MainShell.Instance?.OpenPageByKey(key);
+    }
+
+    private void LoadSuppliers()
+    {
+        suppliers.Clear();
+        var dt = SuppliersRepository.GetSupplierCombos();
+        foreach (DataRow row in dt.Rows)
+            suppliers.Add(new SupplierOption { Id = Convert.ToInt32(row["SupplierId"]), Name = row["SupplierName"].ToString() ?? "" });
+    }
+
+    private void OnBarcodeInput(ChangeEventArgs e) => barcode = e.Value?.ToString() ?? "";
+
+    private void OnBarcodeKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter" || string.IsNullOrWhiteSpace(barcode)) return;
+
+        var product = SuppliersRepository.GetProductForPurchase(barcode.Trim());
+        errorMessage = null;
+        if (product == null)
+        {
+            productName = "";
+            unitCost = "";
+            salePrice = "";
+            isSerialized = false;
+            successMessage = "باركود جديد — املأ بيانات المنتج الجديد يدويًا.";
+        }
+        else
+        {
+            productName = product.ProductName;
+            unitCost = product.Price.ToString(CultureInfo.InvariantCulture);
+            salePrice = product.SalePrice.ToString(CultureInfo.InvariantCulture);
+            isSerialized = product.IsSerialized;
+            successMessage = null;
+        }
+    }
+
+    private void AddToCart()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (string.IsNullOrWhiteSpace(barcode))
+        {
+            errorMessage = "لازم تدخل باركود للصنف.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(productName))
+        {
+            errorMessage = "لازم تدخل اسم المنتج.";
+            return;
+        }
+        if (!decimal.TryParse(unitCost, out var cost) || cost < 0)
+        {
+            errorMessage = "سعر الشراء غير صحيح.";
+            return;
+        }
+        decimal.TryParse(salePrice, out var sale);
+
+        if (isSerialized)
+        {
+            var imeis = imeiText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            if (imeis.Count == 0)
+            {
+                errorMessage = "لازم تدخل رقم IMEI واحد على الأقل للمنتج المسلسل.";
+                return;
+            }
+            if (imeis.Distinct().Count() != imeis.Count || imeis.Any(i => cart.Any(c => c.Imeis != null && c.Imeis.Contains(i))))
+            {
+                errorMessage = "فيه رقم IMEI مكرر في الفاتورة.";
+                return;
+            }
+            cart.Add(new CartLine { Barcode = barcode.Trim(), ProductName = productName.Trim(), Qty = imeis.Count, UnitCost = cost, SalePrice = sale, IsSerialized = true, Imeis = imeis });
+        }
+        else
+        {
+            if (!int.TryParse(qty, out var q) || q <= 0)
+            {
+                errorMessage = "الكمية لازم تكون أكبر من صفر.";
+                return;
+            }
+            cart.Add(new CartLine { Barcode = barcode.Trim(), ProductName = productName.Trim(), Qty = q, UnitCost = cost, SalePrice = sale, IsSerialized = false });
+        }
+
+        barcode = productName = unitCost = salePrice = imeiText = "";
+        qty = "1";
+        isSerialized = false;
+    }
+
+    private void ResetInvoice()
+    {
+        cart.Clear();
+        selectedSupplierId = "";
+        paymentType = "Credit";
+        cashMethod = "";
+        barcode = productName = unitCost = salePrice = imeiText = "";
+        qty = "1";
+        isSerialized = false;
+        errorMessage = null;
+        successMessage = null;
+        editingPurchaseId = null;
+    }
+
+    // ---------- سجل المشتريات ----------
+    private void ToggleHistory()
+    {
+        showHistory = !showHistory;
+        if (showHistory) LoadPurchaseHistory();
+    }
+
+    private void LoadPurchaseHistory() => purchaseHistory = SuppliersRepository.GetPurchases();
+
+    private void StartEditPurchase(int purchaseId, int supplierId)
+    {
+        errorMessage = null;
+        successMessage = null;
+        pendingCancelPurchaseId = null;
+
+        List<PurchaseCartItem> items;
+        try
+        {
+            items = SuppliersRepository.GetPurchaseItemsForInvoice(purchaseId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            return;
+        }
+        if (items.Count == 0)
+        {
+            errorMessage = "لم يتم العثور على بنود لهذه الفاتورة.";
+            return;
+        }
+
+        cart = items.Select(i => new CartLine
+        {
+            Barcode = i.Barcode,
+            ProductName = i.ProductName,
+            Qty = i.Qty,
+            UnitCost = i.UnitCost,
+            SalePrice = i.SalePrice,
+            IsSerialized = i.IsSerialized,
+            Imeis = i.Imeis
+        }).ToList();
+        selectedSupplierId = supplierId.ToString();
+        editingPurchaseId = purchaseId;
+    }
+
+    private void RequestCancelPurchase(int purchaseId)
+    {
+        errorMessage = null;
+        pendingCancelPurchaseId = purchaseId;
+    }
+
+    private void ConfirmCancelPurchase()
+    {
+        if (!pendingCancelPurchaseId.HasValue) return;
+        int purchaseId = pendingCancelPurchaseId.Value;
+        try
+        {
+            AppServices.CoreEngine.Execute(new CancelPurchaseCommand { PurchaseId = purchaseId, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            successMessage = "تم إلغاء فاتورة الشراء بنجاح.";
+            errorMessage = null;
+            pendingCancelPurchaseId = null;
+            if (editingPurchaseId == purchaseId) ResetInvoice();
+            LoadPurchaseHistory();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            pendingCancelPurchaseId = null;
+        }
+    }
+
+    private void ConfirmInvoice()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        if (!int.TryParse(selectedSupplierId, out var supplierId))
+        {
+            errorMessage = "اختر مورد.";
+            return;
+        }
+        if (cart.Count == 0)
+        {
+            errorMessage = "الفاتورة فاضية.";
+            return;
+        }
+        bool payCashNow = paymentType == "CashNow";
+        if (payCashNow && string.IsNullOrEmpty(cashMethod))
+        {
+            errorMessage = "اختر وسيلة الدفع للشراء الكاش الفوري.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var lines = cart.Select(c => new PurchaseLine
+            {
+                Barcode = c.Barcode,
+                ProductName = c.ProductName,
+                Qty = c.Qty,
+                UnitCost = c.UnitCost,
+                SalePrice = c.SalePrice,
+                LineTotal = c.LineTotal,
+                IsSerialized = c.IsSerialized,
+                Imeis = c.Imeis
+            }).ToList();
+
+            PurchaseResult result;
+            if (editingPurchaseId.HasValue)
+            {
+                var editCommand = new EditPurchaseCommand
+                {
+                    PurchaseId = editingPurchaseId.Value,
+                    SupplierId = supplierId,
+                    Lines = lines,
+                    PayCashNow = payCashNow,
+                    CashMethod = payCashNow ? cashMethod : null,
+                    PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+                };
+                result = AppServices.CoreEngine.Execute(editCommand);
+                successMessage = $"تم تعديل فاتورة الشراء رقم {result.PurchaseId} بنجاح، الإجمالي الجديد {result.TotalAmount:N2} ج.م.";
+            }
+            else
+            {
+                var createCommand = new CreatePurchaseCommand
+                {
+                    SupplierId = supplierId,
+                    Lines = lines,
+                    PayCashNow = payCashNow,
+                    CashMethod = payCashNow ? cashMethod : null,
+                    PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+                };
+                result = AppServices.CoreEngine.Execute(createCommand);
+                successMessage = $"تم حفظ فاتورة الشراء رقم {result.PurchaseId} بإجمالي {result.TotalAmount:N2} ج.م.";
+            }
+
+            editingPurchaseId = null;
+            cart.Clear();
+            barcode = productName = unitCost = salePrice = imeiText = "";
+            qty = "1";
+            isSerialized = false;
+            if (showHistory) LoadPurchaseHistory();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}
