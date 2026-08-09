@@ -242,7 +242,7 @@ namespace Temo_Mobile_Store
             dt.Columns.AddRange(new DataColumn[] {
                 new DataColumn("Id"), new DataColumn("التاريخ"), new DataColumn("الوسيلة"), new DataColumn("رصيد افتتاحي"),
                 new DataColumn("إجمالي وارد"), new DataColumn("إجمالي منصرف"),
-                new DataColumn("ختامي متوقع"), new DataColumn("ختامي فعلي"), new DataColumn("الفرق"), new DataColumn("وقت الإقفال")
+                new DataColumn("ختامي فعلي"), new DataColumn("وقت الإقفال")
             });
 
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
@@ -254,8 +254,8 @@ namespace Temo_Mobile_Store
                     while (reader.Read())
                     {
                         dt.Rows.Add(reader["Id"], reader["ClosureDate"], reader["PaymentMethod"], reader["OpeningBalance"],
-                            reader["TotalIn"], reader["TotalOut"], reader["ExpectedClosingBalance"],
-                            reader["ActualClosingBalance"], reader["Difference"], reader["ClosedAt"]);
+                            reader["TotalIn"], reader["TotalOut"],
+                            reader["ActualClosingBalance"], reader["ClosedAt"]);
                     }
                 }
             }

@@ -122,12 +122,20 @@
                             else
                             {
                                 <div class="muted">الرصيد الافتتاحي (نقدي): <b>@CashOpeningDisplay</b></div>
-                                <div class="muted">الرصيد النقدي المسجّل حاليًا: <b>@CashRecordedDisplay</b></div>
                             }
 
                             <div class="data-table-wrap" style="margin-top:10px">
                                 <table class="data-table">
-                                    <thead><tr><th></th><th>الوسيلة</th><th>افتتاحي</th><th>@(isTodayClosed ? "ختامي فعلي" : "الرصيد المسجّل")</th></tr></thead>
+                                    <thead>
+                                        @if (isTodayClosed)
+                                        {
+                                            <tr><th></th><th>الوسيلة</th><th>افتتاحي</th><th>ختامي فعلي</th></tr>
+                                        }
+                                        else
+                                        {
+                                            <tr><th></th><th>الوسيلة</th><th>افتتاحي</th></tr>
+                                        }
+                                    </thead>
                                     <tbody>
                                         @if (isTodayClosed)
                                         {
@@ -146,7 +154,6 @@
                                                     </td>
                                                     <td>@r.Method</td>
                                                     <td>@r.Opening.ToString("N2")</td>
-                                                    <td>@r.RecordedBalance.ToString("N2")</td>
                                                 </tr>
                                             }
                                         }
@@ -227,7 +234,7 @@
                                 <thead>
                                     <tr>
                                         <th>التاريخ</th><th>الوسيلة</th><th>رصيد افتتاحي</th><th>إجمالي وارد</th><th>إجمالي منصرف</th>
-                                        <th>ختامي متوقع</th><th>ختامي فعلي</th><th>الفرق</th><th>وقت الإقفال</th>
+                                        <th>ختامي فعلي</th><th>وقت الإقفال</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -235,12 +242,12 @@
                                     {
                                         <tr class="row-clickable @(selectedClosureId == r.Id ? "row-selected" : "")" @onclick="() => SelectClosure(r.Id)">
                                             <td>@r.Date</td><td>@r.Method</td><td>@r.Opening</td><td>@r.TotalIn</td><td>@r.TotalOut</td>
-                                            <td>@r.ExpectedClosing</td><td>@r.ActualClosing</td><td>@r.Difference</td><td class="muted">@r.ClosedAt</td>
+                                            <td>@r.ActualClosing</td><td class="muted">@r.ClosedAt</td>
                                         </tr>
                                     }
                                     @if (closuresLogRows.Count == 0)
                                     {
-                                        <tr><td colspan="9" class="empty-row">مفيش أيام مقفولة بعد</td></tr>
+                                        <tr><td colspan="7" class="empty-row">مفيش أيام مقفولة بعد</td></tr>
                                     }
                                 </tbody>
                             </table>
@@ -382,7 +389,6 @@
     private Dictionary<string, (decimal Opening, decimal TotalIn, decimal TotalOut, decimal RecordedBalance)> methodSummaries = new();
 
     private string CashOpeningDisplay => methodSummaries.TryGetValue("نقدي", out var s) ? s.Opening.ToString("N2") + " ج.م" : "--";
-    private string CashRecordedDisplay => methodSummaries.TryGetValue("نقدي", out var s) ? s.RecordedBalance.ToString("N2") + " ج.م" : "--";
 
     private string? editingBalanceMethod;
     private string editBalanceValue = "";
@@ -400,7 +406,7 @@
     private void SetOtherActual(string method, string v) => otherMethodsActual[method] = v;
 
     // ---------- سجل إقفال الأيام ----------
-    private class ClosureLogRow { public int Id; public string Date = ""; public string Method = ""; public string Opening = ""; public string TotalIn = ""; public string TotalOut = ""; public string ExpectedClosing = ""; public string ActualClosing = ""; public string Difference = ""; public string ClosedAt = ""; }
+    private class ClosureLogRow { public int Id; public string Date = ""; public string Method = ""; public string Opening = ""; public string TotalIn = ""; public string TotalOut = ""; public string ActualClosing = ""; public string ClosedAt = ""; }
     private List<ClosureLogRow> closuresLogRows = new();
     private int? selectedClosureId;
     private class DenomDetailRow { public string Value = ""; public string Count = ""; public string Total = ""; }
@@ -673,9 +679,7 @@
                 Opening = Convert.ToDecimal(r["رصيد افتتاحي"]).ToString("N2"),
                 TotalIn = Convert.ToDecimal(r["إجمالي وارد"]).ToString("N2"),
                 TotalOut = Convert.ToDecimal(r["إجمالي منصرف"]).ToString("N2"),
-                ExpectedClosing = Convert.ToDecimal(r["ختامي متوقع"]).ToString("N2"),
                 ActualClosing = Convert.ToDecimal(r["ختامي فعلي"]).ToString("N2"),
-                Difference = Convert.ToDecimal(r["الفرق"]).ToString("N2"),
                 ClosedAt = r["وقت الإقفال"].ToString() ?? ""
             });
         }
