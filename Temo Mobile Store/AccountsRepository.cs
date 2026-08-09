@@ -258,5 +258,64 @@ namespace Temo_Mobile_Store
 
             return dt;
         }
+
+        // دفتر الأستاذ العام - بند بند (كل سطر مدين/دائن على حدة) من JournalLines/JournalEntries
+        // الحقيقية، بدل الإجماليات المعروضة في ميزان المراجعة/قائمة الدخل. ده الشاشة الوحيدة في
+        // البرنامج اللي بتوريك القيود الخام نفسها - accountCode=null يعني كل الحسابات،
+        // sourceType=null يعني كل أنواع المصادر.
+        public static DataTable GetGeneralLedger(DateTime from, DateTime to, int? accountCode, string? sourceType)
+        {
+            string fromDate = from.ToString("yyyy-MM-dd");
+            string toDate = to.ToString("yyyy-MM-dd");
+
+            DataTable dt = new DataTable();
+            dt.Columns.AddRange(new DataColumn[] {
+                new DataColumn("التاريخ"), new DataColumn("كود الحساب"), new DataColumn("اسم الحساب"),
+                new DataColumn("البيان"), new DataColumn("نوع المصدر"), new DataColumn("رقم المصدر"),
+                new DataColumn("مدين"), new DataColumn("دائن"), new DataColumn("المستخدم")
+            });
+
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+
+                string query = @"
+                    SELECT E.EntryDate, A.AccountCode, A.AccountName, E.Description, E.SourceType, E.SourceId,
+                           L.Debit, L.Credit, E.CreatedBy
+                    FROM JournalLines L
+                    INNER JOIN JournalEntries E ON E.JournalEntryId = L.JournalEntryId
+                    INNER JOIN AccountsTree A ON A.AccountCode = L.AccountCode
+                    WHERE E.EntryDate BETWEEN @From AND @To
+                          AND (@AccountCode IS NULL OR A.AccountCode = @AccountCode)
+                          AND (@SourceType IS NULL OR E.SourceType = @SourceType)
+                    ORDER BY E.EntryDate ASC, E.JournalEntryId ASC, L.JournalLineId ASC";
+
+                using (SqliteCommand cmd = new SqliteCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@From", fromDate);
+                    cmd.Parameters.AddWithValue("@To", toDate);
+                    cmd.Parameters.AddWithValue("@AccountCode", (object?)accountCode ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@SourceType", (object?)sourceType ?? DBNull.Value);
+
+                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            decimal debit = Convert.ToDecimal(reader["Debit"]);
+                            decimal credit = Convert.ToDecimal(reader["Credit"]);
+                            dt.Rows.Add(
+                                reader["EntryDate"], reader["AccountCode"], reader["AccountName"],
+                                reader["Description"] == DBNull.Value ? "" : reader["Description"].ToString(),
+                                reader["SourceType"], reader["SourceId"] == DBNull.Value ? "" : reader["SourceId"].ToString(),
+                                debit == 0 ? "" : debit.ToString("N2"), credit == 0 ? "" : credit.ToString("N2"),
+                                reader["CreatedBy"] == DBNull.Value ? "" : reader["CreatedBy"].ToString()
+                            );
+                        }
+                    }
+                }
+            }
+
+            return dt;
+        }
     }
 }

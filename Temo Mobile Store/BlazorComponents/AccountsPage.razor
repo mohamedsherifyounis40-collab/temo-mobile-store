@@ -65,6 +65,7 @@
                     <button class="list-tab @(activeTab == "Tree" ? "active" : "")" @onclick='() => SwitchTab("Tree")'>🌳 شجرة الحسابات</button>
                     <button class="list-tab @(activeTab == "Income" ? "active" : "")" @onclick='() => SwitchTab("Income")'>📈 قائمة الدخل</button>
                     <button class="list-tab @(activeTab == "Trial" ? "active" : "")" @onclick='() => SwitchTab("Trial")'>⚖️ ميزان المراجعة</button>
+                    <button class="list-tab @(activeTab == "Ledger" ? "active" : "")" @onclick='() => SwitchTab("Ledger")'>📚 دفتر الأستاذ العام</button>
                 </div>
 
                 @if (activeTab == "Tree")
@@ -165,7 +166,7 @@
                         </div>
                     </div>
                 }
-                else
+                else if (activeTab == "Trial")
                 {
                     <div class="card">
                         <div class="list-toolbar">
@@ -195,6 +196,69 @@
                                         <tr><td colspan="4" class="empty-row">مفيش أرصدة لعرضها</td></tr>
                                     }
                                 </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="card">
+                        <div class="muted" style="font-size:12px; margin-bottom:10px">القيود الخام كل بند لوحده (مدين/دائن) - أدق مصدر بيانات في البرنامج، أي رقم في التقارير أو ميزان المراجعة أو قائمة الدخل أصله من هنا.</div>
+                        <div class="list-toolbar">
+                            <div>
+                                <label class="field-label">من</label>
+                                <input class="field-input" type="date" value="@ledgerFrom.ToString("yyyy-MM-dd")" @onchange="e => ledgerFrom = DateTime.Parse(e.Value!.ToString()!)" />
+                            </div>
+                            <div>
+                                <label class="field-label">إلى</label>
+                                <input class="field-input" type="date" value="@ledgerTo.ToString("yyyy-MM-dd")" @onchange="e => ledgerTo = DateTime.Parse(e.Value!.ToString()!)" />
+                            </div>
+                            <div>
+                                <label class="field-label">الحساب</label>
+                                <select class="field-input" @bind="ledgerAccountFilter">
+                                    <option value="">كل الحسابات</option>
+                                    @foreach (var a in accounts)
+                                    {
+                                        <option value="@a.Code">@a.Code - @a.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label class="field-label">نوع المصدر</label>
+                                <select class="field-input" @bind="ledgerSourceTypeFilter">
+                                    <option value="">كل الأنواع</option>
+                                    @foreach (var t in LedgerSourceTypes)
+                                    {
+                                        <option value="@t">@t</option>
+                                    }
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" @onclick="LoadGeneralLedger">📚 عرض</button>
+                        </div>
+
+                        <div class="data-table-wrap">
+                            <table class="data-table">
+                                <thead><tr><th>التاريخ</th><th>كود الحساب</th><th>اسم الحساب</th><th>البيان</th><th>نوع المصدر</th><th>رقم المصدر</th><th>مدين</th><th>دائن</th><th>المستخدم</th></tr></thead>
+                                <tbody>
+                                    @foreach (var r in ledgerRows)
+                                    {
+                                        <tr>
+                                            <td class="muted">@r.Date</td><td>@r.AccountCode</td><td>@r.AccountName</td>
+                                            <td>@r.Description</td><td>@r.SourceType</td><td>@r.SourceId</td>
+                                            <td>@r.Debit</td><td>@r.Credit</td><td class="muted">@r.CreatedBy</td>
+                                        </tr>
+                                    }
+                                    @if (ledgerRows.Count == 0)
+                                    {
+                                        <tr><td colspan="9" class="empty-row">مفيش قيود في الفترة/الفلتر ده</td></tr>
+                                    }
+                                </tbody>
+                                @if (ledgerRows.Count > 0)
+                                {
+                                    <tfoot>
+                                        <tr class="total-row"><td colspan="6"><b>الإجمالي</b></td><td><b>@ledgerTotalDebit</b></td><td><b>@ledgerTotalCredit</b></td><td></td></tr>
+                                    </tfoot>
+                                }
                             </table>
                         </div>
                     </div>
@@ -270,6 +334,23 @@
     private class TrialRow { public string Code = ""; public string Name = ""; public string Debit = ""; public string Credit = ""; public bool IsTotal; }
     private List<TrialRow> trialRows = new();
 
+    // ---------- دفتر الأستاذ العام ----------
+    private class LedgerRow { public string Date = ""; public string AccountCode = ""; public string AccountName = ""; public string Description = ""; public string SourceType = ""; public string SourceId = ""; public string Debit = ""; public string Credit = ""; public string CreatedBy = ""; }
+    private List<LedgerRow> ledgerRows = new();
+    private DateTime ledgerFrom = DateTime.Now.AddMonths(-1);
+    private DateTime ledgerTo = DateTime.Now;
+    private string ledgerAccountFilter = "";
+    private string ledgerSourceTypeFilter = "";
+    private string ledgerTotalDebit = "0.00";
+    private string ledgerTotalCredit = "0.00";
+
+    private static readonly string[] LedgerSourceTypes = {
+        "Sale", "SaleAdjustment", "SaleCancellation", "Purchase", "PurchaseEdit", "PurchaseReversal",
+        "Expense", "ExpenseEdit", "ExpenseDeletion", "Movement", "MovementEdit", "MovementCancellation",
+        "Transfer", "TransferCancellation", "SupplierPayment", "CustomerPayment", "InventoryAdd",
+        "MaintenanceDelivery", "DayCloseAdjustmentCancellation"
+    };
+
     protected override void OnInitialized()
     {
         userName = AuthManager.CurrentUsername ?? "مستخدم";
@@ -304,6 +385,8 @@
             LoadIncomeStatement();
         else if (tab == "Trial" && trialRows.Count == 0)
             LoadTrialBalance();
+        else if (tab == "Ledger" && ledgerRows.Count == 0)
+            LoadGeneralLedger();
     }
 
     private static bool IsTotalRow(string label) => label.Contains("إجمالي") || label.Contains("صافي") || label.Contains("مجمل");
@@ -322,6 +405,38 @@
         var dt = AccountsRepository.GetIncomeStatement(incomeFrom, incomeTo);
         foreach (DataRow row in dt.Rows)
             incomeRows.Add(new IncomeRow { Label = row["البند"].ToString() ?? "", Amount = row["المبلغ"].ToString() ?? "" });
+    }
+
+    private void LoadGeneralLedger()
+    {
+        ledgerRows.Clear();
+        int? accountCode = int.TryParse(ledgerAccountFilter, out var code) ? code : null;
+        string? sourceType = string.IsNullOrEmpty(ledgerSourceTypeFilter) ? null : ledgerSourceTypeFilter;
+
+        var dt = AccountsRepository.GetGeneralLedger(ledgerFrom, ledgerTo, accountCode, sourceType);
+        decimal totalDebit = 0, totalCredit = 0;
+        foreach (DataRow row in dt.Rows)
+        {
+            string debitText = row["مدين"].ToString() ?? "";
+            string creditText = row["دائن"].ToString() ?? "";
+            if (decimal.TryParse(debitText, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) totalDebit += d;
+            if (decimal.TryParse(creditText, NumberStyles.Any, CultureInfo.InvariantCulture, out var c)) totalCredit += c;
+
+            ledgerRows.Add(new LedgerRow
+            {
+                Date = row["التاريخ"].ToString() ?? "",
+                AccountCode = row["كود الحساب"].ToString() ?? "",
+                AccountName = row["اسم الحساب"].ToString() ?? "",
+                Description = row["البيان"].ToString() ?? "",
+                SourceType = row["نوع المصدر"].ToString() ?? "",
+                SourceId = row["رقم المصدر"].ToString() ?? "",
+                Debit = debitText,
+                Credit = creditText,
+                CreatedBy = row["المستخدم"].ToString() ?? ""
+            });
+        }
+        ledgerTotalDebit = totalDebit.ToString("N2");
+        ledgerTotalCredit = totalCredit.ToString("N2");
     }
 
     private void LoadTrialBalance()
