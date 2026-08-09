@@ -1,11 +1,14 @@
 using TemoStore.Core.Abstractions;
 using TemoStore.Core.Engines;
+using TemoStore.Engines.Handlers;
 
 namespace TemoStore.Engines.Health
 {
     // فحص شامل للنظام عند الطلب - مش جزء من مسار أي عملية بيع/شراء، بيتنادى من شاشة
     // منفصلة أو مجدول. القيود المحاسبية نفسها مش محتاجة فحص هنا لأنها ممنوعة أصلًا
-    // من إنها تتحفظ وهي مش متزنة (AccountingEngine.Post بيرفضها وقت الكتابة).
+    // من إنها تتحفظ وهي مش متزنة (AccountingEngine.Post بيرفضها وقت الكتابة). لكن
+    // ده مش ضمان إن الكاش السريع (PaymentMethodBalances) نفسه فضل متزامن مع الدفتر
+    // الحقيقي بمرور الوقت - ده بالظبط اللي فحص "مطابقة الخزينة" تحت بيتأكد منه.
     public class HealthEngine : IHealthEngine
     {
         private readonly IUnitOfWorkFactory _uowFactory;
@@ -39,6 +42,22 @@ namespace TemoStore.Engines.Health
                 Area = "الخزينة",
                 Healthy = negativeBalances.Count == 0,
                 Message = negativeBalances.Count == 0 ? "كل أرصدة وسائل الدفع سليمة." : "أرصدة سالبة في: " + string.Join("، ", negativeBalances)
+            });
+
+            var mismatches = new List<string>();
+            foreach (var kv in balances)
+            {
+                int accountCode = AccountCodes.ForPaymentMethod(kv.Key);
+                decimal ledgerBalance = uow.Journal.GetAccountBalance(accountCode);
+                // فرق أقل من قرش (تقريب فاصلة عائمة) مش حقيقي - بنتجاهله
+                if (Math.Abs(kv.Value - ledgerBalance) > 0.01m)
+                    mismatches.Add($"{kv.Key}: الكاش السريع {kv.Value:N2} مقابل الدفتر {ledgerBalance:N2}");
+            }
+            report.Items.Add(new Core.Entities.HealthCheckItem
+            {
+                Area = "مطابقة الخزينة مع الدفتر",
+                Healthy = mismatches.Count == 0,
+                Message = mismatches.Count == 0 ? "كل أرصدة وسائل الدفع متطابقة تمامًا مع الدفتر المحاسبي." : "فروقات في: " + string.Join("، ", mismatches)
             });
 
             uow.Rollback();

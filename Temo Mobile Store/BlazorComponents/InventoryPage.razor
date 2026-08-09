@@ -100,6 +100,29 @@
                 <button class="list-tab @(activeTab == "devices" ? "active" : "")" @onclick='() => activeTab = "devices"'>📱 الأجهزة (IMEI)</button>
             </div>
 
+            @if (historyBarcode != null)
+            {
+                <div class="form-panel">
+                    <div class="form-panel-title">📜 سجل حركة: @historyProductName (@historyBarcode)</div>
+                    <table class="data-table">
+                        <thead><tr><th>التاريخ</th><th>النوع</th><th>التفاصيل</th><th>الكمية</th><th>المبلغ</th></tr></thead>
+                        <tbody>
+                            @foreach (var h in productHistoryRows)
+                            {
+                                <tr><td class="muted">@h.Date</td><td>@h.Type</td><td>@h.Details</td><td>@h.Qty</td><td>@h.Amount</td></tr>
+                            }
+                            @if (productHistoryRows.Count == 0)
+                            {
+                                <tr><td colspan="5" class="empty-row">مفيش حركات مسجلة للمنتج ده لسه</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                    <div class="form-actions">
+                        <button class="btn btn-outline" @onclick="() => historyBarcode = null">إغلاق السجل</button>
+                    </div>
+                </div>
+            }
+
             @if (activeTab == "accessories")
             {
                 <div class="card">
@@ -169,6 +192,7 @@
                                             <div class="row-actions">
                                                 <button class="row-action-btn edit" disabled="@(!AuthManager.IsAdmin)" title="تعديل" @onclick="() => OpenEditAccessoryForm(p)">✏️</button>
                                                 <button class="row-action-btn delete" disabled="@(!AuthManager.IsAdmin)" title="حذف" @onclick="() => DeleteAccessory(p.Barcode)">🗑</button>
+                                                <button class="row-action-btn" title="سجل الحركة" @onclick="() => ShowProductHistory(p.Barcode, p.ProductName)">📜</button>
                                             </div>
                                         </td>
                                         <td>
@@ -282,6 +306,7 @@
                                         <td>
                                             <div class="row-actions">
                                                 <button class="row-action-btn edit" disabled="@(!AuthManager.IsAdmin)" title="تعديل السعر" @onclick="() => OpenEditModelPriceForm(d)">✏️</button>
+                                                <button class="row-action-btn" title="سجل الحركة" @onclick="() => ShowProductHistory(d.Barcode, d.ProductName)">📜</button>
                                             </div>
                                         </td>
                                         <td class="muted">@d.CreatedAt</td>
@@ -344,6 +369,31 @@
     private string userInitial = "?";
 
     private string activeTab = "accessories";
+
+    // ---------- سجل حركة المنتج ----------
+    private class ProductHistoryRow { public string Date = ""; public string Type = ""; public string Details = ""; public string Qty = ""; public string Amount = ""; }
+    private List<ProductHistoryRow> productHistoryRows = new();
+    private string? historyBarcode;
+    private string? historyProductName;
+
+    private void ShowProductHistory(string barcode, string productName)
+    {
+        historyBarcode = barcode;
+        historyProductName = productName;
+        productHistoryRows.Clear();
+        var dt = InventoryRepository.GetProductMovementHistory(barcode);
+        foreach (DataRow row in dt.Rows)
+        {
+            productHistoryRows.Add(new ProductHistoryRow
+            {
+                Date = row["التاريخ"].ToString() ?? "",
+                Type = row["النوع"].ToString() ?? "",
+                Details = row["التفاصيل"].ToString() ?? "",
+                Qty = row["الكمية"].ToString() ?? "",
+                Amount = row["المبلغ"].ToString() ?? ""
+            });
+        }
+    }
     private string? errorMessage;
     private string? successMessage;
 

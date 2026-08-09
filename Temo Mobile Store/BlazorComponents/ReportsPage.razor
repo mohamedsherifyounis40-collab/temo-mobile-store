@@ -71,6 +71,26 @@
 
                 @if (activeTab == "Summary")
                 {
+                    <div class="card">
+                        <div class="list-toolbar" style="align-items:center">
+                            <div class="card-title" style="margin:0">🩺 فحص سلامة النظام</div>
+                            <button class="btn btn-outline" @onclick="RunHealthCheck">🔄 فحص الآن</button>
+                        </div>
+                        @if (healthItems.Count > 0)
+                        {
+                            <div class="grid-mid-reports" style="margin-top:10px">
+                                @foreach (var h in healthItems)
+                                {
+                                    <div class="card" style="border:1px solid @(h.Healthy ? "var(--color-green)" : "var(--color-red)"); padding:10px">
+                                        <div><b>@(h.Healthy ? "✅" : "⚠️") @h.Area</b></div>
+                                        <div class="muted" style="font-size:13px">@h.Message</div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="muted" style="font-size:13px; margin-bottom:6px">📅 الأرقام دي عن: <b>@metricsPeriodLabel</b></div>
                     <div class="metrics-row">
                         <div class="card metric-card"><div class="metric-label">إجمالي المبيعات (الدرج)</div><div class="metric-value">@totalSalesText</div></div>
                         <div class="card metric-card"><div class="metric-label">تكلفة البضاعة المباعة</div><div class="metric-value cost">@totalCostText</div></div>
@@ -293,6 +313,7 @@
                                 <button class="btn btn-primary" @onclick="() => ShowStatement(true)">📋 عرض كشف الحساب</button>
                             </div>
                             <button class="btn btn-outline" style="margin-top:8px; width:100%" @onclick="() => ShowStatement(false)">🔄 عرض كل الفترات</button>
+                            <button class="btn btn-outline" style="margin-top:8px; width:100%" @onclick="ExportStatement">📥 تصدير Excel</button>
 
                             <div class="closure-panel" style="margin-top:16px">
                                 <div class="muted">إجمالي الوارد: <b style="color:var(--color-green)">@statementTotalIn</b></div>
@@ -373,8 +394,21 @@
     private string? successMessage;
     private string activeTab = "Summary";
 
+    // ---------- فحص سلامة النظام ----------
+    private class HealthItemRow { public string Area = ""; public bool Healthy; public string Message = ""; }
+    private List<HealthItemRow> healthItems = new();
+
+    private void RunHealthCheck()
+    {
+        healthItems.Clear();
+        var report = AppServices.HealthEngine.RunFullCheck();
+        foreach (var item in report.Items)
+            healthItems.Add(new HealthItemRow { Area = item.Area, Healthy = item.Healthy, Message = item.Message });
+    }
+
     // ---------- الملخص المالي ----------
     private string totalSalesText = "0.00 ج.م", totalCostText = "0.00 ج.م", totalExpensesText = "0.00 ج.م", netProfitText = "0.00 ج.م";
+    private string metricsPeriodLabel = "كل الفترات (من أول يوم)";
     private DateTime filterFrom = DateTime.Now.AddMonths(-1);
     private DateTime filterTo = DateTime.Now;
     private class ProfitRow { public int SaleId; public string ProductName = ""; public string CostPrice = ""; public string Price = ""; public int Qty; public string NetProfit = ""; public string SaleDate = ""; }
@@ -419,6 +453,7 @@
     private class StatementRow { public string Date = ""; public string Type = ""; public string Details = ""; public string In = ""; public string Out = ""; public string Balance = ""; }
     private List<StatementRow> statementRows = new();
     private string statementTotalIn = "0.00 ج.م", statementTotalOut = "0.00 ج.م", statementNet = "0.00 ج.م", statementCurrentBalance = "0.00 ج.م";
+    private bool statementUseDateFilter = true;
 
     protected override void OnInitialized()
     {
@@ -466,6 +501,7 @@
         totalCostText = cost.ToString("N2") + " ج.م";
         totalExpensesText = expenses.ToString("N2") + " ج.م";
         netProfitText = net.ToString("N2") + " ج.م";
+        metricsPeriodLabel = "كل الفترات (من أول يوم)";
         LoadClosureSummary();
     }
 
@@ -511,6 +547,7 @@
         totalCostText = cost.ToString("N2") + " ج.م";
         totalExpensesText = expenses.ToString("N2") + " ج.م";
         netProfitText = net.ToString("N2") + " ج.م";
+        metricsPeriodLabel = $"{filterFrom:yyyy-MM-dd} إلى {filterTo:yyyy-MM-dd}";
     }
 
     private void StartEditBalance(string method, decimal currentOpening)
@@ -707,6 +744,7 @@
     private void ShowStatement(bool useDateFilter)
     {
         if (string.IsNullOrEmpty(statementMethod)) return;
+        statementUseDateFilter = useDateFilter;
 
         var (dt, totalIn, totalOut, currentBalance) = ReportsRepository.GetStatement(statementMethod, statementFrom, statementTo, useDateFilter);
         statementRows.Clear();
@@ -727,5 +765,18 @@
         statementTotalOut = totalOut.ToString("N2") + " ج.م";
         statementNet = (totalIn - totalOut).ToString("N2") + " ج.م";
         statementCurrentBalance = currentBalance.ToString("N2") + " ج.م";
+    }
+
+    private void ExportStatement()
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (string.IsNullOrEmpty(statementMethod)) return;
+
+        var (dt, _, _, _) = ReportsRepository.GetStatement(statementMethod, statementFrom, statementTo, statementUseDateFilter);
+        if (ExcelExportHelper.ExportToExcel(dt, $"كشف حساب {statementMethod}", out string filePath, out string error))
+            successMessage = $"تم تصدير كشف الحساب بنجاح في: {filePath}";
+        else
+            errorMessage = error;
     }
 }

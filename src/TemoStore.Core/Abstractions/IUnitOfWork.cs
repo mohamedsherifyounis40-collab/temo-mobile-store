@@ -154,6 +154,10 @@ namespace TemoStore.Core.Abstractions
     {
         int InsertEntry(string sourceType, int? sourceId, string? description, string createdBy);
         void InsertLine(int journalEntryId, int accountCode, decimal debit, decimal credit);
+
+        // صافي رصيد حساب معين من الدفتر الحقيقي (SUM(Debit) - SUM(Credit)) - مستخدم
+        // للمطابقة بين الدفتر وبين الكاش السريع (PaymentMethodBalances) في HealthEngine
+        decimal GetAccountBalance(int accountCode);
     }
 
     // شجرة الحسابات - مستخدمة من AccountingEngine عشان يتأكد إن أي كود حساب بيتسجل

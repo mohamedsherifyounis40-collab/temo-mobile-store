@@ -41,5 +41,13 @@ namespace TemoStore.Data.Repositories
             cmd.Parameters.AddWithValue("@Credit", credit);
             cmd.ExecuteNonQuery();
         }
+
+        public decimal GetAccountBalance(int accountCode)
+        {
+            using var cmd = new SqliteCommand(
+                "SELECT COALESCE(SUM(Debit), 0) - COALESCE(SUM(Credit), 0) FROM JournalLines WHERE AccountCode = @Code", _conn, _tx);
+            cmd.Parameters.AddWithValue("@Code", accountCode);
+            return Convert.ToDecimal(cmd.ExecuteScalar());
+        }
     }
 }

@@ -136,6 +136,7 @@
                                 <input class="field-input" type="date" value="@incomeTo.ToString("yyyy-MM-dd")" @onchange="e => incomeTo = DateTime.Parse(e.Value!.ToString()!)" />
                             </div>
                             <button class="btn btn-primary" @onclick="LoadIncomeStatement">📈 عرض</button>
+                            <button class="btn btn-outline" @onclick='() => ExportReport("IncomeStatement", "قائمة الدخل")'>📥 تصدير Excel</button>
                         </div>
 
                         <div class="data-table-wrap">
@@ -171,6 +172,7 @@
                     <div class="card">
                         <div class="list-toolbar">
                             <button class="btn btn-primary" @onclick="LoadTrialBalance">⚖️ تحديث</button>
+                            <button class="btn btn-outline" @onclick='() => ExportReport("TrialBalance", "ميزان المراجعة")'>📥 تصدير Excel</button>
                         </div>
                         <div class="data-table-wrap">
                             <table class="data-table">
@@ -234,6 +236,7 @@
                                 </select>
                             </div>
                             <button class="btn btn-primary" @onclick="LoadGeneralLedger">📚 عرض</button>
+                            <button class="btn btn-outline" @onclick='() => ExportReport("Ledger", "دفتر الأستاذ العام")'>📥 تصدير Excel</button>
                         </div>
 
                         <div class="data-table-wrap">
@@ -405,6 +408,27 @@
         var dt = AccountsRepository.GetIncomeStatement(incomeFrom, incomeTo);
         foreach (DataRow row in dt.Rows)
             incomeRows.Add(new IncomeRow { Label = row["البند"].ToString() ?? "", Amount = row["المبلغ"].ToString() ?? "" });
+    }
+
+    private void ExportReport(string reportKind, string displayName)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        DataTable dt = reportKind switch
+        {
+            "IncomeStatement" => AccountsRepository.GetIncomeStatement(incomeFrom, incomeTo),
+            "TrialBalance" => AccountsRepository.GetTrialBalance(),
+            "Ledger" => AccountsRepository.GetGeneralLedger(ledgerFrom, ledgerTo,
+                            int.TryParse(ledgerAccountFilter, out var code) ? code : null,
+                            string.IsNullOrEmpty(ledgerSourceTypeFilter) ? null : ledgerSourceTypeFilter),
+            _ => new DataTable()
+        };
+
+        if (ExcelExportHelper.ExportToExcel(dt, displayName, out string filePath, out string error))
+            successMessage = $"تم تصدير \"{displayName}\" بنجاح في: {filePath}";
+        else
+            errorMessage = error;
     }
 
     private void LoadGeneralLedger()

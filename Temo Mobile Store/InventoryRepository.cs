@@ -202,5 +202,65 @@ namespace Temo_Mobile_Store
             }
             return dt;
         }
+
+        // تاريخ حركة منتج معين بالكامل (بيع/شراء/تسوية جرد) في مكان واحد، مرتب زمنيًا -
+        // مفيدة لما تحب تعرف "المنتج ده اتباع/اتشرى/اتجرد إمتى وبكام".
+        public static DataTable GetProductMovementHistory(string barcode)
+        {
+            DataTable dt = new DataTable();
+            dt.Columns.AddRange(new DataColumn[] {
+                new DataColumn("التاريخ"), new DataColumn("النوع"), new DataColumn("التفاصيل"),
+                new DataColumn("الكمية"), new DataColumn("المبلغ")
+            });
+
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+
+                string query = @"
+                    SELECT SaleDate AS OpDate, 'بيع' AS OpType,
+                           (CASE WHEN PaymentType = 'Credit' THEN 'بيع آجل' ELSE 'بيع نقدي - ' || COALESCE(PaymentMethod, 'نقدي') END) AS Details,
+                           QuantitySold AS Qty, Total AS Amount
+                        FROM Sales WHERE Barcode = @Barcode
+                    UNION ALL
+                    SELECT P.PurchaseDate AS OpDate, 'شراء' AS OpType,
+                           'من: ' || COALESCE(S.SupplierName, 'بدون مورد') AS Details,
+                           PI.Quantity AS Qty, PI.LineTotal AS Amount
+                        FROM PurchaseItems PI
+                        INNER JOIN Purchases P ON PI.PurchaseId = P.PurchaseId
+                        LEFT JOIN Suppliers S ON P.SupplierId = S.SupplierId
+                        WHERE PI.Barcode = @Barcode
+                    UNION ALL
+                    SELECT AdjustmentDate AS OpDate, 'تسوية جرد' AS OpType,
+                           'قبل: ' || SystemQuantityBefore || ' - بعد: ' || CountedQuantity AS Details,
+                           Difference AS Qty, 0 AS Amount
+                        FROM InventoryAdjustments WHERE Barcode = @Barcode
+                    ORDER BY OpDate ASC";
+
+                using (SqliteCommand cmd = new SqliteCommand(query, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Barcode", barcode);
+                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string opType = reader["OpType"].ToString() ?? "";
+                            int qty = Convert.ToInt32(reader["Qty"]);
+                            decimal amount = Convert.ToDecimal(reader["Amount"]);
+                            // للبيع/الشراء الكمية دايمًا رقم موجب (كمية العملية نفسها)، أما تسوية
+                            // الجرد فالإشارة نفسها هي المعنى (زيادة أو نقص فعلي في الرصيد)
+                            string qtyText = opType == "تسوية جرد" ? (qty > 0 ? $"+{qty}" : qty.ToString()) : qty.ToString();
+                            dt.Rows.Add(
+                                reader["OpDate"], opType, reader["Details"],
+                                qtyText,
+                                amount == 0 ? "" : amount.ToString("N2")
+                            );
+                        }
+                    }
+                }
+            }
+
+            return dt;
+        }
     }
 }
