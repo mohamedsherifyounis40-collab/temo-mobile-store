@@ -84,6 +84,19 @@ namespace Temo_Mobile_Store
                             dt.Rows.Add(reader["SaleDate"], "بيع آجل", reader["ProductName"], reader["Total"]);
                     }
                 }
+                // بيع نقدي مربوط بالعميل ده (اختياريًا، للمرجعية بس - راجع SalesPage.razor) -
+                // ده بيع متسدد بالكامل وقت حصوله فمالوش أي أثر على "المتبقي عليه" في
+                // GetCustomersWithBalances (اللي لسه بيحسب بس من البيع الآجل والتحصيل)،
+                // هنا بس عشان يظهر في كشف الحساب كمرجع تاريخي لو حصلت أي مشكلة بعدين.
+                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleDate, ProductName, Total, PaymentMethod FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Cash' ORDER BY SaleDate", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Id", customerId);
+                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                            dt.Rows.Add(reader["SaleDate"], "بيع نقدي (متسدد)", reader["ProductName"] + " - " + reader["PaymentMethod"], reader["Total"]);
+                    }
+                }
                 using (SqliteCommand cmd = new SqliteCommand("SELECT CreatedAt, Amount, PaymentMethod FROM CashMovements WHERE CustomerId = @Id AND MovementType = 'قبض' ORDER BY CreatedAt", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", customerId);
