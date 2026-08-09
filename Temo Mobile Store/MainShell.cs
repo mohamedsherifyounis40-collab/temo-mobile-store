@@ -1564,7 +1564,7 @@ namespace Temo_Mobile_Store
         private static Color LightTint(Color c, float amount) => UIHelpers.LightTint(c, amount);
 
         // ==========================================================================
-        // الاختصارات السريعة: F2 بيع سريع | F4 سند قبض | F5 سند صرف | F6 تقرير يومي | Ctrl+F بحث شامل
+        // الاختصارات السريعة: F2 بيع سريع | F4 سند قبض | F5 سند صرف | F6 تقرير يومي | F8 فتح الدرج | Ctrl+F بحث شامل
         // ==========================================================================
         private void MainShell_KeyDown(object sender, KeyEventArgs e)
         {
@@ -1597,6 +1597,24 @@ namespace Temo_Mobile_Store
             {
                 NavigateToPageKey(PageKeys.ReportsBlazor);
                 e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F8)
+            {
+                OpenCashDrawer();
+                e.Handled = true;
+            }
+        }
+
+        // ==========================================================================
+        // فتح الدرج (F8) - بيبعت نبضة فتح لطابعة الفواتير المحددة في الإعدادات.
+        // بنسكت لو نجحت (بيحصل كتير أثناء البيع)، وبنبين رسالة واضحة بس لو فشلت.
+        // ==========================================================================
+        private void OpenCashDrawer()
+        {
+            string printerName = SettingsRepository.GetReceiptPrinterName();
+            if (!CashDrawerHelper.OpenDrawer(printerName, out string error))
+            {
+                MessageBox.Show(error, "تعذر فتح الدرج", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 

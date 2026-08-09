@@ -3,6 +3,7 @@
 @using System.IO
 @using System.Drawing
 @using System.Drawing.Imaging
+@using System.Drawing.Printing
 @using System.Windows.Forms
 @implements IDisposable
 
@@ -115,6 +116,31 @@
                                 <button class="btn btn-primary" @onclick="SaveStoreSettings">💾 حفظ الإعدادات</button>
                             </div>
                             <div class="muted" style="margin-top:10px; font-size:12px">ℹ️ البيانات دي هتظهر تلقائيًا في رأس وذيل فاتورة البيع المطبوعة.</div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top:16px">
+                        <div class="card-title">🖨️ طابعة الفواتير وفتح الدرج</div>
+                        <div class="muted" style="font-size:12px; margin-bottom:10px">لو الدرج متوصل بكابل بطابعة الفواتير، حدد الطابعة دي عشان اختصار F8 يقدر يبعتلها نبضة فتح الدرج من أي شاشة في البرنامج.</div>
+                        <div class="form-grid">
+                            <div>
+                                <label class="field-label">طابعة الفواتير</label>
+                                <select class="field-input" @onchange="e => receiptPrinterName = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">-- اختر الطابعة --</option>
+                                    @foreach (var printer in installedPrinters)
+                                    {
+                                        <option value="@printer" selected="@(printer == receiptPrinterName)">@printer</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions" style="margin-top:12px; align-items:center">
+                            <button class="btn btn-primary" @onclick="SaveReceiptPrinter">💾 حفظ الطابعة</button>
+                            <button class="btn btn-outline" @onclick="TestOpenDrawer">🗄️ تجربة فتح الدرج الآن</button>
+                            @if (!string.IsNullOrEmpty(drawerStatusMessage))
+                            {
+                                <span style="color:@(drawerStatusIsError ? "var(--color-red)" : "var(--color-green)"); font-size:13px">@drawerStatusMessage</span>
+                            }
                         </div>
                     </div>
 
@@ -314,6 +340,11 @@
     private string? syncStatusMessage;
     private bool syncStatusIsError;
 
+    private string receiptPrinterName = "";
+    private List<string> installedPrinters = new();
+    private string? drawerStatusMessage;
+    private bool drawerStatusIsError;
+
     // ---------- النسخ الاحتياطي ----------
     private class BackupRow { public string FileName = ""; public string DateText = ""; public string SizeText = ""; public string FullPath = ""; }
     private List<BackupRow> backups = new();
@@ -345,6 +376,7 @@
         {
             LoadStoreSettings();
             LoadCatalogSync();
+            LoadReceiptPrinter();
         }
     }
 
@@ -383,6 +415,43 @@
         syncUrl = url ?? "";
         syncSecret = secret ?? "";
         syncEnabled = enabled;
+    }
+
+    private void LoadReceiptPrinter()
+    {
+        try { installedPrinters = PrinterSettings.InstalledPrinters.Cast<string>().ToList(); }
+        catch { installedPrinters = new List<string>(); }
+
+        receiptPrinterName = SettingsRepository.GetReceiptPrinterName() ?? "";
+    }
+
+    private void SaveReceiptPrinter()
+    {
+        try
+        {
+            SettingsRepository.SaveReceiptPrinterName(receiptPrinterName);
+            drawerStatusIsError = false;
+            drawerStatusMessage = "تم الحفظ ✅";
+        }
+        catch (Exception ex)
+        {
+            drawerStatusIsError = true;
+            drawerStatusMessage = "حصل خطأ أثناء الحفظ: " + ex.Message;
+        }
+    }
+
+    private void TestOpenDrawer()
+    {
+        if (!CashDrawerHelper.OpenDrawer(receiptPrinterName, out string error))
+        {
+            drawerStatusIsError = true;
+            drawerStatusMessage = error;
+        }
+        else
+        {
+            drawerStatusIsError = false;
+            drawerStatusMessage = "اتبعتت نبضة الفتح ✅ (لو الدرج ماتفتحش، اتأكد من التوصيل)";
+        }
     }
 
     private async Task OnLogoSelected(InputFileChangeEventArgs e)

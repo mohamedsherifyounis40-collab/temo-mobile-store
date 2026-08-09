@@ -318,6 +318,7 @@ namespace Temo_Mobile_Store.Database
                 EnsureSalesPaymentMethodColumn(conn);
                 EnsureSalesInvoiceIdColumn(conn);
                 EnsureStoreSettingsCatalogSyncColumns(conn);
+                EnsureStoreSettingsReceiptPrinterColumn(conn);
                 EnsureDailyClosuresAdjustmentMovementIdColumn(conn);
                 EnsureEmployeesStandardHoursPerDayColumn(conn);
                 EnsureAttendanceRecordsOvertimeHoursColumn(conn);
@@ -648,6 +649,30 @@ namespace Temo_Mobile_Store.Database
                 ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN CatalogSyncEnabled INTEGER NOT NULL DEFAULT 0;");
             if (!existingColumns.Contains("WhatsAppNumber"))
                 ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN WhatsAppNumber TEXT;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود ReceiptPrinterName لجدول StoreSettings - اسم طابعة الفواتير
+        // (اللي الدرج متوصل بيها بكابل RJ11) عشان اختصار F8 يعرف يبعتلها نبضة الفتح.
+        // ==========================================================================
+        private static void EnsureStoreSettingsReceiptPrinterColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(StoreSettings);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "ReceiptPrinterName", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN ReceiptPrinterName TEXT;");
         }
 
         // ==========================================================================

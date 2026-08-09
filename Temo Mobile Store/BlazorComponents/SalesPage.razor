@@ -855,6 +855,15 @@
 
             invoiceNumberText = $"#{result.DailyInvoiceNumber}";
             successMessage = $"تم تأكيد الفاتورة رقم {result.DailyInvoiceNumber} بنجاح. الباقي: {result.ChangeDue:N2} ج.م";
+
+            // الدرج بيتفتح تلقائيًا للدفع النقدي بس (مش فيزا/فودافون كاش/إلخ) - فشل الفتح
+            // مايوقفش أو يبوّظ البيع، البيع خلص فعلًا؛ بس بننبّه في نفس رسالة النجاح
+            if (saleType == "Cash" && selectedPaymentMethod == "نقدي")
+            {
+                if (!CashDrawerHelper.OpenDrawer(SettingsRepository.GetReceiptPrinterName(), out string drawerError))
+                    successMessage += $" ⚠️ تعذر فتح الدرج تلقائيًا: {drawerError}";
+            }
+
             cart.Clear();
             quickDiscountPercent = 0;
             TaxRatePercent = 0;

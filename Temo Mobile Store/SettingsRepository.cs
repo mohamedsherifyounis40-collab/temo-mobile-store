@@ -69,6 +69,32 @@ namespace Temo_Mobile_Store
             }
         }
 
+        public static string GetReceiptPrinterName()
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("SELECT ReceiptPrinterName FROM StoreSettings WHERE Id = 1;", conn))
+                {
+                    object result = cmd.ExecuteScalar();
+                    return result == null || result == DBNull.Value ? null : result.ToString();
+                }
+            }
+        }
+
+        public static void SaveReceiptPrinterName(string printerName)
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("UPDATE StoreSettings SET ReceiptPrinterName = @Name WHERE Id = 1;", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Name", string.IsNullOrWhiteSpace(printerName) ? (object)DBNull.Value : printerName.Trim());
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         // بينسخ قاعدة البيانات كاملة لمسار معين (مستخدم في تصدير نسخة احتياطية)
         public static void BackupDatabaseTo(string destPath)
         {
