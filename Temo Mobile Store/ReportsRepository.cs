@@ -295,36 +295,25 @@ namespace Temo_Mobile_Store
                 new DataColumn("وارد"), new DataColumn("منصرف"), new DataColumn("الرصيد بعد الحركة")
             });
 
-            string query;
-            if (method == "نقدي")
-            {
-                query = @"
-                    SELECT SaleDate AS OpDate, 'بيع' AS OpType, ProductName AS Details, Total AS Amount, 1 AS IsIn FROM Sales
-                    WHERE SaleDate BETWEEN @From AND @To
-                    UNION ALL
-                    SELECT E.ExpenseDate AS OpDate, 'مصروف' AS OpType, A.AccountName AS Details, E.Amount AS Amount, 0 AS IsIn
-                        FROM Expenses E INNER JOIN AccountsTree A ON E.AccountCode = A.AccountCode
-                        WHERE E.ExpenseDate BETWEEN @From AND @To
-                    UNION ALL
-                    SELECT CM.CreatedAt AS OpDate, CM.MovementType AS OpType,
-                           (CASE WHEN AC.AccountName IS NOT NULL THEN AC.AccountName ELSE 'بدون تصنيف' END ||
-                            CASE WHEN CM.Description IS NOT NULL AND CM.Description <> '' THEN ' - ' || CM.Description ELSE '' END) AS Details,
-                           CM.Amount, CASE WHEN CM.MovementType = 'قبض' THEN 1 ELSE 0 END AS IsIn
-                        FROM CashMovements CM LEFT JOIN AccountsTree AC ON CM.AccountCode = AC.AccountCode
-                        WHERE CM.PaymentMethod = 'نقدي' AND CM.CreatedAt BETWEEN @From AND @To
-                    ORDER BY OpDate ASC";
-            }
-            else
-            {
-                query = @"
-                    SELECT CM.CreatedAt AS OpDate, CM.MovementType AS OpType,
-                           (CASE WHEN AC.AccountName IS NOT NULL THEN AC.AccountName ELSE 'بدون تصنيف' END ||
-                            CASE WHEN CM.Description IS NOT NULL AND CM.Description <> '' THEN ' - ' || CM.Description ELSE '' END) AS Details,
-                           CM.Amount, CASE WHEN CM.MovementType = 'قبض' THEN 1 ELSE 0 END AS IsIn
-                        FROM CashMovements CM LEFT JOIN AccountsTree AC ON CM.AccountCode = AC.AccountCode
-                        WHERE CM.PaymentMethod = @Method AND CM.CreatedAt BETWEEN @From AND @To
-                    ORDER BY OpDate ASC";
-            }
+            // ملحوظة مهمة: مفيش union مباشر مع جدول Sales هنا لأي وسيلة (حتى نقدي) - كل
+            // عملية بيع (وأي تعديل/إلغاء عليها بعد كده) بتتسجل أصلاً كحركة في CashMovements
+            // عن طريق CashDrawerEngine.Credit/Debit وقت التنفيذ (شوف SalesHandlers.cs).
+            // الاعتماد على الاتنين مع بعض كان بيسبب ظهور كل عملية بيع نقدي مرتين في الكشف
+            // (مرة "بيع" من جدول Sales نفسه، ومرة "قبض" من CashMovements) - وبيضاعف
+            // إجمالي الوارد والرصيد الجاري المعروض. CashMovements لوحدها كافية ودقيقة:
+            // بتعكس كل حركة كاش فعلية بتاريخها الحقيقي، حتى تسويات تعديل/إلغاء البيع اللاحقة.
+            string query = @"
+                SELECT E.ExpenseDate AS OpDate, 'مصروف' AS OpType, A.AccountName AS Details, E.Amount AS Amount, 0 AS IsIn
+                    FROM Expenses E INNER JOIN AccountsTree A ON E.AccountCode = A.AccountCode
+                    WHERE E.PaymentMethod = @Method AND E.ExpenseDate BETWEEN @From AND @To
+                UNION ALL
+                SELECT CM.CreatedAt AS OpDate, CM.MovementType AS OpType,
+                       (CASE WHEN AC.AccountName IS NOT NULL THEN AC.AccountName ELSE 'بدون تصنيف' END ||
+                        CASE WHEN CM.Description IS NOT NULL AND CM.Description <> '' THEN ' - ' || CM.Description ELSE '' END) AS Details,
+                       CM.Amount, CASE WHEN CM.MovementType = 'قبض' THEN 1 ELSE 0 END AS IsIn
+                    FROM CashMovements CM LEFT JOIN AccountsTree AC ON CM.AccountCode = AC.AccountCode
+                    WHERE CM.PaymentMethod = @Method AND CM.CreatedAt BETWEEN @From AND @To
+                ORDER BY OpDate ASC";
 
             decimal totalIn = 0, totalOut = 0, runningBalance = 0, currentBalance = 0;
 
@@ -335,7 +324,7 @@ namespace Temo_Mobile_Store
                 {
                     cmd.Parameters.AddWithValue("@From", fromDate);
                     cmd.Parameters.AddWithValue("@To", toDate);
-                    if (method != "نقدي") cmd.Parameters.AddWithValue("@Method", method);
+                    cmd.Parameters.AddWithValue("@Method", method);
 
                     using (SqliteDataReader reader = cmd.ExecuteReader())
                     {
