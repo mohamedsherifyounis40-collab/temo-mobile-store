@@ -135,9 +135,9 @@
                 <div class="card invoice-card">
                     <div class="card-title">بيانات الفاتورة</div>
 
-                    <label class="field-label">العميل</label>
+                    <label class="field-label">العميل @(saleType == "Cash" ? "(اختياري - عشان تقدر ترجعله لو حصل أي حاجة)" : "")</label>
                     <div class="customer-row">
-                        <select class="field-input" value="@selectedCustomerId" @onchange="OnCustomerChanged" disabled="@(saleType != "Credit")">
+                        <select class="field-input" value="@selectedCustomerId" @onchange="OnCustomerChanged">
                             <option value="">عميل نقدي</option>
                             @if (customersTable != null)
                             {
@@ -172,6 +172,21 @@
                         <div class="meta-row"><span>البائع</span><b>@userName</b></div>
                         <div class="meta-row"><span>الفرع</span><b>الفرع الرئيسي</b></div>
                     </div>
+
+                    <div class="form-actions" style="margin-top:10px; flex-wrap:wrap; align-items:center">
+                        <select class="field-input" style="width:auto" @bind="invoicePaperSizeIndex">
+                            <option value="0">80 مم (حرارية)</option>
+                            <option value="1">58 مم (حرارية)</option>
+                            <option value="2">A4 (عادية)</option>
+                        </select>
+                        <button class="btn btn-outline" title="طباعة آخر فاتورة" @onclick="PrintLastInvoice">🖨️ طباعة</button>
+                        <button class="btn btn-outline" title="حفظ آخر فاتورة PDF" @onclick="SaveLastInvoicePdf">💾 PDF</button>
+                        <button class="btn btn-outline" title="إرسال آخر فاتورة واتساب" @onclick="SendLastInvoiceWhatsApp">📱 واتساب</button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(invoiceActionMessage))
+                    {
+                        <div class="muted" style="font-size:12px; margin-top:6px; color:@(invoiceActionIsError ? "var(--color-red)" : "var(--color-green)")">@invoiceActionMessage</div>
+                    }
                 </div>
 
                 <div class="card search-card">
@@ -441,6 +456,9 @@
     private string? errorMessage;
     private string? successMessage;
     private string invoiceNumberText = "غير محفوظة بعد";
+    private int invoicePaperSizeIndex = 0;
+    private string? invoiceActionMessage;
+    private bool invoiceActionIsError;
 
     // ---------- سجل المبيعات (تعديل/إلغاء بيع سابق) - نفس منطق SalesPageControl.BtnSaveSaleEdit_Click/BtnCancelSale_Click بالظبط ----------
     private bool showHistory;
@@ -844,7 +862,7 @@
             var command = new CreateSaleCommand
             {
                 Lines = BuildCommandLines(),
-                CustomerId = saleType == "Credit" && int.TryParse(selectedCustomerId, out var cid) ? cid : null,
+                CustomerId = int.TryParse(selectedCustomerId, out var cid) ? cid : null,
                 PaymentType = saleType,
                 PaymentMethod = saleType == "Cash" ? selectedPaymentMethod : null,
                 PerformedBy = AuthManager.CurrentUsername ?? "unknown",
@@ -878,5 +896,73 @@
         {
             isSaving = false;
         }
+    }
+
+    // ==========================================================================
+    // طباعة/PDF/واتساب لآخر فاتورة بيع مسجلة - بيرجع نفس السلوك اللي كان موجود
+    // في شاشة المبيعات القديمة (WinForms) قبل الانتقال لـ Blazor Hybrid.
+    // ==========================================================================
+    private List<ReceiptData>? LoadLastInvoiceOrShowError()
+    {
+        invoiceActionMessage = null;
+        invoiceActionIsError = false;
+
+        List<ReceiptData> items;
+        try { items = SalesRepository.GetLastInvoiceForReceipt(); }
+        catch (Exception ex)
+        {
+            invoiceActionIsError = true;
+            invoiceActionMessage = "حصل خطأ أثناء تجهيز الفاتورة: " + ex.Message;
+            return null;
+        }
+
+        if (items == null || items.Count == 0)
+        {
+            invoiceActionIsError = true;
+            invoiceActionMessage = "لا توجد عمليات بيع مسجلة بعد.";
+            return null;
+        }
+
+        return items;
+    }
+
+    private void PrintLastInvoice()
+    {
+        var items = LoadLastInvoiceOrShowError();
+        if (items == null) return;
+        ReceiptPrintHelper.PrintInvoice(items, invoicePaperSizeIndex);
+    }
+
+    private void SaveLastInvoicePdf()
+    {
+        var items = LoadLastInvoiceOrShowError();
+        if (items == null) return;
+
+        if (ReceiptPrintHelper.SaveInvoicePdf(items, invoicePaperSizeIndex, out string filePath, out string error))
+        {
+            invoiceActionIsError = false;
+            invoiceActionMessage = $"تم حفظ الفاتورة في: {filePath}";
+        }
+        else
+        {
+            invoiceActionIsError = true;
+            invoiceActionMessage = error;
+        }
+    }
+
+    private void SendLastInvoiceWhatsApp()
+    {
+        invoiceActionMessage = null;
+        invoiceActionIsError = false;
+
+        var lastSale = SalesRepository.GetLastSaleWithCustomer();
+        if (lastSale.ProductName == null)
+        {
+            invoiceActionIsError = true;
+            invoiceActionMessage = "لا توجد عمليات بيع مسجلة بعد.";
+            return;
+        }
+
+        ReceiptPrintHelper.SendInvoiceWhatsApp(lastSale.CustomerPhone, lastSale.CustomerName, lastSale.DailyInvoiceNumber, lastSale.SaleDate, lastSale.Total, MainShell.Instance);
     }
 }
