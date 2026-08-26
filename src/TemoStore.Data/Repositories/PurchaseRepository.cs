@@ -41,13 +41,14 @@ namespace TemoStore.Data.Repositories
         public void InsertItem(int purchaseId, PurchaseLine line)
         {
             using var cmd = new SqliteCommand(
-                "INSERT INTO PurchaseItems (PurchaseId, Barcode, ProductName, Quantity, UnitCost, LineTotal) VALUES (@P, @B, @N, @Q, @U, @L)", _conn, _tx);
+                "INSERT INTO PurchaseItems (PurchaseId, Barcode, ProductName, Quantity, UnitCost, LineTotal, SkipInventory) VALUES (@P, @B, @N, @Q, @U, @L, @Skip)", _conn, _tx);
             cmd.Parameters.AddWithValue("@P", purchaseId);
             cmd.Parameters.AddWithValue("@B", string.IsNullOrEmpty(line.Barcode) ? (object)DBNull.Value : line.Barcode);
             cmd.Parameters.AddWithValue("@N", line.ProductName);
             cmd.Parameters.AddWithValue("@Q", line.Qty);
             cmd.Parameters.AddWithValue("@U", line.UnitCost);
             cmd.Parameters.AddWithValue("@L", line.LineTotal);
+            cmd.Parameters.AddWithValue("@Skip", line.SkipInventory ? 1 : 0);
             cmd.ExecuteNonQuery();
         }
 
@@ -82,7 +83,7 @@ namespace TemoStore.Data.Repositories
                 };
             }
 
-            using (var cmd = new SqliteCommand("SELECT Barcode, ProductName, Quantity, UnitCost, LineTotal FROM PurchaseItems WHERE PurchaseId = @Id", _conn, _tx))
+            using (var cmd = new SqliteCommand("SELECT Barcode, ProductName, Quantity, UnitCost, LineTotal, SkipInventory FROM PurchaseItems WHERE PurchaseId = @Id", _conn, _tx))
             {
                 cmd.Parameters.AddWithValue("@Id", purchaseId);
                 using var reader = cmd.ExecuteReader();
@@ -94,7 +95,8 @@ namespace TemoStore.Data.Repositories
                         ProductName = reader["ProductName"].ToString()!,
                         Qty = Convert.ToInt32(reader["Quantity"]),
                         UnitCost = Convert.ToDecimal(reader["UnitCost"]),
-                        LineTotal = Convert.ToDecimal(reader["LineTotal"])
+                        LineTotal = Convert.ToDecimal(reader["LineTotal"]),
+                        SkipInventory = Convert.ToInt32(reader["SkipInventory"]) == 1
                     });
                 }
             }

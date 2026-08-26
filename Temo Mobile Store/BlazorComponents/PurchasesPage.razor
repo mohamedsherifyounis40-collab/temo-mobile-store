@@ -1,8 +1,9 @@
-@using System.Data
+﻿@using System.Data
 @using System.Globalization
 @using TemoStore.Core.Entities
 @using TemoStore.Core.Commands
 @implements IDisposable
+@inject IJSRuntime JS
 
 <div class="app-shell">
 
@@ -27,7 +28,7 @@
                 <div class="topbar-datetime"><span>@nowText</span></div>
                 <LicenseBadge />
                     <NotificationBell />
-                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <button class="icon-btn" title="@(currentTheme == "dark" ? "الوضع الفاتح" : "الوضع الداكن")" @onclick="ToggleTheme">@(currentTheme == "dark" ? "☀️" : "🌙")</button>
                     <button class="icon-btn" title="تسجيل خروج" @onclick="() => MainShell.Instance?.RequestLogout()">🚪</button>
                 <div class="topbar-user">
                     <div class="avatar">@userInitial</div>
@@ -160,40 +161,58 @@
                 <div class="card">
                     <div class="card-title">إضافة صنف</div>
 
-                    <label class="field-label">الباركود</label>
-                    <input class="field-input" placeholder="امسح أو اكتب الباركود (Enter)" value="@barcode" @oninput="OnBarcodeInput" @onkeydown="OnBarcodeKeyDown" />
-
-                    <div class="form-grid" style="margin-top:10px">
-                        <div>
-                            <label class="field-label">اسم المنتج</label>
-                            <input class="field-input" value="@productName" @oninput="e => productName = e.Value?.ToString() ?? string.Empty" />
-                        </div>
-                        <div>
-                            <label class="field-label">سعر الشراء (تكلفة)</label>
-                            <input class="field-input" type="number" value="@unitCost" @oninput="e => unitCost = e.Value?.ToString() ?? string.Empty" />
-                        </div>
-                        <div>
-                            <label class="field-label">سعر البيع المقترح</label>
-                            <input class="field-input" type="number" value="@salePrice" @oninput="e => salePrice = e.Value?.ToString() ?? string.Empty" />
-                        </div>
-                        @if (!isSerialized)
-                        {
-                            <div>
-                                <label class="field-label">الكمية</label>
-                                <input class="field-input" type="number" value="@qty" @oninput="e => qty = e.Value?.ToString() ?? string.Empty" />
-                            </div>
-                        }
-                    </div>
-
-                    <label class="field-label" style="margin-top:10px">
-                        <input type="checkbox" checked="@isSerialized" @onchange="e => isSerialized = (bool)(e.Value ?? false)" />
-                        منتج بسيريال (IMEI)
+                    <label class="field-label" style="margin-bottom:10px">
+                        <input type="checkbox" checked="@isLumpSum" @onchange="e => isLumpSum = (bool)(e.Value ?? false)" />
+                        🧾 بند مبلغ إجمالي (بدون تسجيل في المخزون) — زي مصاريف شحن أو فاتورة عامة
                     </label>
 
-                    @if (isSerialized)
+                    @if (isLumpSum)
                     {
-                        <label class="field-label">أرقام IMEI (رقم في كل سطر)</label>
-                        <textarea class="notes-input" value="@imeiText" @oninput="e => imeiText = e.Value?.ToString() ?? string.Empty"></textarea>
+                        <label class="field-label">الوصف (اختياري)</label>
+                        <input class="field-input" placeholder="فاتورة شراء عامة" value="@lumpSumDescription" @oninput="e => lumpSumDescription = e.Value?.ToString() ?? string.Empty" />
+
+                        <label class="field-label" style="margin-top:10px">المبلغ الإجمالي</label>
+                        <input class="field-input" type="number" value="@lumpSumAmount" @oninput="e => lumpSumAmount = e.Value?.ToString() ?? string.Empty" />
+
+                        <div class="muted" style="margin-top:10px;font-size:12px">البند ده بيتسجل كدين/سداد للمورد وبيظهر في كشف حسابه، من غير ما يلمس المخزون خالص.</div>
+                    }
+                    else
+                    {
+                        <label class="field-label">الباركود</label>
+                        <input class="field-input" placeholder="امسح أو اكتب الباركود (Enter)" value="@barcode" @oninput="OnBarcodeInput" @onkeydown="OnBarcodeKeyDown" />
+
+                        <div class="form-grid" style="margin-top:10px">
+                            <div>
+                                <label class="field-label">اسم المنتج</label>
+                                <input class="field-input" value="@productName" @oninput="e => productName = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div>
+                                <label class="field-label">سعر الشراء (تكلفة)</label>
+                                <input class="field-input" type="number" value="@unitCost" @oninput="e => unitCost = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            <div>
+                                <label class="field-label">سعر البيع المقترح</label>
+                                <input class="field-input" type="number" value="@salePrice" @oninput="e => salePrice = e.Value?.ToString() ?? string.Empty" />
+                            </div>
+                            @if (!isSerialized)
+                            {
+                                <div>
+                                    <label class="field-label">الكمية</label>
+                                    <input class="field-input" type="number" value="@qty" @oninput="e => qty = e.Value?.ToString() ?? string.Empty" />
+                                </div>
+                            }
+                        </div>
+
+                        <label class="field-label" style="margin-top:10px">
+                            <input type="checkbox" checked="@isSerialized" @onchange="e => isSerialized = (bool)(e.Value ?? false)" />
+                            منتج بسيريال (IMEI)
+                        </label>
+
+                        @if (isSerialized)
+                        {
+                            <label class="field-label">أرقام IMEI (رقم في كل سطر)</label>
+                            <textarea class="notes-input" value="@imeiText" @oninput="e => imeiText = e.Value?.ToString() ?? string.Empty"></textarea>
+                        }
                     }
 
                     <button class="btn btn-primary" style="margin-top:10px" @onclick="AddToCart">➕ إضافة للفاتورة</button>
@@ -228,7 +247,7 @@
                                 <td>@line.SalePrice.ToString("N2")</td>
                                 <td>@line.UnitCost.ToString("N2")</td>
                                 <td>@line.Qty</td>
-                                <td class="muted">@(line.Imeis is { Count: > 0 } ? string.Join(", ", line.Imeis) : line.Barcode)</td>
+                                <td class="muted">@(line.SkipInventory ? "🧾 مبلغ إجمالي" : (line.Imeis is { Count: > 0 } ? string.Join(", ", line.Imeis) : line.Barcode))</td>
                                 <td>@line.ProductName</td>
                             </tr>
                         }
@@ -299,7 +318,7 @@
 
     private class CartLine
     {
-        public required string Barcode { get; set; }
+        public string? Barcode { get; set; }
         public required string ProductName { get; set; }
         public int Qty { get; set; }
         public decimal UnitCost { get; set; }
@@ -307,12 +326,15 @@
         public decimal LineTotal => UnitCost * Qty;
         public bool IsSerialized { get; set; }
         public List<string>? Imeis { get; set; }
+        public bool SkipInventory { get; set; }
     }
 
     private List<CartLine> cart = new();
 
     private string barcode = "", productName = "", unitCost = "", salePrice = "", qty = "1", imeiText = "";
     private bool isSerialized;
+    private bool isLumpSum;
+    private string lumpSumDescription = "", lumpSumAmount = "";
 
     private bool isSaving;
     private string? errorMessage;
@@ -339,6 +361,25 @@
     }
 
     public void Dispose() => clockTimer?.Dispose();
+
+    private string currentTheme = "light";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            currentTheme = ThemeManager.CurrentTheme;
+            await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        currentTheme = ThemeManager.ToggledTheme();
+        ThemeManager.SetTheme(currentTheme);
+        await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+    }
 
     private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
 
@@ -386,6 +427,21 @@
     {
         errorMessage = null;
         successMessage = null;
+
+        if (isLumpSum)
+        {
+            if (!decimal.TryParse(lumpSumAmount, out var amount) || amount <= 0)
+            {
+                errorMessage = "من فضلك أدخل مبلغ إجمالي صحيح أكبر من صفر.";
+                return;
+            }
+            string description = string.IsNullOrWhiteSpace(lumpSumDescription) ? "فاتورة شراء عامة" : lumpSumDescription.Trim();
+            cart.Add(new CartLine { Barcode = null, ProductName = description, Qty = 1, UnitCost = amount, SalePrice = 0, IsSerialized = false, SkipInventory = true });
+
+            lumpSumDescription = lumpSumAmount = "";
+            isLumpSum = false;
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(barcode))
         {
@@ -443,6 +499,8 @@
         barcode = productName = unitCost = salePrice = imeiText = "";
         qty = "1";
         isSerialized = false;
+        isLumpSum = false;
+        lumpSumDescription = lumpSumAmount = "";
         errorMessage = null;
         successMessage = null;
         editingPurchaseId = null;
@@ -487,7 +545,8 @@
             UnitCost = i.UnitCost,
             SalePrice = i.SalePrice,
             IsSerialized = i.IsSerialized,
-            Imeis = i.Imeis
+            Imeis = i.Imeis,
+            SkipInventory = i.SkipInventory
         }).ToList();
         selectedSupplierId = supplierId.ToString();
         editingPurchaseId = purchaseId;
@@ -553,7 +612,8 @@
                 SalePrice = c.SalePrice,
                 LineTotal = c.LineTotal,
                 IsSerialized = c.IsSerialized,
-                Imeis = c.Imeis
+                Imeis = c.Imeis,
+                SkipInventory = c.SkipInventory
             }).ToList();
 
             PurchaseResult result;
@@ -590,6 +650,8 @@
             barcode = productName = unitCost = salePrice = imeiText = "";
             qty = "1";
             isSerialized = false;
+            isLumpSum = false;
+            lumpSumDescription = lumpSumAmount = "";
             if (showHistory) LoadPurchaseHistory();
         }
         catch (Exception ex)

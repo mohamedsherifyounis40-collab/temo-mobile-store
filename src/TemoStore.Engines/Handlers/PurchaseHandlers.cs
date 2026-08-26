@@ -73,12 +73,14 @@ namespace TemoStore.Engines.Handlers
             {
                 uow.Purchases.InsertItem(purchaseId, line);
 
+                if (line.SkipInventory) continue;
+
                 string barcode = line.Barcode ?? string.Empty;
                 var existing = string.IsNullOrEmpty(barcode) ? null : uow.Products.GetByBarcode(barcode);
                 string finalBarcode = existing != null ? barcode
                     : (string.IsNullOrEmpty(barcode) ? "NEW-" + DateTime.Now.Ticks : barcode);
 
-                uow.Products.UpsertOnPurchase(barcode, line.ProductName, line.UnitCost, line.SalePrice, line.Qty, line.IsSerialized);
+                uow.Products.UpsertOnPurchase(finalBarcode, line.ProductName, line.UnitCost, line.SalePrice, line.Qty, line.IsSerialized);
 
                 if (line.IsSerialized && line.Imeis != null)
                 {
@@ -174,10 +176,18 @@ namespace TemoStore.Engines.Handlers
             foreach (var line in command.Lines)
             {
                 uow.Purchases.InsertItem(command.PurchaseId, line);
-                uow.Products.UpsertOnPurchase(line.Barcode ?? "", line.ProductName, line.UnitCost, line.SalePrice, line.Qty, line.IsSerialized);
-                if (line.IsSerialized && line.Imeis != null && !string.IsNullOrEmpty(line.Barcode))
+
+                if (line.SkipInventory) continue;
+
+                string barcode = line.Barcode ?? string.Empty;
+                var existing = string.IsNullOrEmpty(barcode) ? null : uow.Products.GetByBarcode(barcode);
+                string finalBarcode = existing != null ? barcode
+                    : (string.IsNullOrEmpty(barcode) ? "NEW-" + DateTime.Now.Ticks : barcode);
+
+                uow.Products.UpsertOnPurchase(finalBarcode, line.ProductName, line.UnitCost, line.SalePrice, line.Qty, line.IsSerialized);
+                if (line.IsSerialized && line.Imeis != null)
                     foreach (var imei in line.Imeis)
-                        uow.Products.InsertProductUnit(line.Barcode, imei, command.PurchaseId);
+                        uow.Products.InsertProductUnit(finalBarcode, imei, command.PurchaseId);
             }
 
             if (command.PayCashNow)

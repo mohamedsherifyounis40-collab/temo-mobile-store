@@ -60,6 +60,11 @@ namespace TemoStore.Core.Entities
         public decimal LineTotal { get; set; }
         public bool IsSerialized { get; set; }
         public List<string>? Imeis { get; set; }
+
+        // سطر "فاتورة مبلغ إجمالي": مبلغ مستحق للمورد من غير ما يتسجل صنف
+        // بالمخزون - بيتسجل في تفاصيل الفاتورة وحساب المورد بس، وبيتجاهله كل
+        // منطق المخزون (UpsertOnPurchase/InsertProductUnit/عكس المخزون عند الإلغاء).
+        public bool SkipInventory { get; set; }
     }
 
     public class PurchaseRecord

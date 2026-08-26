@@ -95,6 +95,32 @@ namespace Temo_Mobile_Store
             }
         }
 
+        public static string GetTheme()
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("SELECT Theme FROM StoreSettings WHERE Id = 1;", conn))
+                {
+                    object result = cmd.ExecuteScalar();
+                    return result == null || result == DBNull.Value ? "light" : result.ToString();
+                }
+            }
+        }
+
+        public static void SaveTheme(string theme)
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand("UPDATE StoreSettings SET Theme = @Theme WHERE Id = 1;", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Theme", theme == "dark" ? "dark" : "light");
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         // بينسخ قاعدة البيانات كاملة لمسار معين (مستخدم في تصدير نسخة احتياطية)
         public static void BackupDatabaseTo(string destPath)
         {

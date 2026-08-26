@@ -32,6 +32,10 @@ namespace Temo_Mobile_Store
             blazorWebView.RootComponents.Add<HomeApp>("#app");
 
             this.Controls.Add(blazorWebView);
+
+            // كل ما الكونترول ده يظهر تاني (المستخدم رجع لشاشة الرئيسية من شاشة تانية،
+            // راجع MainShell.ShowPageInline) نطلب من HomePage.razor تحديث فوري للداشبورد.
+            this.VisibleChanged += (s, e) => { if (this.Visible) HomeRefreshSignal.Request(); };
         }
     }
 }

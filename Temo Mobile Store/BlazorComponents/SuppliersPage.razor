@@ -1,7 +1,8 @@
-@using System.Data
+﻿@using System.Data
 @using System.Globalization
 @using TemoStore.Core.Commands
 @implements IDisposable
+@inject IJSRuntime JS
 
 <div class="app-shell">
 
@@ -26,7 +27,7 @@
                 <div class="topbar-datetime"><span>@nowText</span></div>
                 <LicenseBadge />
                     <NotificationBell />
-                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <button class="icon-btn" title="@(currentTheme == "dark" ? "الوضع الفاتح" : "الوضع الداكن")" @onclick="ToggleTheme">@(currentTheme == "dark" ? "☀️" : "🌙")</button>
                     <button class="icon-btn" title="تسجيل خروج" @onclick="() => MainShell.Instance?.RequestLogout()">🚪</button>
                 <div class="topbar-user">
                     <div class="avatar">@userInitial</div>
@@ -318,6 +319,25 @@
     }
 
     public void Dispose() => clockTimer?.Dispose();
+
+    private string currentTheme = "light";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            currentTheme = ThemeManager.CurrentTheme;
+            await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        currentTheme = ThemeManager.ToggledTheme();
+        ThemeManager.SetTheme(currentTheme);
+        await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+    }
 
     private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
 

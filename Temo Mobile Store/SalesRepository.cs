@@ -96,16 +96,21 @@ namespace Temo_Mobile_Store
         public static DataTable GetSales()
         {
             DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("رقم البيع"), new DataColumn("المنتج"), new DataColumn("الكمية المباعة"), new DataColumn("الإجمالي"), new DataColumn("التاريخ والوقت ⏰") });
+            dt.Columns.AddRange(new DataColumn[] { new DataColumn("رقم البيع"), new DataColumn("المنتج"), new DataColumn("الكمية المباعة"), new DataColumn("الإجمالي"), new DataColumn("وسيلة الدفع"), new DataColumn("التاريخ والوقت ⏰") });
 
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleID, ProductName, QuantitySold, Total, SaleDate FROM Sales ORDER BY SaleID ASC", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleID, ProductName, QuantitySold, Total, PaymentType, PaymentMethod, SaleDate FROM Sales ORDER BY SaleID ASC", conn))
                 using (SqliteDataReader reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
-                        dt.Rows.Add(reader["SaleID"], reader["ProductName"], reader["QuantitySold"], reader["Total"], reader["SaleDate"]);
+                    {
+                        string paymentType = reader["PaymentType"] == DBNull.Value ? "Cash" : reader["PaymentType"].ToString();
+                        string paymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString();
+                        string paymentLabel = paymentType == "Credit" ? "آجل" : (string.IsNullOrEmpty(paymentMethod) ? "كاش" : paymentMethod);
+                        dt.Rows.Add(reader["SaleID"], reader["ProductName"], reader["QuantitySold"], reader["Total"], paymentLabel, reader["SaleDate"]);
+                    }
                 }
             }
             return dt;

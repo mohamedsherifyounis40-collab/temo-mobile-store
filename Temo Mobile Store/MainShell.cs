@@ -1089,10 +1089,10 @@ namespace Temo_Mobile_Store
         // ==========================================================================
         private Panel BuildBalancesRow(List<(string Method, decimal Balance)> methodBalances, decimal totalBalance)
         {
-            var methodIcons = new Dictionary<string, string> { { "نقدي", "💵" }, { "فوري", "📲" }, { "أمان", "🔒" }, { "سهولة", "✅" }, { "فودافون كاش", "🔴" }, { "إنستاباي", "🏛️" } };
+            var methodIcons = new Dictionary<string, string> { { "نقدي", "💵" }, { "فوري", "📲" }, { "أمان", "🔒" }, { "ممكن", "✅" }, { "فودافون كاش", "🔴" }, { "إنستاباي", "🏛️" } };
             var methodColors = new Dictionary<string, Color> {
                 { "نقدي", UIHelpers.ColorGreen }, { "فوري", UIHelpers.ColorOrange },
-                { "أمان", UIHelpers.ColorAccentPrimary }, { "سهولة", Color.FromArgb(22, 160, 133) },
+                { "أمان", UIHelpers.ColorAccentPrimary }, { "ممكن", Color.FromArgb(22, 160, 133) },
                 { "فودافون كاش", UIHelpers.ColorRed }, { "إنستاباي", UIHelpers.ColorPurple }
             };
 

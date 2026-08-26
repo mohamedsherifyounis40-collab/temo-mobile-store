@@ -1,7 +1,8 @@
-@using System.Data
+﻿@using System.Data
 @using System.Globalization
 @using Microsoft.Data.Sqlite
 @implements IDisposable
+@inject IJSRuntime JS
 
 <div class="app-shell">
 
@@ -26,7 +27,7 @@
                 <div class="topbar-datetime"><span>@nowText</span></div>
                 <LicenseBadge />
                 <NotificationBell />
-                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <button class="icon-btn" title="@(currentTheme == "dark" ? "الوضع الفاتح" : "الوضع الداكن")" @onclick="ToggleTheme">@(currentTheme == "dark" ? "☀️" : "🌙")</button>
                 <button class="icon-btn" title="تسجيل خروج" @onclick="() => MainShell.Instance?.RequestLogout()">🚪</button>
                 <div class="topbar-user">
                     <div class="avatar">@userInitial</div>
@@ -175,14 +176,14 @@
                     else
                     {
                         <table class="mini-table">
-                            <thead><tr><th>العميل</th><th>الإجمالي</th><th>النوع</th></tr></thead>
+                            <thead><tr><th>العميل</th><th>الإجمالي</th><th>وسيلة الدفع</th></tr></thead>
                             <tbody>
                                 @foreach (var inv in latestInvoices)
                                 {
                                     <tr class="clickable-row" @onclick="() => MainShell.Instance?.OpenPageByKey(MainShell.PageKeys.SalesBlazor)">
                                         <td>@inv.CustomerName</td>
                                         <td class="num">@inv.Total.ToString("N0") ج.م</td>
-                                        <td>@(inv.PaymentType == "Cash" ? "كاش" : "آجل")</td>
+                                        <td>@(inv.PaymentType == "Cash" ? (string.IsNullOrEmpty(inv.PaymentMethod) ? "كاش" : inv.PaymentMethod) : "آجل")</td>
                                     </tr>
                                 }
                             </tbody>
@@ -324,7 +325,7 @@
 
     private decimal distCash, distCredit, distMaintenance;
 
-    private List<(int InvoiceId, int SaleId, string CustomerName, string Date, decimal Total, string PaymentType)> latestInvoices = new();
+    private List<(int InvoiceId, int SaleId, string CustomerName, string Date, decimal Total, string PaymentType, string? PaymentMethod)> latestInvoices = new();
     private List<(string Icon, string Text, string AccentClass)> notificationRows = new();
     private List<(string Icon, string Text, DateTime When)> recentActivity = new();
     private List<(string Name, int Qty)> lowStockProducts = new();
@@ -347,10 +348,40 @@
         clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); LoadDashboard(); StateHasChanged(); });
         clockTimer.Start();
 
+        // بيتنادى لحظة ما المستخدم يرجع للرئيسية من شاشة تانية (راجع HomeRefreshSignal
+        // وHomePageBlazorHost.VisibleChanged) - عشان يشوف فورًا أثر أي حركة عملها (بيع،
+        // مصروف، فاتورة شراء...) من غير ما يستنى تايمر الـ 30 ثانية.
+        HomeRefreshSignal.Requested += OnHomeRefreshRequested;
+
         LoadDashboard();
     }
 
-    public void Dispose() => clockTimer?.Dispose();
+    private void OnHomeRefreshRequested() => InvokeAsync(() => { RefreshNow(); LoadDashboard(); StateHasChanged(); });
+
+    public void Dispose()
+    {
+        clockTimer?.Dispose();
+        HomeRefreshSignal.Requested -= OnHomeRefreshRequested;
+    }
+
+    private string currentTheme = "light";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            currentTheme = ThemeManager.CurrentTheme;
+            await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        currentTheme = ThemeManager.ToggledTheme();
+        ThemeManager.SetTheme(currentTheme);
+        await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+    }
 
     private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
 
@@ -365,7 +396,7 @@
         "نقدي" => "💵",
         "فوري" => "⚡",
         "أمان" => "🛡️",
-        "سهولة" => "🟢",
+        "ممكن" => "🟢",
         "فودافون كاش" => "📱",
         "إنستاباي" => "🔷",
         _ => "💳"
@@ -506,7 +537,7 @@
 
             using (var cmd = new SqliteCommand(@"
                 SELECT S.SalesInvoiceId, MIN(S.SaleID) AS FirstSaleId, MAX(S.SaleDate) AS SaleDate,
-                       SUM(S.Total) AS Total, MAX(S.PaymentType) AS PaymentType, C.CustomerName
+                       SUM(S.Total) AS Total, MAX(S.PaymentType) AS PaymentType, MAX(S.PaymentMethod) AS PaymentMethod, C.CustomerName
                 FROM Sales S LEFT JOIN Customers C ON S.CustomerId = C.CustomerId
                 WHERE S.SalesInvoiceId IS NOT NULL
                 GROUP BY S.SalesInvoiceId
@@ -521,7 +552,8 @@
                         r["CustomerName"] == DBNull.Value ? "عميل نقدي" : r["CustomerName"].ToString()!,
                         r["SaleDate"].ToString()!,
                         r["Total"] == DBNull.Value ? 0 : Convert.ToDecimal(r["Total"]),
-                        r["PaymentType"] == DBNull.Value ? "Cash" : r["PaymentType"].ToString()!));
+                        r["PaymentType"] == DBNull.Value ? "Cash" : r["PaymentType"].ToString()!,
+                        r["PaymentMethod"] == DBNull.Value ? null : r["PaymentMethod"].ToString()));
                 }
             }
 

@@ -8,7 +8,7 @@ html, body { background: transparent; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(160deg, #EBF1FA, #D6E3F5);
+    background: linear-gradient(160deg, var(--color-login-gradient-1), var(--color-login-gradient-2));
     padding: 30px 20px;
 }
 

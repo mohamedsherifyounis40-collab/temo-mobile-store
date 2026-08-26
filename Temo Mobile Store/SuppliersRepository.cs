@@ -24,6 +24,7 @@ namespace Temo_Mobile_Store
         public decimal LineTotal;
         public bool IsSerialized;
         public List<string> Imeis;
+        public bool SkipInventory;
     }
 
     // ==========================================================================
@@ -225,7 +226,7 @@ namespace Temo_Mobile_Store
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, ProductName, Quantity, UnitCost, LineTotal FROM PurchaseItems WHERE PurchaseId = @Id", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT Barcode, ProductName, Quantity, UnitCost, LineTotal, SkipInventory FROM PurchaseItems WHERE PurchaseId = @Id", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", purchaseId);
                     using (SqliteDataReader reader = cmd.ExecuteReader())
@@ -240,7 +241,8 @@ namespace Temo_Mobile_Store
                                 UnitCost = Convert.ToDecimal(reader["UnitCost"]),
                                 LineTotal = Convert.ToDecimal(reader["LineTotal"]),
                                 IsSerialized = false,
-                                Imeis = null
+                                Imeis = null,
+                                SkipInventory = Convert.ToInt32(reader["SkipInventory"]) == 1
                             });
                         }
                     }

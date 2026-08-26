@@ -15,6 +15,34 @@
     --color-orange: #F59E0B;
     --color-red: #EF4444;
     --color-purple: #8B5CF6;
+    --color-danger-bg: #FDECEC;
+    --color-danger-border: #F3C6C6;
+    --color-danger-text: #B42318;
+    --color-success-bg: #E9F9EF;
+    --color-success-border: #B9E8C9;
+    --color-success-text: #157347;
+    --color-login-gradient-1: #EBF1FA;
+    --color-login-gradient-2: #D6E3F5;
+}
+
+/* شكل داكن (Dark) - بيتفعّل بضبط data-theme="dark" على <html> من زر القمر 🌙 (راجع
+   js/theme.js وThemeManager.cs). نفس أسماء المتغيرات بالظبط، قيم مختلفة بس - الشريط
+   الجانبي فاضل زي ما هو (أصلًا غامق) عشان يفضل نفس الهوية البصرية في الوضعين. */
+:root[data-theme="dark"] {
+    --color-accent: #4C8DFF;
+    --color-bg-app: #0F1524;
+    --color-bg-card: #1A2236;
+    --color-border: #2A3450;
+    --color-text: #E5E9F0;
+    --color-text-muted: #8B96AC;
+    --color-danger-bg: #3B1B1B;
+    --color-danger-border: #6B2A2A;
+    --color-danger-text: #FF8A80;
+    --color-success-bg: #123524;
+    --color-success-border: #1F5B3C;
+    --color-success-text: #6FE3A0;
+    --color-login-gradient-1: #131A2C;
+    --color-login-gradient-2: #0D1220;
 }
 
 * { box-sizing: border-box; }
@@ -181,14 +209,14 @@ input, select, textarea { font-family: inherit; }
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: var(--color-accent); color: #fff; }
-.btn-outline { background: #fff; color: var(--color-text); border: 1px solid var(--color-border); }
-.btn-danger-outline { background: #fff; color: var(--color-red); border: 1px solid #F3C6C6; }
+.btn-outline { background: var(--color-bg-card); color: var(--color-text); border: 1px solid var(--color-border); }
+.btn-danger-outline { background: var(--color-bg-card); color: var(--color-red); border: 1px solid var(--color-danger-border); }
 .btn-sm { padding: 6px 10px; font-size: 12px; }
 .btn-confirm { width: 100%; background: var(--color-accent); color: #fff; padding: 13px; font-size: 15px; margin-top: 14px; border-radius: 10px; }
 
 .alert { padding: 10px 14px; border-radius: 9px; margin-bottom: 12px; font-size: 13px; }
-.alert-error { background: #FDECEC; color: #B42318; border: 1px solid #F3C6C6; }
-.alert-success { background: #E9F9EF; color: #157347; border: 1px solid #B9E8C9; }
+.alert-error { background: var(--color-danger-bg); color: var(--color-danger-text); border: 1px solid var(--color-danger-border); }
+.alert-success { background: var(--color-success-bg); color: var(--color-success-text); border: 1px solid var(--color-success-border); }
 
 /* ---------- كروت عامة ---------- */
 .card {

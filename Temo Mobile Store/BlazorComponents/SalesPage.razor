@@ -1,9 +1,10 @@
-@using System.Data
+﻿@using System.Data
 @using System.Globalization
 @using System.Timers
 @using TemoStore.Core.Entities
 @using TemoStore.Core.Commands
 @implements IDisposable
+@inject IJSRuntime JS
 
 <div class="app-shell">
 
@@ -30,7 +31,7 @@
                 </div>
                 <LicenseBadge />
                     <NotificationBell />
-                <button class="icon-btn" disabled title="قريبًا">🌙</button>
+                <button class="icon-btn" title="@(currentTheme == "dark" ? "الوضع الفاتح" : "الوضع الداكن")" @onclick="ToggleTheme">@(currentTheme == "dark" ? "☀️" : "🌙")</button>
                     <button class="icon-btn" title="تسجيل خروج" @onclick="() => MainShell.Instance?.RequestLogout()">🚪</button>
                 <div class="topbar-user">
                     <div class="avatar">@userInitial</div>
@@ -78,6 +79,7 @@
                                 <th>المنتج</th>
                                 <th>الكمية</th>
                                 <th>الإجمالي</th>
+                                <th>وسيلة الدفع</th>
                                 <th>التاريخ والوقت</th>
                                 @if (AuthManager.IsAdmin)
                                 {
@@ -96,6 +98,7 @@
                                         <td>@row["المنتج"]</td>
                                         <td>@row["الكمية المباعة"]</td>
                                         <td class="num">@Convert.ToDecimal(row["الإجمالي"]).ToString("N2")</td>
+                                        <td class="muted">@row["وسيلة الدفع"]</td>
                                         <td class="muted">@row["التاريخ والوقت ⏰"]</td>
                                         @if (AuthManager.IsAdmin)
                                         {
@@ -485,6 +488,25 @@
 
     public void Dispose() => clockTimer?.Dispose();
 
+    private string currentTheme = "light";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            currentTheme = ThemeManager.CurrentTheme;
+            await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        currentTheme = ThemeManager.ToggledTheme();
+        ThemeManager.SetTheme(currentTheme);
+        await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+    }
+
     private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
 
     private void LoadCustomers() => customersTable = SalesRepository.GetCustomers();
@@ -514,7 +536,7 @@
         "نقدي" => "💵",
         "فوري" => "⚡",
         "أمان" => "🛡️",
-        "سهولة" => "🟢",
+        "ممكن" => "🟢",
         "فودافون كاش" => "📱",
         "إنستاباي" => "🔷",
         _ => "💳"

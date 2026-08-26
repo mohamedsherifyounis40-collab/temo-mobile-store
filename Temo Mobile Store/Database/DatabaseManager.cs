@@ -82,7 +82,8 @@ namespace Temo_Mobile_Store.Database
                     ProductName TEXT,
                     Quantity INTEGER NOT NULL DEFAULT 0,
                     UnitCost REAL NOT NULL DEFAULT 0,
-                    LineTotal REAL NOT NULL DEFAULT 0
+                    LineTotal REAL NOT NULL DEFAULT 0,
+                    SkipInventory INTEGER NOT NULL DEFAULT 0
                 );");
 
                 ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS ProductUnits (
@@ -326,8 +327,93 @@ namespace Temo_Mobile_Store.Database
                 EnsureProductsImageColumn(conn);
                 EnsureSalesDiscountColumn(conn);
                 EnsureSalesTaxAndPaymentColumns(conn);
+                EnsurePurchaseItemsSkipInventoryColumn(conn);
+                EnsureStoreSettingsThemeColumn(conn);
+                RenamePaymentMethodSohoulaToMomken(conn);
 
                 BackfillHistoricalJournalEntries(conn);
+                ReconcileTreasuryLedgerHistoricalGap(conn);
+            }
+        }
+
+        // ==========================================================================
+        // تسوية تاريخية (مرة واحدة فقط، محمية بعلامة TreasuryReconciliationMarker):
+        // "فحص سلامة النظام" كشف إن أرصدة الخزينة الفعلية (PaymentMethodBalances -
+        // بتتحدث لحظيًا مع كل عملية حقيقية) مش متطابقة مع رصيد الدفتر المحاسبي (الدفتر
+        // اتبنى بأثر رجعي من BackfillHistoricalJournalEntries فوق، واللي بطبيعته بيمشي
+        // على "الحالة النهائية دلوقتي" لكل عملية قديمة مش كل تعديل/إلغاء حصل فيها -
+        // فرق تراكمي طبيعي نتيجة كده، مش خطأ في العملية الحالية).
+        //
+        // الحل: الخزينة الفعلية (اللي بتتحدث لحظيًا وبيتم جردها فعليًا) هي مصدر الحقيقة،
+        // فبنسوّي الدفتر عليها بقيد تسوية واحد واضح (حساب 2200... لأ، حساب 5700 "عجز
+        // وزيادة الخزينة" الموجود أصلًا في شجرة الحسابات بالظبط للحالة دي)، بدل ما نحاول
+        // نعيد بناء تاريخ كل عملية اتعدّلت أو اتلغت من زمان (خطر ومش أدق من كده).
+        // ==========================================================================
+        private static void ReconcileTreasuryLedgerHistoricalGap(SqliteConnection conn)
+        {
+            using (var checkCmd = new SqliteCommand("SELECT COUNT(*) FROM JournalEntries WHERE SourceType = 'TreasuryReconciliationMarker'", conn))
+            {
+                if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0) return;
+            }
+
+            var balances = new List<(string Method, decimal QuickCash)>();
+            using (var cmd = new SqliteCommand("SELECT PaymentMethod, CurrentBalance FROM PaymentMethodBalances", conn))
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                    balances.Add((reader["PaymentMethod"].ToString(), Convert.ToDecimal(reader["CurrentBalance"])));
+            }
+
+            using (var tx = conn.BeginTransaction())
+            {
+                try
+                {
+                    var gapLines = new List<(int AccountCode, decimal Debit, decimal Credit)>();
+                    decimal totalGap = 0;
+
+                    foreach (var (method, quickCash) in balances)
+                    {
+                        int accountCode = HistoricalPaymentMethodAccountCode(method);
+                        decimal ledgerBalance;
+                        using (var cmd = new SqliteCommand("SELECT COALESCE(SUM(Debit),0) - COALESCE(SUM(Credit),0) FROM JournalLines WHERE AccountCode = @Code", conn, tx))
+                        {
+                            cmd.Parameters.AddWithValue("@Code", accountCode);
+                            ledgerBalance = Convert.ToDecimal(cmd.ExecuteScalar());
+                        }
+
+                        decimal gap = ledgerBalance - quickCash; // موجب = الدفتر زيادة عن الفعلي
+                        if (Math.Abs(gap) <= 0.01m) continue;
+
+                        if (gap > 0)
+                            gapLines.Add((accountCode, 0, gap)); // ننزل الدفتر لحد الرصيد الفعلي
+                        else
+                            gapLines.Add((accountCode, -gap, 0)); // نزوّد الدفتر لحد الرصيد الفعلي
+                        totalGap += gap;
+                    }
+
+                    if (gapLines.Count > 0)
+                    {
+                        int journalId = InsertJournalEntry(conn, tx, DateTime.Now.ToString("yyyy-MM-dd"), "TreasuryReconciliation", 1,
+                            "تسوية تاريخية - فرق تراكمي بين الخزينة الفعلية والدفتر المرحّل بأثر رجعي (راجع فحص سلامة النظام)", "ترحيل-تاريخي");
+                        foreach (var line in gapLines)
+                            InsertJournalLine(conn, tx, journalId, line.AccountCode, line.Debit, line.Credit);
+
+                        // حساب موازن واحد (عجز وزيادة الخزينة) بعكس صافي كل الفروق مع بعض
+                        if (totalGap > 0)
+                            InsertJournalLine(conn, tx, journalId, 5700, totalGap, 0);
+                        else if (totalGap < 0)
+                            InsertJournalLine(conn, tx, journalId, 5700, 0, -totalGap);
+                    }
+
+                    InsertJournalEntry(conn, tx, DateTime.Now.ToString("yyyy-MM-dd"), "TreasuryReconciliationMarker", 1, "علامة انتهاء تسوية الخزينة التاريخية - ما تتحذفش", "ترحيل-تاريخي");
+
+                    tx.Commit();
+                }
+                catch
+                {
+                    tx.Rollback();
+                    throw;
+                }
             }
         }
 
@@ -347,7 +433,7 @@ namespace Temo_Mobile_Store.Database
         // ==========================================================================
         private static readonly Dictionary<string, int> HistoricalPaymentMethodAccountCodes = new Dictionary<string, int>
         {
-            { "نقدي", 1100 }, { "فوري", 1110 }, { "أمان", 1120 }, { "سهولة", 1130 }, { "فودافون كاش", 1140 }, { "إنستاباي", 1150 }
+            { "نقدي", 1100 }, { "فوري", 1110 }, { "أمان", 1120 }, { "سهولة", 1130 }, { "ممكن", 1130 }, { "فودافون كاش", 1140 }, { "إنستاباي", 1150 }
         };
 
         private static int HistoricalPaymentMethodAccountCode(string method) =>
@@ -673,6 +759,102 @@ namespace Temo_Mobile_Store.Database
 
             if (!columnExists)
                 ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN ReceiptPrinterName TEXT;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود SkipInventory لجدول PurchaseItems - بيميّز سطر "فاتورة مبلغ
+        // إجمالي" (بدون تسجيل صنف بالمخزون) عن سطر صنف حقيقي باركوده فاضي (اللي
+        // بيتولّده باركود تلقائي). من غير العمود ده الاتنين بيبانوا نفس الحاجة
+        // (Barcode = NULL) ومفيش طريقة نفرّق بينهم لما الفاتورة تتفتح للتعديل.
+        // ==========================================================================
+        private static void EnsurePurchaseItemsSkipInventoryColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(PurchaseItems);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "SkipInventory", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE PurchaseItems ADD COLUMN SkipInventory INTEGER NOT NULL DEFAULT 0;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود Theme لجدول StoreSettings - شكل الواجهة (Light/Dark) اللي المستخدم
+        // اختاره من زر القمر 🌙 في كل الشاشات. بيتحفظ مرة واحدة على مستوى الجهاز كله
+        // (مش لكل مستخدم) عشان كل الشاشات (اللي كل واحدة فيها BlazorWebView منفصل) تتفق
+        // على نفس الشكل لحظة التنقل بينها.
+        // ==========================================================================
+        private static void EnsureStoreSettingsThemeColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(StoreSettings);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "Theme", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE StoreSettings ADD COLUMN Theme TEXT NOT NULL DEFAULT 'light';");
+        }
+
+        // ==========================================================================
+        // ترحيل بيانات (مرة واحدة، آمن يتنفذ أكتر من مرة - UPDATE عادي مش هيغيّر حاجة
+        // لو مفيش صفوف باسم "سهولة" أصلًا): إعادة تسمية وسيلة الدفع "سهولة" إلى "ممكن"
+        // في كل الجداول اللي بتسجل اسمها كنص (مش بس شجرة الحسابات). لازم يتنفذ في كل
+        // الجداول دي مع بعض عشان القيم القديمة تتوحّد مع الاسم الجديد في القوائم
+        // المنسدلة وربط الحساب المحاسبي (راجع AccountCodes.ForPaymentMethod).
+        // ==========================================================================
+        private static void RenamePaymentMethodSohoulaToMomken(SqliteConnection conn)
+        {
+            ExecuteNonQuery(conn, "UPDATE CashMovements SET PaymentMethod = 'ممكن' WHERE PaymentMethod = 'سهولة';");
+            ExecuteNonQuery(conn, "UPDATE DailyClosures SET PaymentMethod = 'ممكن' WHERE PaymentMethod = 'سهولة';");
+            ExecuteNonQuery(conn, "UPDATE Sales SET PaymentMethod = 'ممكن' WHERE PaymentMethod = 'سهولة';");
+            ExecuteNonQuery(conn, "UPDATE Expenses SET PaymentMethod = 'ممكن' WHERE PaymentMethod = 'سهولة';");
+
+            // PaymentMethodBalances مفتاحها الأساسي (Primary Key) هو اسم الوسيلة نفسه، وصف
+            // "ممكن" برصيد صفر ممكن يكون اتزرع فيه بالفعل (راجع سيدنج PaymentMethodBalances
+            // فوق - بيمشي على UIHelpers.PaymentMethods اللي بقى فيها "ممكن" دلوقتي) قبل ما
+            // الترحيل ده يتنفذ. فبنتعامل مع الحالتين: لو "ممكن" لسه مش موجود، UPDATE بسيط بيسميه.
+            // لو موجود بالفعل (برصيد صفر عادة)، بنضيف عليه رصيد "سهولة" القديم ونمسح صف "سهولة".
+            decimal? sohoulaBalance = null;
+            using (SqliteCommand cmd = new SqliteCommand("SELECT CurrentBalance FROM PaymentMethodBalances WHERE PaymentMethod = 'سهولة';", conn))
+            {
+                object result = cmd.ExecuteScalar();
+                if (result != null && result != DBNull.Value) sohoulaBalance = Convert.ToDecimal(result);
+            }
+
+            if (sohoulaBalance.HasValue)
+            {
+                bool momkenExists;
+                using (SqliteCommand cmd = new SqliteCommand("SELECT COUNT(*) FROM PaymentMethodBalances WHERE PaymentMethod = 'ممكن';", conn))
+                    momkenExists = Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+
+                if (momkenExists)
+                {
+                    ExecuteNonQuery(conn, $"UPDATE PaymentMethodBalances SET CurrentBalance = CurrentBalance + ({sohoulaBalance.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}) WHERE PaymentMethod = 'ممكن';");
+                    ExecuteNonQuery(conn, "DELETE FROM PaymentMethodBalances WHERE PaymentMethod = 'سهولة';");
+                }
+                else
+                {
+                    ExecuteNonQuery(conn, "UPDATE PaymentMethodBalances SET PaymentMethod = 'ممكن' WHERE PaymentMethod = 'سهولة';");
+                }
+            }
         }
 
         // ==========================================================================

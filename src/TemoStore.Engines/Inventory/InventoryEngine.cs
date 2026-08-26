@@ -43,6 +43,8 @@ namespace TemoStore.Engines.Inventory
 
             foreach (var line in purchase.Lines)
             {
+                if (line.SkipInventory) continue;
+
                 if (line.IsSerialized && line.Imeis != null)
                 {
                     foreach (var imei in line.Imeis)
@@ -61,7 +63,7 @@ namespace TemoStore.Engines.Inventory
 
             foreach (var line in purchase.Lines)
             {
-                if (string.IsNullOrEmpty(line.Barcode)) continue;
+                if (line.SkipInventory || string.IsNullOrEmpty(line.Barcode)) continue;
                 uow.Products.DeductQuantity(line.Barcode, line.Qty);
             }
 
