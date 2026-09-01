@@ -298,7 +298,19 @@
                     <div class="data-table-wrap">
                         <table class="data-table">
                             <thead>
-                                <tr><th></th><th>تاريخ الإضافة</th><th>الحالة</th><th>المنتج</th><th>الباركود</th><th>IMEI</th></tr>
+                                <tr>
+                                    <th></th>
+                                    <th>تاريخ الإضافة</th>
+                                    <th>الحالة</th>
+                                    <th>سعر البيع</th>
+                                    @if (AuthManager.IsAdmin)
+                                    {
+                                        <th>سعر الشراء</th>
+                                    }
+                                    <th>المنتج</th>
+                                    <th>الباركود</th>
+                                    <th>IMEI</th>
+                                </tr>
                             </thead>
                             <tbody>
                                 @foreach (var d in devices)
@@ -312,6 +324,11 @@
                                         </td>
                                         <td class="muted">@d.CreatedAt</td>
                                         <td>@d.Status</td>
+                                        <td>@d.SalePrice.ToString("N2")</td>
+                                        @if (AuthManager.IsAdmin)
+                                        {
+                                            <td>@d.CostPrice.ToString("N2")</td>
+                                        }
                                         <td>@d.ProductName</td>
                                         <td class="muted">@d.Barcode</td>
                                         <td>@d.Imei</td>
@@ -319,7 +336,7 @@
                                 }
                                 @if (devices.Count == 0)
                                 {
-                                    <tr><td colspan="6" class="empty-row">مفيش أجهزة مطابقة</td></tr>
+                                    <tr><td colspan="8" class="empty-row">مفيش أجهزة مطابقة</td></tr>
                                 }
                             </tbody>
                         </table>
@@ -428,6 +445,8 @@
         public required string ProductName { get; set; }
         public required string Status { get; set; }
         public required string CreatedAt { get; set; }
+        public decimal CostPrice { get; set; }
+        public decimal SalePrice { get; set; }
     }
 
     private List<DeviceRow> devices = new();
@@ -511,7 +530,9 @@
                 Barcode = row["الباركود"].ToString() ?? "",
                 ProductName = row["المنتج"].ToString() ?? "",
                 Status = row["الحالة"].ToString() ?? "",
-                CreatedAt = row["تاريخ الإضافة"].ToString() ?? ""
+                CreatedAt = row["تاريخ الإضافة"].ToString() ?? "",
+                CostPrice = row["سعر الشراء"] == DBNull.Value ? 0 : Convert.ToDecimal(row["سعر الشراء"]),
+                SalePrice = row["سعر البيع"] == DBNull.Value ? 0 : Convert.ToDecimal(row["سعر البيع"])
             });
         }
     }
@@ -714,8 +735,8 @@
         showDeviceForm = false;
         editingModelBarcode = d.Barcode;
         editingModelName = d.ProductName;
-        devCost = "";
-        devSale = "";
+        devCost = d.CostPrice.ToString("0.##");
+        devSale = d.SalePrice.ToString("0.##");
         errorMessage = null;
     }
 

@@ -101,9 +101,9 @@ namespace Temo_Mobile_Store
         public static DataTable GetImeiUnits(string statusFilter, string search)
         {
             DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("IMEI"), new DataColumn("الباركود"), new DataColumn("المنتج"), new DataColumn("الحالة"), new DataColumn("تاريخ الإضافة") });
+            dt.Columns.AddRange(new DataColumn[] { new DataColumn("IMEI"), new DataColumn("الباركود"), new DataColumn("المنتج"), new DataColumn("سعر الشراء"), new DataColumn("سعر البيع"), new DataColumn("الحالة"), new DataColumn("تاريخ الإضافة") });
 
-            string query = @"SELECT PU.IMEI, PU.Barcode, PU.Status, PU.CreatedAt, P.ProductName
+            string query = @"SELECT PU.IMEI, PU.Barcode, PU.Status, PU.CreatedAt, P.ProductName, P.Price, P.SalePrice
                 FROM ProductUnits PU LEFT JOIN Products P ON PU.Barcode = P.Barcode
                 WHERE (PU.IMEI LIKE @Search OR P.ProductName LIKE @Search)";
 
@@ -123,7 +123,7 @@ namespace Temo_Mobile_Store
                         while (reader.Read())
                         {
                             string statusArabic = reader["Status"].ToString() == "InStock" ? "متاح في المخزون" : (reader["Status"].ToString() == "Sold" ? "مباع" : reader["Status"].ToString());
-                            dt.Rows.Add(reader["IMEI"], reader["Barcode"], reader["ProductName"], statusArabic, reader["CreatedAt"]);
+                            dt.Rows.Add(reader["IMEI"], reader["Barcode"], reader["ProductName"], reader["Price"], reader["SalePrice"], statusArabic, reader["CreatedAt"]);
                         }
                     }
                 }
