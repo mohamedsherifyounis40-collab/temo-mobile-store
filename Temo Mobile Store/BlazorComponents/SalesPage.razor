@@ -72,6 +72,14 @@
             {
                 <div class="card">
                     <div class="card-title">📋 سجل المبيعات (دوس على "تعديل" أو "إلغاء" لعملية بيع)</div>
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-error">⚠️ @errorMessage</div>
+                    }
+                    @if (!string.IsNullOrEmpty(successMessage))
+                    {
+                        <div class="alert alert-success">✅ @successMessage</div>
+                    }
                     <table class="cart-table">
                         <thead>
                             <tr>
