@@ -193,6 +193,7 @@
                                             <div class="row-actions">
                                                 <button class="row-action-btn edit" disabled="@(!AuthManager.IsAdmin)" title="تعديل" @onclick="() => OpenEditAccessoryForm(p)">✏️</button>
                                                 <button class="row-action-btn delete" disabled="@(!AuthManager.IsAdmin)" title="حذف" @onclick="() => DeleteAccessory(p.Barcode)">🗑</button>
+                                                <button class="row-action-btn" title="طباعة ملصق الباركود" @onclick="() => PrintRowBarcode(p.Barcode, p.ProductName)">🏷️</button>
                                                 <button class="row-action-btn" title="سجل الحركة" @onclick="() => ShowProductHistory(p.Barcode, p.ProductName)">📜</button>
                                             </div>
                                         </td>
@@ -570,6 +571,21 @@
         printCopies = "1";
         showAccessoryForm = true;
         errorMessage = null;
+    }
+
+    // طباعة سريعة من صف في الجدول من غير ما تفتح فورم التعديل - متاحة لأي مستخدم (مش أدمن بس)،
+    // زي ما كانت شغالة بالظبط في الشاشة القديمة (زر الطباعة كان مستقل عن صلاحيات التعديل)
+    private void PrintRowBarcode(string barcode, string productName)
+    {
+        errorMessage = null;
+        try
+        {
+            BarcodeHelper.PrintBarcodeLabel(barcode, productName, null, 1);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
     }
 
     // ---------- طباعة ملصق باركود - نفس BarcodeHelper.PrintBarcodeLabel المستخدمة في الشاشة القديمة بالظبط ----------
