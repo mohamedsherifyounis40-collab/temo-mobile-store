@@ -455,7 +455,13 @@
     private void Navigate(string key, bool isCurrent)
     {
         if (!isCurrent)
+        {
             MainShell.Instance?.OpenPageByKey(key);
+            return;
+        }
+
+        if (AuthManager.IsAdmin)
+            LoadAttendance();
     }
 
     private void SwitchTab(string tab)

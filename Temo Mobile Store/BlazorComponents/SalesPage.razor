@@ -516,7 +516,13 @@
     private void Navigate(string key, bool isCurrent)
     {
         if (!isCurrent)
+        {
             MainShell.Instance?.OpenPageByKey(key);
+            return;
+        }
+
+        LoadCustomers();
+        LoadPopular();
     }
 
     // ---------- حسابات الفاتورة ----------

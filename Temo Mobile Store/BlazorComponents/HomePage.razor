@@ -388,7 +388,12 @@
     private void Navigate(string key, bool isCurrent)
     {
         if (!isCurrent)
+        {
             MainShell.Instance?.OpenPageByKey(key);
+            return;
+        }
+
+        LoadDashboard();
     }
 
     private static string PaymentIcon(string method) => method switch

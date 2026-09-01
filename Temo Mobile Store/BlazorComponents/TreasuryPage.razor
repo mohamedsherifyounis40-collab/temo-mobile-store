@@ -442,7 +442,12 @@
     private void Navigate(string key, bool isCurrent)
     {
         if (!isCurrent)
+        {
             MainShell.Instance?.OpenPageByKey(key);
+            return;
+        }
+
+        LoadAll();
     }
 
     private void SwitchOp(string op)

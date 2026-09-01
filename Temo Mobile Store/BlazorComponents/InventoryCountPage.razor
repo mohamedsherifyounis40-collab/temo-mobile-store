@@ -286,7 +286,16 @@
     private void Navigate(string key, bool isCurrent)
     {
         if (!isCurrent)
+        {
             MainShell.Instance?.OpenPageByKey(key);
+            return;
+        }
+
+        if (AuthManager.IsAdmin)
+        {
+            LoadProducts();
+            LoadLog();
+        }
     }
 
     private void LoadProducts()

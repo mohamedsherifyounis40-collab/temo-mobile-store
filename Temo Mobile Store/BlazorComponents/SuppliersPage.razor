@@ -344,7 +344,12 @@
     private void Navigate(string key, bool isCurrent)
     {
         if (!isCurrent)
+        {
             MainShell.Instance?.OpenPageByKey(key);
+            return;
+        }
+
+        LoadSuppliers();
     }
 
     private static decimal ParseFormattedDecimal(object value)
