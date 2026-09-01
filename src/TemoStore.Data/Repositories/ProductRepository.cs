@@ -124,6 +124,22 @@ namespace TemoStore.Data.Repositories
             return res?.ToString() ?? "";
         }
 
+        public (string Barcode, string Status)? GetProductUnitByImei(string imei)
+        {
+            using var cmd = new SqliteCommand("SELECT Barcode, Status FROM ProductUnits WHERE IMEI = @IMEI", _conn, _tx);
+            cmd.Parameters.AddWithValue("@IMEI", imei);
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read()) return null;
+            return (reader["Barcode"].ToString()!, reader["Status"].ToString()!);
+        }
+
+        public void DeleteProductUnit(string imei)
+        {
+            using var cmd = new SqliteCommand("DELETE FROM ProductUnits WHERE IMEI = @IMEI", _conn, _tx);
+            cmd.Parameters.AddWithValue("@IMEI", imei);
+            cmd.ExecuteNonQuery();
+        }
+
         public void DeleteProductUnitsForPurchase(int purchaseId)
         {
             using var cmd = new SqliteCommand("DELETE FROM ProductUnits WHERE PurchaseId = @Id", _conn, _tx);

@@ -114,6 +114,20 @@ namespace TemoStore.Engines.Inventory
             uow.Products.InsertProductUnit(finalBarcode, imei, null);
         }
 
+        // بيحذف وحدة جهاز واحدة بالـ IMEI بتاعها. ممنوع تحذف وحدة اتباعت بالفعل - محتاجة
+        // تفضل موجودة في السجل عشان فاتورة البيع القديمة تفضل صحيحة/قابلة للمراجعة.
+        public void DeleteDevice(string imei, IUnitOfWork uow)
+        {
+            var unit = uow.Products.GetProductUnitByImei(imei);
+            if (unit == null)
+                throw new InvalidOperationException("مفيش جهاز بالرقم ده.");
+            if (unit.Value.Status != "InStock")
+                throw new InvalidOperationException("الجهاز ده متباع بالفعل، مينفعش يتحذف.");
+
+            uow.Products.DeleteProductUnit(imei);
+            uow.Products.DeductQuantity(unit.Value.Barcode, 1);
+        }
+
         public int ApplyInventoryCount(IReadOnlyList<InventoryAdjustmentLine> rows, IUnitOfWork uow)
         {
             foreach (var row in rows)

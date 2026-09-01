@@ -43,6 +43,8 @@ namespace TemoStore.Core.Abstractions
         void MarkImeiInStock(string imei);
         bool ImeiExists(string imei);
         string GetImeiStatus(string imei);
+        (string Barcode, string Status)? GetProductUnitByImei(string imei);
+        void DeleteProductUnit(string imei);
         void DeleteProductUnitsForPurchase(int purchaseId);
         IReadOnlyList<ProductRecord> GetBelowThreshold(int threshold);
         void InsertAccessory(string barcode, string productName, decimal costPrice, decimal salePrice, int quantity);

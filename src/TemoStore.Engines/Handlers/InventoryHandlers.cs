@@ -160,6 +160,34 @@ namespace TemoStore.Engines.Handlers
         }
     }
 
+    public class DeleteDeviceCommandHandler : ICommandHandler<DeleteDeviceCommand, bool>
+    {
+        private readonly IUnitOfWorkFactory _uowFactory;
+        private readonly IInventoryEngine _inventory;
+        private readonly IAccountingEngine _accounting;
+
+        public DeleteDeviceCommandHandler(IUnitOfWorkFactory uowFactory, IInventoryEngine inventory, IAccountingEngine accounting)
+        {
+            _uowFactory = uowFactory;
+            _inventory = inventory;
+            _accounting = accounting;
+        }
+
+        public bool Handle(DeleteDeviceCommand command)
+        {
+            using var uow = _uowFactory.Create();
+            var unit = uow.Products.GetProductUnitByImei(command.Imei);
+            decimal value = unit != null ? (uow.Products.GetByBarcode(unit.Value.Barcode)?.Price ?? 0) : 0;
+
+            _inventory.DeleteDevice(command.Imei, uow);
+
+            InventoryAccountingHelper.PostInventoryDelta(_accounting, uow, -value, "InventoryDeviceDelete", $"حذف جهاز بالـ IMEI: {command.Imei}", command.PerformedBy);
+
+            uow.Commit();
+            return true;
+        }
+    }
+
     public class SaveInventoryAdjustmentsCommandHandler : ICommandHandler<SaveInventoryAdjustmentsCommand, int>
     {
         private readonly IUnitOfWorkFactory _uowFactory;

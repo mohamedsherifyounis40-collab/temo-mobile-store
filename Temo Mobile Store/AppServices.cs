@@ -93,6 +93,7 @@ namespace Temo_Mobile_Store
             services.AddSingleton<ICommandHandler<DeleteProductCommand, bool>, DeleteProductCommandHandler>();
             services.AddSingleton<ICommandHandler<UpdateModelPriceCommand, bool>, UpdateModelPriceCommandHandler>();
             services.AddSingleton<ICommandHandler<AddDeviceCommand, bool>, AddDeviceCommandHandler>();
+            services.AddSingleton<ICommandHandler<DeleteDeviceCommand, bool>, DeleteDeviceCommandHandler>();
             services.AddSingleton<ICommandHandler<SaveInventoryAdjustmentsCommand, int>, SaveInventoryAdjustmentsCommandHandler>();
             services.AddSingleton<ICommandHandler<ReceiveDeviceCommand, bool>, ReceiveDeviceCommandHandler>();
             services.AddSingleton<ICommandHandler<UpdateMaintenanceStatusCommand, bool>, UpdateMaintenanceStatusCommandHandler>();

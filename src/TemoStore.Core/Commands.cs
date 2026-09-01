@@ -225,6 +225,12 @@ namespace TemoStore.Core.Commands
         public required string PerformedBy { get; set; }
     }
 
+    public class DeleteDeviceCommand : ICommand<bool>
+    {
+        public required string Imei { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
     public class SaveInventoryAdjustmentsCommand : ICommand<int>
     {
         public required List<InventoryAdjustmentLine> Rows { get; set; }

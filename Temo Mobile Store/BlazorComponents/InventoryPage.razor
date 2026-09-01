@@ -320,6 +320,8 @@
                                         <td>
                                             <div class="row-actions">
                                                 <button class="row-action-btn edit" disabled="@(!AuthManager.IsAdmin)" title="تعديل السعر" @onclick="() => OpenEditModelPriceForm(d)">✏️</button>
+                                                <button class="row-action-btn delete" disabled="@(!AuthManager.IsAdmin || d.Status != "متاح في المخزون")" title="حذف" @onclick="() => DeleteDevice(d.Imei)">🗑</button>
+                                                <button class="row-action-btn" title="طباعة ملصق الباركود" @onclick="() => PrintRowBarcode(d.Barcode, d.ProductName)">🏷️</button>
                                                 <button class="row-action-btn" title="سجل الحركة" @onclick="() => ShowProductHistory(d.Barcode, d.ProductName)">📜</button>
                                             </div>
                                         </td>
@@ -833,6 +835,21 @@
             });
             successMessage = "تم تعديل سعر الموديل بنجاح.";
             editingModelBarcode = null;
+            LoadDevices();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private void DeleteDevice(string imei)
+    {
+        errorMessage = null;
+        try
+        {
+            AppServices.CoreEngine.Execute(new DeleteDeviceCommand { Imei = imei, PerformedBy = AuthManager.CurrentUsername ?? "unknown" });
+            successMessage = "تم حذف الجهاز.";
             LoadDevices();
         }
         catch (Exception ex)

@@ -39,6 +39,7 @@ namespace TemoStore.Core.Engines
         void DeleteProduct(string barcode, IUnitOfWork uow);
         void UpdateModelPrice(string barcode, string productName, decimal costPrice, decimal salePrice, IUnitOfWork uow);
         void AddDeviceManually(string barcode, string productName, decimal costPrice, decimal salePrice, string imei, IUnitOfWork uow);
+        void DeleteDevice(string imei, IUnitOfWork uow);
         int ApplyInventoryCount(IReadOnlyList<InventoryAdjustmentLine> rows, IUnitOfWork uow);
     }
 
