@@ -101,7 +101,7 @@ namespace Temo_Mobile_Store
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleID, ProductName, QuantitySold, Total, PaymentType, PaymentMethod, SaleDate FROM Sales ORDER BY SaleID ASC", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleID, ProductName, QuantitySold, Total, PaymentType, PaymentMethod, SaleDate FROM Sales ORDER BY SaleID DESC", conn))
                 using (SqliteDataReader reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
