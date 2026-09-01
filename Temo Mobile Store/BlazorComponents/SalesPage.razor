@@ -202,49 +202,8 @@
                 </div>
 
                 <div class="card search-card">
-                    <div class="card-title">بحث عن منتج</div>
-                    <div class="tabs">
-                        <button class="tab @(activeTab=="product"?"active":"")" @onclick='() => activeTab="product"'>منتج</button>
-                        <button class="tab @(activeTab=="barcode"?"active":"")" @onclick='() => activeTab="barcode"'>باركود</button>
-                        <button class="tab @(activeTab=="serial"?"active":"")" @onclick='() => activeTab="serial"'>سيريال</button>
-                    </div>
-
-                    @if (activeTab == "product")
-                    {
-                        <input class="field-input" placeholder="ابحث عن منتج بالاسم أو الباركود..." value="@productSearchTerm" @oninput="OnProductSearchChanged" />
-                        @if (productResults.Count > 0)
-                        {
-                            <div class="search-results">
-                                @foreach (var p in productResults)
-                                {
-                                    <div class="search-result-row" @onclick="() => AddProductResultToCart(p)">
-                                        <span>@p.ProductName</span>
-                                        <span class="muted">@p.SalePrice.ToString("N2") ج.م — متاح: @p.Quantity</span>
-                                    </div>
-                                }
-                            </div>
-                        }
-                    }
-                    else if (activeTab == "barcode")
-                    {
-                        <input class="field-input" placeholder="امسح الباركود (Enter)" value="@barcodeInput" @oninput="OnBarcodeInput" @onkeydown="OnBarcodeKeyDown" />
-                    }
-                    else
-                    {
-                        <input class="field-input" placeholder="ابحث برقم السيريال/IMEI..." value="@serialSearchTerm" @oninput="OnSerialSearchChanged" />
-                        @if (serialResults.Count > 0)
-                        {
-                            <div class="search-results">
-                                @foreach (var s in serialResults)
-                                {
-                                    <div class="search-result-row" @onclick="() => AddSerialResultToCart(s)">
-                                        <span>@s.ProductName</span>
-                                        <span class="muted">IMEI: @s.IMEI — @s.SalePrice.ToString("N2") ج.م</span>
-                                    </div>
-                                }
-                            </div>
-                        }
-                    }
+                    <div class="card-title">بحث عن منتج بالباركود</div>
+                    <input class="field-input" placeholder="امسح الباركود (Enter)" value="@barcodeInput" @oninput="OnBarcodeInput" @onkeydown="OnBarcodeKeyDown" />
 
                     @if (pendingImeiOptions != null)
                     {
@@ -446,12 +405,7 @@
     private decimal quickDiscountPercent;
     private string notes = "";
 
-    private string activeTab = "product";
     private string barcodeInput = "";
-    private string productSearchTerm = "";
-    private string serialSearchTerm = "";
-    private List<ProductSearchResult> productResults = new();
-    private List<SerialSearchResult> serialResults = new();
     private List<ProductSearchResult> popularProducts = new();
 
     private List<string>? pendingImeiOptions;
@@ -586,23 +540,6 @@
         }
     }
 
-    // ---------- بحث المنتجات ----------
-    private void OnProductSearchChanged(ChangeEventArgs e)
-    {
-        productSearchTerm = e.Value?.ToString() ?? "";
-        productResults = string.IsNullOrWhiteSpace(productSearchTerm) || productSearchTerm.Length < 2
-            ? new List<ProductSearchResult>()
-            : SalesRepository.SearchProducts(productSearchTerm);
-    }
-
-    private void OnSerialSearchChanged(ChangeEventArgs e)
-    {
-        serialSearchTerm = e.Value?.ToString() ?? "";
-        serialResults = string.IsNullOrWhiteSpace(serialSearchTerm) || serialSearchTerm.Length < 2
-            ? new List<SerialSearchResult>()
-            : SalesRepository.SearchProductsBySerial(serialSearchTerm);
-    }
-
     private void OnBarcodeInput(ChangeEventArgs e) => barcodeInput = e.Value?.ToString() ?? "";
 
     private void OnBarcodeKeyDown(KeyboardEventArgs e)
@@ -665,25 +602,6 @@
             IsSerialized = true
         });
         pendingImeiOptions = null;
-        errorMessage = null;
-    }
-
-    private void AddSerialResultToCart(SerialSearchResult s)
-    {
-        if (cart.Any(c => c.Imei == s.IMEI))
-        {
-            errorMessage = "الوحدة دي مضافة بالفعل في السلة.";
-            return;
-        }
-        cart.Add(new CartLine
-        {
-            Barcode = s.Barcode,
-            ProductName = s.ProductName,
-            UnitPrice = s.SalePrice,
-            Quantity = 1,
-            Imei = s.IMEI,
-            IsSerialized = true
-        });
         errorMessage = null;
     }
 
