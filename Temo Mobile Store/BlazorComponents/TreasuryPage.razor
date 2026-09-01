@@ -146,6 +146,16 @@
                             <input class="field-input" type="number" value="@movementAmount" @oninput="e => movementAmount = e.Value?.ToString() ?? string.Empty" />
                         </div>
                         <div>
+                            <label class="field-label">الحساب</label>
+                            <select class="field-input" value="@movementAccountCode" @onchange="e => movementAccountCode = e.Value?.ToString() ?? string.Empty">
+                                <option value="">اختر حساب</option>
+                                @foreach (var a in accounts)
+                                {
+                                    <option value="@a.Code">@a.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
                             <label class="field-label">مرجع (اختياري)</label>
                             <input class="field-input" value="@movementReference" @oninput="e => movementReference = e.Value?.ToString() ?? string.Empty" />
                         </div>
@@ -387,7 +397,7 @@
     private string opType = "Expense";
 
     private string expenseAccountCode = "", expenseAmount = "", expenseMethod = "";
-    private string movementType = "قبض", movementMethod = "", movementAmount = "", movementReference = "", movementDescription = "";
+    private string movementType = "قبض", movementMethod = "", movementAmount = "", movementReference = "", movementDescription = "", movementAccountCode = "";
     private string transferFrom = "", transferTo = "", transferAmount = "", transferDescription = "";
 
     // ---------- تعديل/حذف/إلغاء مصروف أو حركة سابقة - نفس منطق TreasuryPageControl بالظبط ----------
@@ -569,6 +579,11 @@
             errorMessage = "المبلغ لازم يكون أكبر من صفر.";
             return;
         }
+        if (!int.TryParse(movementAccountCode, out var accountCode))
+        {
+            errorMessage = "اختر الحساب اللي الحركة دي هتتسجل عليه في الدفتر.";
+            return;
+        }
         if (UIHelpers.IsTodayClosed(movementMethod))
         {
             errorMessage = "تم إقفال اليوم بالفعل، لا يمكن تسجيل حركة جديدة.";
@@ -582,12 +597,13 @@
                 Type = movementType,
                 Method = movementMethod,
                 Amount = amount,
+                AccountCode = accountCode,
                 Reference = string.IsNullOrWhiteSpace(movementReference) ? null : movementReference.Trim(),
                 Description = string.IsNullOrWhiteSpace(movementDescription) ? null : movementDescription.Trim(),
                 PerformedBy = AuthManager.CurrentUsername ?? "unknown"
             });
             successMessage = "تم تسجيل الحركة بنجاح.";
-            movementMethod = movementAmount = movementReference = movementDescription = "";
+            movementMethod = movementAmount = movementReference = movementDescription = movementAccountCode = "";
             LoadAll();
         }
         catch (Exception ex)
