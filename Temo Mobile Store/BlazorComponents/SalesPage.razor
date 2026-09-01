@@ -304,8 +304,8 @@
                         }
                     </div>
 
-                    <div class="card-title quick-discount-title">خصم سريع على الفاتورة (%)</div>
-                    <input class="field-input" type="number" min="0" max="100" @bind="quickDiscountPercent" />
+                    <div class="card-title quick-discount-title">خصم سريع على الفاتورة (مبلغ)</div>
+                    <input class="field-input" type="number" min="0" max="@NetBeforeQuickDiscount" @bind="quickDiscountAmountInput" />
 
                     <div class="card-title quick-discount-title">ضريبة على الفاتورة (%) - اختياري</div>
                     <input class="field-input" type="number" min="0" @bind="TaxRatePercent" />
@@ -402,7 +402,7 @@
 
     private string saleType = "Cash";
     private string? selectedPaymentMethod;
-    private decimal quickDiscountPercent;
+    private decimal quickDiscountAmountInput;
     private string notes = "";
 
     private string barcodeInput = "";
@@ -493,7 +493,7 @@
     private decimal Subtotal => cart.Sum(c => c.LineSubtotal);
     private decimal ItemDiscountTotal => cart.Sum(c => c.Discount);
     private decimal NetBeforeQuickDiscount => Subtotal - ItemDiscountTotal;
-    private decimal QuickDiscountAmount => NetBeforeQuickDiscount * (quickDiscountPercent / 100m);
+    private decimal QuickDiscountAmount => Math.Clamp(quickDiscountAmountInput, 0, Math.Max(0, NetBeforeQuickDiscount));
     private decimal TotalDiscount => ItemDiscountTotal + QuickDiscountAmount;
     private decimal NetBeforeTax => Subtotal - TotalDiscount;
     private decimal TaxTotal => Math.Round(NetBeforeTax * TaxRatePercent / 100m, 2);
@@ -650,7 +650,7 @@
         selectedCustomerId = "";
         saleType = "Cash";
         selectedPaymentMethod = null;
-        quickDiscountPercent = 0;
+        quickDiscountAmountInput = 0;
         notes = "";
         amountPaidManuallyEdited = false;
         amountPaidInput = 0;
@@ -839,7 +839,7 @@
             }
 
             cart.Clear();
-            quickDiscountPercent = 0;
+            quickDiscountAmountInput = 0;
             TaxRatePercent = 0;
             amountPaidManuallyEdited = false;
             selectedPaymentMethod = null;
