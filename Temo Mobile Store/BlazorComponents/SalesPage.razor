@@ -80,6 +80,26 @@
                     {
                         <div class="alert alert-success">✅ @successMessage</div>
                     }
+
+                    @if (editingSaleId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">تعديل كمية البيع رقم @editingSaleId — @editingSaleProductName</div>
+                            <input class="field-input" type="number" min="1" @bind="editQuantity" />
+                            <button class="btn btn-primary btn-sm" @onclick="SaveEditSale">💾 حفظ الكمية الجديدة</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => editingSaleId = null">إلغاء</button>
+                        </div>
+                    }
+
+                    @if (pendingCancelSaleId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">⚠️ متأكد من إلغاء عملية البيع رقم @pendingCancelSaleId؟ هيترجع الصنف للمخزون تاني.</div>
+                            <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmCancelSale">✅ تأكيد الإلغاء</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => pendingCancelSaleId = null">تراجع</button>
+                        </div>
+                    }
+
                     <table class="cart-table">
                         <thead>
                             <tr>
@@ -120,25 +140,6 @@
                             }
                         </tbody>
                     </table>
-
-                    @if (editingSaleId.HasValue)
-                    {
-                        <div class="add-customer-panel">
-                            <div class="card-title">تعديل كمية البيع رقم @editingSaleId — @editingSaleProductName</div>
-                            <input class="field-input" type="number" min="1" @bind="editQuantity" />
-                            <button class="btn btn-primary btn-sm" @onclick="SaveEditSale">💾 حفظ الكمية الجديدة</button>
-                            <button class="btn btn-outline btn-sm" @onclick="() => editingSaleId = null">إلغاء</button>
-                        </div>
-                    }
-
-                    @if (pendingCancelSaleId.HasValue)
-                    {
-                        <div class="add-customer-panel">
-                            <div class="card-title">⚠️ متأكد من إلغاء عملية البيع رقم @pendingCancelSaleId؟ هيترجع الصنف للمخزون تاني.</div>
-                            <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmCancelSale">✅ تأكيد الإلغاء</button>
-                            <button class="btn btn-outline btn-sm" @onclick="() => pendingCancelSaleId = null">تراجع</button>
-                        </div>
-                    }
                 </div>
             }
 
