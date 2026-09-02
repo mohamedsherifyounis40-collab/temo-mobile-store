@@ -129,6 +129,7 @@
                 <div class="card">
                     <div class="list-toolbar">
                         <input class="field-input" placeholder="بحث بالاسم أو الباركود..." value="@accessorySearch" @oninput="e => accessorySearch = e.Value?.ToString() ?? string.Empty" />
+                        <button class="btn btn-outline" @onclick="ExportAccessoriesExcel">📥 تصدير Excel</button>
                         <button class="btn btn-primary" disabled="@(!AuthManager.IsAdmin)" @onclick="OpenNewAccessoryForm">➕ إضافة منتج</button>
                     </div>
 
@@ -239,7 +240,8 @@
                             <option value="متاح في المخزون">متاح في المخزون</option>
                             <option value="مباع">مباع</option>
                         </select>
-                        <button class="btn btn-primary" disabled="@(!AuthManager.IsAdmin)" @onclick="OpenNewDeviceForm">➕ إضافة جهاز</button>
+                        <button class="btn btn-outline" @onclick="ExportDevicesExcel">📥 تصدير Excel</button>
+                        <button class="btn btn-primary" @onclick="OpenNewDeviceForm">➕ إضافة جهاز</button>
                     </div>
 
                     @if (showDeviceForm)
@@ -615,6 +617,26 @@
         {
             errorMessage = ex.Message;
         }
+    }
+
+    private void ExportAccessoriesExcel()
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (ExcelExportHelper.ExportToExcel(InventoryRepository.GetAccessoryProducts(), "منتجات المخزون", out string filePath, out string error))
+            successMessage = $"تم تصدير المنتجات بنجاح في: {filePath}";
+        else
+            errorMessage = error;
+    }
+
+    private void ExportDevicesExcel()
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (ExcelExportHelper.ExportToExcel(InventoryRepository.GetImeiUnits(deviceStatusFilter, deviceSearch), "أجهزة المخزون", out string filePath, out string error))
+            successMessage = $"تم تصدير الأجهزة بنجاح في: {filePath}";
+        else
+            errorMessage = error;
     }
 
     // ---------- استيراد/تصدير إكسل - نفس ExcelImportHelper المستخدمة في الشاشة القديمة بالظبط ----------

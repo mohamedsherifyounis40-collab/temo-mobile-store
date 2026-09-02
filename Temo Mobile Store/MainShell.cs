@@ -315,7 +315,7 @@ namespace Temo_Mobile_Store
             else if (pageKey == PageKeys.MaintenanceBlazor)
                 BuildMaintenanceBlazorPage();
             else if (pageKey == PageKeys.TreasuryBlazor)
-                BuildTreasuryBlazorPage();
+                BuildTreasuryBlazorPage(presetMovementType);
             else if (pageKey == PageKeys.SuppliersBlazor)
                 BuildSuppliersBlazorPage();
             else if (pageKey == PageKeys.PurchasesBlazor)
@@ -442,10 +442,18 @@ namespace Temo_Mobile_Store
 
         // تجربة شاشة خزينة جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة
         // الخزينة الأصلية، بنفس نمط InventoryBlazor بالظبط
-        private void BuildTreasuryBlazorPage()
+        private void BuildTreasuryBlazorPage(string presetMovementType = null)
         {
             ShowPageInline(PageKeys.TreasuryBlazor, () => new TreasuryPageBlazorHost());
+            if (presetMovementType != null)
+                TreasuryPresetRequested?.Invoke(presetMovementType);
         }
+
+        // بيدي شاشة الخزينة Blazor (لو مفتوحة بالفعل) فرصة تستقبل نوع الحركة المطلوب فتحها بيه
+        // مباشرة (قبض/صرف/مصروف) - زي F4/F5 وزرار "إضافة مصروف" في الداشبورد بالظبط. الكونترول
+        // بتاعها بيفضل موجود في الذاكرة (ShowPageInline مبيعملوش Dispose)، فمينفعش نمرر بارامتر
+        // وقت الإنشاء بس (بيتنادى مرة واحدة) - الحدث الثابت ده هو اللي بيوصّل القيمة لأي وقت
+        public static event Action<string> TreasuryPresetRequested;
 
         // ==========================================================================
         // بناء صفحة "الرئيسية" بكروت الـ KPI - بيانات حقيقية من قاعدة البيانات (لليوم الحالي)

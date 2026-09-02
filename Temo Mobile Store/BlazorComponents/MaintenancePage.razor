@@ -151,6 +151,7 @@
                         </div>
                         <div class="form-actions">
                             <button class="btn btn-primary" @onclick="SaveStatus">💾 تحديث</button>
+                            <button class="btn btn-outline" @onclick="NotifyWhatsApp" style="background:#25D366;color:#fff;border-color:#25D366">📱 إشعار العميل واتساب</button>
                             <button class="btn btn-outline" @onclick="() => statusTicketId = null">إلغاء</button>
                         </div>
                     </div>
@@ -288,6 +289,8 @@
 
     private int? statusTicketId;
     private string statusTicketDevice = "";
+    private string statusTicketCustomerName = "";
+    private string statusTicketCustomerPhone = "";
     private string newStatus = "مستلم";
 
     private int? deliverTicketId;
@@ -416,10 +419,29 @@
     {
         statusTicketId = t.Id;
         statusTicketDevice = t.DeviceInfo;
+        statusTicketCustomerName = t.CustomerName;
+        statusTicketCustomerPhone = t.CustomerPhone;
         newStatus = t.Status == "تم التسليم" || t.Status == "ملغي" ? "مستلم" : t.Status;
         showReceiveForm = false;
         deliverTicketId = null;
         errorMessage = null;
+    }
+
+    // إشعار العميل بحالة تذكرته الحالية عبر واتساب - نفس رسالة MaintenancePageControl القديمة بالظبط
+    private void NotifyWhatsApp()
+    {
+        if (statusTicketId == null) return;
+
+        string customerName = string.IsNullOrWhiteSpace(statusTicketCustomerName) ? "عميلنا العزيز" : statusTicketCustomerName;
+        const string separatorLine = "------------------------";
+        string message = $"*صيانة - Temo Mobile Store*\n" +
+                          $"{separatorLine}\n" +
+                          $"العميل: {customerName}\n" +
+                          $"حالة الصيانة: *{newStatus}*\n" +
+                          $"{separatorLine}\n" +
+                          $"شكرًا لثقتكم بينا";
+
+        WhatsAppHelper.SendMessage(statusTicketCustomerPhone, message, MainShell.Instance);
     }
 
     private void SaveStatus()

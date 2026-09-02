@@ -425,9 +425,34 @@
         clockTimer.Start();
 
         LoadAll();
+
+        MainShell.TreasuryPresetRequested += ApplyPresetMovementType;
     }
 
-    public void Dispose() => clockTimer?.Dispose();
+    public void Dispose()
+    {
+        clockTimer?.Dispose();
+        MainShell.TreasuryPresetRequested -= ApplyPresetMovementType;
+    }
+
+    // بيستقبل نوع الحركة المطلوب فتحه من برّه الشاشة (F4/F5/زرار "إضافة مصروف" في الداشبورد) -
+    // راجع MainShell.BuildTreasuryBlazorPage/TreasuryPresetRequested
+    private void ApplyPresetMovementType(string type)
+    {
+        InvokeAsync(() =>
+        {
+            if (type == "مصروف")
+            {
+                opType = "Expense";
+            }
+            else
+            {
+                opType = "Movement";
+                movementType = type;
+            }
+            StateHasChanged();
+        });
+    }
 
     private string currentTheme = "light";
 

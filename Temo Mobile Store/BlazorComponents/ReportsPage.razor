@@ -112,6 +112,7 @@
                             </div>
                             <button class="btn btn-primary" @onclick="FilterProfit">🔍 تطبيق الفلتر</button>
                             <button class="btn btn-outline" @onclick="RefreshAll">🔄 عرض الكل وتحديث</button>
+                            <button class="btn btn-outline" @onclick="ExportProfitExcel">📥 تصدير Excel</button>
                         </div>
                         <div class="data-table-wrap">
                             <table class="data-table">
@@ -554,6 +555,22 @@
                 summaryRows.Add(new SummaryRow { Method = method, Opening = s.Opening, RecordedBalance = s.RecordedBalance });
             }
         }
+    }
+
+    private void ExportProfitExcel()
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        var dt = new DataTable();
+        dt.Columns.AddRange(new[] { "رقم الحركة", "المنتج", "سعر الشراء", "سعر البيع", "الكمية", "الربح الصافي", "التاريخ والوقت" }.Select(c => new DataColumn(c)).ToArray());
+        foreach (var r in profitRows)
+            dt.Rows.Add(r.SaleId, r.ProductName, r.CostPrice, r.Price, r.Qty, r.NetProfit, r.SaleDate);
+
+        if (ExcelExportHelper.ExportToExcel(dt, "سجل الأرباح التفصيلي", out string filePath, out string error))
+            successMessage = $"تم تصدير السجل بنجاح في: {filePath}";
+        else
+            errorMessage = error;
     }
 
     private void FilterProfit()
