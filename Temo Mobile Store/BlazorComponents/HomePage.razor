@@ -47,7 +47,7 @@
                     <div class="breadcrumb">الرئيسية &gt; لوحة التحكم</div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn btn-outline" disabled title="قريبًا">🖨️ طباعة ملخص اليوم</button>
+                    <button class="btn btn-outline" @onclick="PrintDailySummary">🖨️ طباعة ملخص اليوم</button>
                 </div>
             </div>
 
@@ -309,8 +309,8 @@
     private List<(string Method, decimal Balance)> methodBalances = new();
     private decimal totalBalance;
 
-    private decimal todaySales, todayCogs, todayExpenses;
-    private int invoiceCount;
+    private decimal todaySales, todayCogs, todayExpenses, todayPurchases;
+    private int invoiceCount, maintenanceCount;
     private decimal todayProfit => todaySales - todayCogs - todayExpenses;
 
     private decimal yesterdaySales, yesterdayProfit;
@@ -472,6 +472,15 @@
         return result;
     }
 
+    private void PrintDailySummary()
+    {
+        DailySummaryPrintHelper.Print(
+            MainShell.Instance,
+            todaySales, todayPurchases, todayExpenses, todayProfit,
+            invoiceCount, maintenanceCount,
+            methodBalances, totalBalance);
+    }
+
     private void LoadDashboard()
     {
         try
@@ -483,6 +492,8 @@
 
             LoadDayTotals(conn, today, out todaySales, out todayCogs, out invoiceCount);
             todayExpenses = GetSumScalar(conn, "SELECT SUM(Amount) FROM Expenses WHERE ExpenseDate LIKE @D", today);
+            todayPurchases = GetSumScalar(conn, "SELECT SUM(TotalAmount) FROM Purchases WHERE PurchaseDate LIKE @D", today);
+            maintenanceCount = (int)GetSumScalar(conn, "SELECT COUNT(*) FROM MaintenanceTickets WHERE ReceivedDate LIKE @D", today);
             newCustomersToday = GetNewCustomersCount(conn, today);
 
             // لازم نصفّر كل الليستات هنا لأن LoadDashboard بتتنادى كل 30 ثانية من التايمر
