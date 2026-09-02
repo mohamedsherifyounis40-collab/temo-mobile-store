@@ -122,3 +122,23 @@
 .summary-row.total { border-top: 1px dashed var(--color-border); margin-top: 6px; padding-top: 10px; font-size: 15px; }
 .summary-row.total b { color: var(--color-accent); }
 .summary-row.change b.negative { color: var(--color-red); }
+
+/* ---------- بوكس تأكيد الإلغاء (Modal) - ثابت في نص الشاشة بغض النظر عن مكان السكرول ---------- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.modal-box {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 20px;
+    width: 360px;
+    max-width: 90vw;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+}

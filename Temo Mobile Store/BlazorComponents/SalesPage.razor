@@ -91,15 +91,6 @@
                         </div>
                     }
 
-                    @if (pendingCancelSaleId.HasValue)
-                    {
-                        <div class="add-customer-panel">
-                            <div class="card-title">⚠️ متأكد من إلغاء عملية البيع رقم @pendingCancelSaleId؟ هيترجع الصنف للمخزون تاني.</div>
-                            <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmCancelSale">✅ تأكيد الإلغاء</button>
-                            <button class="btn btn-outline btn-sm" @onclick="() => pendingCancelSaleId = null">تراجع</button>
-                        </div>
-                    }
-
                     <table class="cart-table">
                         <thead>
                             <tr>
@@ -338,6 +329,20 @@
         </div>
     </div>
 </div>
+
+@if (pendingCancelSaleId.HasValue)
+{
+    <div class="modal-overlay" @onclick="() => pendingCancelSaleId = null">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <div class="card-title">⚠️ متأكد من إلغاء عملية البيع رقم @pendingCancelSaleId؟</div>
+            <div class="muted">هيترجع الصنف للمخزون تاني.</div>
+            <div class="form-actions" style="margin-top:14px">
+                <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmCancelSale">✅ تأكيد الإلغاء</button>
+                <button class="btn btn-outline btn-sm" @onclick="() => pendingCancelSaleId = null">تراجع</button>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
