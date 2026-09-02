@@ -479,16 +479,40 @@
         _ => "💳"
     };
 
+    // نفس تعريف AccountCodes.ForPaymentMethod بالظبط (TemoStore.Engines.Handlers) - مش قابل
+    // للاستيراد من هنا (internal في أسمبلي تاني)، فمكرّرة محليًا بس عشان نستبعد حسابات
+    // وسائل الدفع من دروب داون "الحساب" فوق - راجع التعليق جنب accounts.Clear() تحت
+    private static int AccountCodeForPaymentMethod(string method) => method switch
+    {
+        "نقدي" => 1100,
+        "فوري" => 1110,
+        "أمان" => 1120,
+        "ممكن" or "سهولة" => 1130,
+        "فودافون كاش" => 1140,
+        "إنستاباي" => 1150,
+        _ => 1100
+    };
+
     private void LoadAll()
     {
         balances.Clear();
         foreach (var m in UIHelpers.PaymentMethods)
             balances.Add(new BalanceRow { Method = m, Balance = TreasuryRepository.GetPaymentMethodBalance(m) });
 
+        // مستبعدين حسابات وسائل الدفع نفسها (نقدي/فوري/أمان/...) من هنا عمدًا - دي بتتمثّل
+        // أصلاً بحقل "وسيلة الدفع" في نفس الفورم. لو اتحددت هنا كمان كـ"الحساب" (الطرف التاني)،
+        // القيد بيتسجل مدين ودائن على نفس الحساب فيلغي نفسه في الدفتر (صفر أثر) بينما الرصيد
+        // السريع للخزينة بيتحرك فعليًا - فرق بيتراكم بصمت من غير أي رسالة خطأ.
+        var treasuryAccountCodes = new HashSet<string>(UIHelpers.PaymentMethods.Select(m => AccountCodeForPaymentMethod(m).ToString()));
+
         accounts.Clear();
         var accDt = TreasuryRepository.GetAccountsTree();
         foreach (DataRow row in accDt.Rows)
-            accounts.Add(new AccountOption { Code = row["AccountCode"].ToString() ?? "", Name = row["AccountName"].ToString() ?? "" });
+        {
+            string code = row["AccountCode"].ToString() ?? "";
+            if (treasuryAccountCodes.Contains(code)) continue;
+            accounts.Add(new AccountOption { Code = code, Name = row["AccountName"].ToString() ?? "" });
+        }
 
         expenses.Clear();
         var expDt = TreasuryRepository.GetExpenses();
