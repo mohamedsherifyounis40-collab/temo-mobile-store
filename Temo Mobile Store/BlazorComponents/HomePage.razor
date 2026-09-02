@@ -590,10 +590,13 @@
         }
     }
 
+    // المبيعات الصافية الفعلية = Total (الإجمالي قبل الخصم) ناقص Discount زائد Tax - مش Total
+    // لوحده، وإلا الرقم بيتضخّم بمقدار أي خصم اتدّى. وعدد الفواتير = عدد فواتير حقيقية
+    // (SalesInvoiceId مميزة)، مش عدد أسطر Sales - فاتورة فيها أكتر من صنف كانت بتتعد أكتر من مرة.
     private static void LoadDayTotals(SqliteConnection conn, string dateStr, out decimal sales, out decimal cogs, out int count)
     {
         sales = 0; cogs = 0; count = 0;
-        using var cmd = new SqliteCommand("SELECT SUM(Total) AS T, SUM(CostPrice * QuantitySold) AS C, COUNT(*) AS N FROM Sales WHERE SaleDate LIKE @D", conn);
+        using var cmd = new SqliteCommand("SELECT SUM(Total - Discount + Tax) AS T, SUM(CostPrice * QuantitySold) AS C, COUNT(DISTINCT SalesInvoiceId) AS N FROM Sales WHERE SaleDate LIKE @D", conn);
         cmd.Parameters.AddWithValue("@D", dateStr + "%");
         using var r = cmd.ExecuteReader();
         if (r.Read())

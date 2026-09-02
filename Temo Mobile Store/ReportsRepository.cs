@@ -34,7 +34,7 @@ namespace Temo_Mobile_Store
             {
                 conn.Open();
                 decimal totalSales = 0, totalCost = 0;
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Total) as TotalSales, SUM(CostPrice * QuantitySold) as TotalCost FROM Sales", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Total - Discount + Tax) as TotalSales, SUM(CostPrice * QuantitySold) as TotalCost FROM Sales", conn))
                 using (SqliteDataReader reader = cmd.ExecuteReader())
                 {
                     if (reader.Read())
@@ -79,7 +79,7 @@ namespace Temo_Mobile_Store
             {
                 conn.Open();
                 using (SqliteCommand cmd = new SqliteCommand(
-                    "SELECT SaleID, ProductName, CostPrice, Price, QuantitySold, Total, SaleDate FROM Sales WHERE SaleDate BETWEEN @From AND @To ORDER BY SaleID ASC", conn))
+                    "SELECT SaleID, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, SaleDate FROM Sales WHERE SaleDate BETWEEN @From AND @To ORDER BY SaleID ASC", conn))
                 {
                     cmd.Parameters.AddWithValue("@From", fromDate);
                     cmd.Parameters.AddWithValue("@To", toDate);
@@ -91,8 +91,10 @@ namespace Temo_Mobile_Store
                             decimal sell = Convert.ToDecimal(reader["Price"]);
                             int qty = Convert.ToInt32(reader["QuantitySold"]);
                             decimal total = Convert.ToDecimal(reader["Total"]);
+                            // الإجمالي الصافي الفعلي بعد الخصم + الضريبة - مش Total لوحده (قبل الخصم)
+                            decimal netTotal = total - Convert.ToDecimal(reader["Discount"]) + Convert.ToDecimal(reader["Tax"]);
 
-                            totalSales += total;
+                            totalSales += netTotal;
                             totalCost += cost * qty;
 
                             rows.Add(new DetailedProfitRow
@@ -102,7 +104,7 @@ namespace Temo_Mobile_Store
                                 CostPrice = cost,
                                 Price = sell,
                                 Quantity = qty,
-                                NetProfit = (sell - cost) * qty,
+                                NetProfit = netTotal - cost * qty,
                                 SaleDate = reader["SaleDate"].ToString() ?? ""
                             });
                         }

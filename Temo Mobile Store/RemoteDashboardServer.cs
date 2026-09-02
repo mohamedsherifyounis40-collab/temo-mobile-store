@@ -148,7 +148,7 @@ namespace Temo_Mobile_Store
                 {
                     conn.Open();
 
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Total) AS T, SUM(CostPrice * QuantitySold) AS C, COUNT(*) AS N FROM Sales WHERE SaleDate LIKE @Today", conn))
+                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Total - Discount + Tax) AS T, SUM(CostPrice * QuantitySold) AS C, COUNT(DISTINCT SalesInvoiceId) AS N FROM Sales WHERE SaleDate LIKE @Today", conn))
                     {
                         cmd.Parameters.AddWithValue("@Today", today + "%");
                         using (var reader = cmd.ExecuteReader())
