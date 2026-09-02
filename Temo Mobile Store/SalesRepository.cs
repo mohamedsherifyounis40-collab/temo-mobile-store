@@ -69,6 +69,19 @@ namespace Temo_Mobile_Store
         public string IMEI;
     }
 
+    // صف مرتجع - مستخدم في سجل المرتجعات بشاشة المبيعات
+    public class ReturnHistoryRow
+    {
+        public int ReturnId;
+        public int SaleId;
+        public string ProductName;
+        public int Quantity;
+        public decimal RefundAmount;
+        public string Reason;
+        public string ReturnDate;
+        public string PerformedBy;
+    }
+
     // ==========================================================================
     // SalesRepository: كل الوصول لقاعدة البيانات الخاص بشاشة المبيعات (نقطة البيع)
     // في مكان واحد - فحص مخزون، تسجيل/تعديل/إلغاء بيع، وحدات IMEI، وترقيم الفواتير.
@@ -187,6 +200,63 @@ namespace Temo_Mobile_Store
                     }
                 }
             }
+        }
+
+        // الكمية المتاحة للإرجاع من عملية بيع معينة = الكمية المباعة ناقص مجموع كل
+        // المرتجعات المسجّلة عليها سابقًا (لو مفيش بيع بالرقم ده، بترجع 0)
+        public static int GetReturnableQuantity(int saleId)
+        {
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                int quantitySold;
+                using (SqliteCommand cmd = new SqliteCommand("SELECT QuantitySold FROM Sales WHERE SaleID = @Id", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Id", saleId);
+                    var res = cmd.ExecuteScalar();
+                    if (res == null || res == DBNull.Value) return 0;
+                    quantitySold = Convert.ToInt32(res);
+                }
+                using (SqliteCommand cmd = new SqliteCommand("SELECT COALESCE(SUM(Quantity), 0) FROM Returns WHERE SaleId = @Id", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Id", saleId);
+                    int alreadyReturned = Convert.ToInt32(cmd.ExecuteScalar());
+                    return quantitySold - alreadyReturned;
+                }
+            }
+        }
+
+        // آخر المرتجعات المسجّلة - لعرض "سجل المرتجعات" بشاشة المبيعات
+        public static System.Collections.Generic.List<ReturnHistoryRow> GetReturnsHistory(int limit = 50)
+        {
+            var results = new System.Collections.Generic.List<ReturnHistoryRow>();
+            using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
+            {
+                conn.Open();
+                using (SqliteCommand cmd = new SqliteCommand(
+                    "SELECT ReturnId, SaleId, ProductName, Quantity, RefundAmount, Reason, ReturnDate, PerformedBy FROM Returns ORDER BY ReturnId DESC LIMIT @Limit", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Limit", limit);
+                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            results.Add(new ReturnHistoryRow
+                            {
+                                ReturnId = Convert.ToInt32(reader["ReturnId"]),
+                                SaleId = Convert.ToInt32(reader["SaleId"]),
+                                ProductName = reader["ProductName"].ToString(),
+                                Quantity = Convert.ToInt32(reader["Quantity"]),
+                                RefundAmount = Convert.ToDecimal(reader["RefundAmount"]),
+                                Reason = reader["Reason"] == DBNull.Value ? "" : reader["Reason"].ToString(),
+                                ReturnDate = reader["ReturnDate"].ToString(),
+                                PerformedBy = reader["PerformedBy"] == DBNull.Value ? "" : reader["PerformedBy"].ToString()
+                            });
+                        }
+                    }
+                }
+            }
+            return results;
         }
 
         public static int GetDailyInvoiceNumber(int invoiceId, string saleDate)

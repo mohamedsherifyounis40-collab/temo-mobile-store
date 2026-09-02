@@ -42,6 +42,23 @@ namespace TemoStore.Core.Commands
         public required string PerformedBy { get; set; }
     }
 
+    // مرتجع (كلي أو جزئي) لصنف من عملية بيع سابقة - على عكس CancelSaleCommand، مبيمسحش
+    // عملية البيع الأصلية (بتفضل زي ما هي كسجل تاريخي)، وبيشتغل حتى لو يوم البيع الأصلي
+    // نفسه مُقفل بالفعل (المرتجع حدث جديد بتاريخ النهارده، مش تعديل على يوم قديم)
+    public class CreateReturnCommand : ICommand<ReturnResult>
+    {
+        public required int SaleId { get; set; }
+        public required int Quantity { get; set; }
+        public required string Reason { get; set; }
+        public required string PerformedBy { get; set; }
+    }
+
+    public class ReturnResult
+    {
+        public int ReturnId { get; set; }
+        public decimal RefundAmount { get; set; }
+    }
+
     public class CreatePurchaseCommand : ICommand<PurchaseResult>
     {
         public required int SupplierId { get; set; }

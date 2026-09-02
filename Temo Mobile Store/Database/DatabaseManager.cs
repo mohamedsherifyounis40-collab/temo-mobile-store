@@ -53,6 +53,25 @@ namespace Temo_Mobile_Store.Database
                     SalesInvoiceId INTEGER
                 );");
 
+                // مرتجعات المبيعات - سجل مستقل عن Sales عمدًا (زي InventoryAdjustments مقابل
+                // Products بالظبط): عملية البيع الأصلية بتفضل ثابتة كسجل تاريخي، وكل حركة مرتجع
+                // (كلي أو جزئي) بتتوثّق هنا لوحدها. "الكمية المتاحة للإرجاع" = Sales.QuantitySold
+                // ناقص مجموع Quantity هنا لنفس SaleId.
+                ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS Returns (
+                    ReturnId INTEGER PRIMARY KEY AUTOINCREMENT,
+                    SaleId INTEGER NOT NULL,
+                    Barcode TEXT,
+                    ProductName TEXT,
+                    Quantity INTEGER NOT NULL DEFAULT 0,
+                    RefundAmount REAL NOT NULL DEFAULT 0,
+                    Reason TEXT,
+                    PaymentType TEXT,
+                    PaymentMethod TEXT,
+                    CustomerId INTEGER,
+                    ReturnDate TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                    PerformedBy TEXT
+                );");
+
                 ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS Customers (
                     CustomerId INTEGER PRIMARY KEY AUTOINCREMENT,
                     CustomerName TEXT NOT NULL,

@@ -22,6 +22,7 @@ namespace TemoStore.Core.Abstractions
         IAttendanceRepository Attendance { get; }
         IAccountRepository Accounts { get; }
         IClosureRepository Closures { get; }
+        IReturnRepository Returns { get; }
 
         void Commit();
         void Rollback();
@@ -103,6 +104,17 @@ namespace TemoStore.Core.Abstractions
         void SetInvoiceId(int saleId, int invoiceId);
         void SetAmountPaid(int invoiceId, decimal amountPaid);
         IReadOnlyList<SaleRecord> GetByInvoiceId(int invoiceId);
+    }
+
+    // مرتجعات المبيعات - جدول Returns منفصل عن Sales عمدًا (زي InventoryAdjustments
+    // المنفصل عن Products بالظبط): عملية البيع الأصلية بتفضل سجل تاريخي ثابت، وكل حركة
+    // مرتجع (كلي أو جزئي) بتتوثّق هنا لوحدها بسببها ومبلغها ومين نفّذها
+    public interface IReturnRepository
+    {
+        int Insert(ReturnRecord ret);
+        int GetReturnedQuantity(int saleId);
+        IReadOnlyList<ReturnRecord> GetBySaleId(int saleId);
+        IReadOnlyList<ReturnRecord> GetAll();
     }
 
     public interface IPurchaseRepository

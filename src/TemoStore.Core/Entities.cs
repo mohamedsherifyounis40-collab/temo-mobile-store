@@ -50,6 +50,25 @@ namespace TemoStore.Core.Entities
         public string? Imei { get; set; }
     }
 
+    // مرتجع (كلي أو جزئي) لصنف من عملية بيع سابقة - عملية البيع الأصلية (SaleRecord) بتفضل
+    // زي ما هي بالظبط، والـReturnRecord ده هو سجل مستقل بيوثّق كل حركة رد على حدة، عشان
+    // "الكمية المتاحة للإرجاع" تتحسب دايمًا كـ QuantitySold ناقص مجموع كل المرتجعات المسجّلة
+    public class ReturnRecord
+    {
+        public int ReturnId { get; set; }
+        public int SaleId { get; set; }
+        public string Barcode { get; set; } = "";
+        public string ProductName { get; set; } = "";
+        public int Quantity { get; set; }
+        public decimal RefundAmount { get; set; }
+        public string Reason { get; set; } = "";
+        public string PaymentType { get; set; } = "";
+        public string? PaymentMethod { get; set; }
+        public int? CustomerId { get; set; }
+        public string ReturnDate { get; set; } = "";
+        public string PerformedBy { get; set; } = "";
+    }
+
     public class PurchaseLine
     {
         public string? Barcode { get; set; }

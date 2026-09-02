@@ -22,6 +22,7 @@ namespace TemoStore.Core.Engines
         ValidationResult ValidatePurchase(CreatePurchaseCommand command);
         ValidationResult ValidateExpense(RecordExpenseCommand command);
         ValidationResult ValidateTransfer(TransferFundsCommand command);
+        ValidationResult ValidateReturn(CreateReturnCommand command);
     }
 
     // مسؤول عن المخزون بس - خصم/إضافة كميات، وحدات IMEI، حركة مخزن، مراجعة الحد

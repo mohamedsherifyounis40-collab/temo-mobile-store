@@ -75,6 +75,7 @@ namespace Temo_Mobile_Store
             services.AddSingleton<ICommandHandler<CreateSaleCommand, SaleResult>, CreateSaleCommandHandler>();
             services.AddSingleton<ICommandHandler<UpdateSaleQuantityCommand, SaleResult>, UpdateSaleQuantityCommandHandler>();
             services.AddSingleton<ICommandHandler<CancelSaleCommand, bool>, CancelSaleCommandHandler>();
+            services.AddSingleton<ICommandHandler<CreateReturnCommand, ReturnResult>, CreateReturnCommandHandler>();
             services.AddSingleton<ICommandHandler<CreatePurchaseCommand, PurchaseResult>, CreatePurchaseCommandHandler>();
             services.AddSingleton<ICommandHandler<EditPurchaseCommand, PurchaseResult>, EditPurchaseCommandHandler>();
             services.AddSingleton<ICommandHandler<CancelPurchaseCommand, bool>, CancelPurchaseCommandHandler>();

@@ -363,4 +363,124 @@ namespace TemoStore.Engines.Handlers
             return true;
         }
     }
+
+    // ==========================================================================
+    // مرتجع (كلي أو جزئي) لصنف من عملية بيع سابقة. على عكس CancelSaleCommand، عملية
+    // البيع الأصلية (Sales) بتفضل زي ما هي بالظبط - سجل تاريخي ثابت - وكل حركة مرتجع
+    // بتتوثّق في جدول Returns المستقل بسببها ومبلغها. القيد المحاسبي عكس نسبة الكمية
+    // المرتجعة من الفاتورة الأصلية بالظبط (نفس منطق CancelSale، لكن على جزء من الكمية
+    // مش كلها بالضرورة)، والمرتجع بيتنفذ حتى لو يوم البيع الأصلي مُقفل من زمان - هو
+    // نفسه حدث جديد بتاريخ النهارده (ValidationEngine.ValidateReturn بيرفض بس لو
+    // *النهارده* مُقفل، زي أي عملية جديدة تانية في النظام).
+    // ==========================================================================
+    public class CreateReturnCommandHandler : ICommandHandler<CreateReturnCommand, ReturnResult>
+    {
+        private readonly IValidationEngine _validation;
+        private readonly IUnitOfWorkFactory _uowFactory;
+        private readonly IInventoryEngine _inventory;
+        private readonly ICashDrawerEngine _cashDrawer;
+        private readonly IAccountingEngine _accounting;
+        private readonly IIntegrityEngine _integrity;
+        private readonly IEventBus _eventBus;
+
+        public CreateReturnCommandHandler(IValidationEngine validation, IUnitOfWorkFactory uowFactory, IInventoryEngine inventory,
+            ICashDrawerEngine cashDrawer, IAccountingEngine accounting, IIntegrityEngine integrity, IEventBus eventBus)
+        {
+            _validation = validation;
+            _uowFactory = uowFactory;
+            _inventory = inventory;
+            _cashDrawer = cashDrawer;
+            _accounting = accounting;
+            _integrity = integrity;
+            _eventBus = eventBus;
+        }
+
+        public ReturnResult Handle(CreateReturnCommand command)
+        {
+            var validation = _validation.ValidateReturn(command);
+            if (!validation.IsValid)
+                throw new ValidationException(validation.Errors);
+
+            using var uow = _uowFactory.Create();
+
+            var sale = uow.Sales.GetById(command.SaleId) ?? throw new InvalidOperationException("لم يتم العثور على عملية البيع الأصلية.");
+
+            int alreadyReturned = uow.Returns.GetReturnedQuantity(command.SaleId);
+            int remaining = sale.QuantitySold - alreadyReturned;
+            if (command.Quantity > remaining)
+                throw new InvalidOperationException($"الكمية المطلوب إرجاعها أكبر من المتاح للإرجاع! المتاح حاليًا هو: {remaining}");
+
+            // حصة الكمية المرتجعة من إجمالي/خصم/ضريبة الفاتورة الأصلية بالظبط - نفس مبدأ
+            // UpdateSaleQuantityCommand، لكن هنا القيمة الأصلية (sale.Total/Discount/Tax)
+            // بتفضل زي ما هي دايمًا (المرجع دايمًا الفاتورة الأصلية، مش آخر مرتجع)
+            decimal fraction = sale.QuantitySold > 0 ? (decimal)command.Quantity / sale.QuantitySold : 0;
+            decimal returnGross = Math.Round(sale.Total * fraction, 2);
+            decimal returnDiscount = Math.Round(sale.Discount * fraction, 2);
+            decimal returnTax = Math.Round(sale.Tax * fraction, 2);
+            decimal refundAmount = returnGross - returnDiscount + returnTax;
+            decimal returnCost = sale.CostPrice * command.Quantity;
+
+            uow.Products.AddQuantity(sale.Barcode, command.Quantity);
+            if (sale.Imei != null)
+                _inventory.MarkImeiInStock(sale.Imei, uow);
+
+            var lines = new List<JournalLineRequest>();
+            if (returnGross != 0)
+            {
+                lines.Add(new() { AccountCode = AccountCodes.SalesRevenue, Debit = returnGross, Credit = 0 });
+                if (returnDiscount > 0)
+                    lines.Add(new() { AccountCode = AccountCodes.SalesDiscounts, Debit = 0, Credit = returnDiscount });
+                if (returnTax > 0)
+                    lines.Add(new() { AccountCode = AccountCodes.TaxPayable, Debit = returnTax, Credit = 0 });
+                if (sale.PaymentType == "Cash" && sale.PaymentMethod != null)
+                    lines.Add(new() { AccountCode = AccountCodes.ForPaymentMethod(sale.PaymentMethod), Debit = 0, Credit = refundAmount });
+                else
+                    lines.Add(new() { AccountCode = AccountCodes.Customers, Debit = 0, Credit = refundAmount });
+            }
+
+            if (sale.PaymentType == "Cash" && sale.PaymentMethod != null && refundAmount != 0)
+                _cashDrawer.Debit(sale.PaymentMethod, refundAmount, $"مرتجع من عملية بيع رقم {command.SaleId}", uow, saleId: command.SaleId, accountCode: AccountCodes.SalesRevenue);
+
+            if (returnCost > 0)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = AccountCodes.Inventory, Debit = returnCost, Credit = 0 });
+                lines.Add(new JournalLineRequest { AccountCode = AccountCodes.Cogs, Debit = 0, Credit = returnCost });
+            }
+
+            if (lines.Count > 0)
+                _accounting.Post(new JournalEntryRequest { SourceType = "Return", SourceId = command.SaleId, Description = $"مرتجع {command.Quantity} من {sale.ProductName} (بيع رقم {command.SaleId}) - {command.Reason}", Lines = lines }, command.PerformedBy, uow);
+
+            int returnId = uow.Returns.Insert(new ReturnRecord
+            {
+                SaleId = command.SaleId,
+                Barcode = sale.Barcode,
+                ProductName = sale.ProductName,
+                Quantity = command.Quantity,
+                RefundAmount = refundAmount,
+                Reason = command.Reason,
+                PaymentType = sale.PaymentType,
+                PaymentMethod = sale.PaymentMethod,
+                CustomerId = sale.CustomerId,
+                PerformedBy = command.PerformedBy
+            });
+
+            var affectedMethods = sale.PaymentType == "Cash" && sale.PaymentMethod != null ? new[] { sale.PaymentMethod } : null;
+            var integrity = _integrity.CheckBeforeCommit(uow, new[] { sale.Barcode }, affectedMethods);
+            if (!integrity.Passed)
+                throw new InvalidOperationException(string.Join("؛ ", integrity.Violations));
+
+            uow.Commit();
+
+            _eventBus.Publish(new ReturnCompleted
+            {
+                OriginalSaleId = command.SaleId,
+                Quantity = command.Quantity,
+                RefundAmount = refundAmount,
+                Reason = command.Reason,
+                PerformedBy = command.PerformedBy
+            });
+
+            return new ReturnResult { ReturnId = returnId, RefundAmount = refundAmount };
+        }
+    }
 }

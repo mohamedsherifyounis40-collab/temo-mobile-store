@@ -34,6 +34,7 @@ namespace TemoStore.Data
             Attendance = new AttendanceRecordRepository(_conn, _tx);
             Accounts = new AccountRepository(_conn, _tx);
             Closures = new ClosureRepository(_conn, _tx);
+            Returns = new ReturnRepository(_conn, _tx);
         }
 
         public IProductRepository Products { get; }
@@ -51,6 +52,7 @@ namespace TemoStore.Data
         public IAttendanceRepository Attendance { get; }
         public IAccountRepository Accounts { get; }
         public IClosureRepository Closures { get; }
+        public IReturnRepository Returns { get; }
 
         public void Commit()
         {

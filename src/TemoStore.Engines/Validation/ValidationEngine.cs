@@ -143,6 +143,40 @@ namespace TemoStore.Engines.Validation
             return errors.Count == 0 ? ValidationResult.Ok() : new ValidationResult { IsValid = false, Errors = errors };
         }
 
+        public ValidationResult ValidateReturn(CreateReturnCommand command)
+        {
+            var errors = new List<string>();
+
+            if (command.Quantity <= 0)
+                errors.Add("كمية المرتجع لازم تكون أكبر من صفر.");
+
+            if (string.IsNullOrWhiteSpace(command.Reason))
+                errors.Add("لازم تحدد سبب المرتجع.");
+
+            if (_dateClosure.IsClosed(DateTime.Now))
+                errors.Add("تم إقفال اليوم بالفعل، لا يمكن تسجيل مرتجعات جديدة.");
+
+            using (var uow = _uowFactory.Create())
+            {
+                var sale = uow.Sales.GetById(command.SaleId);
+                if (sale == null)
+                {
+                    errors.Add("لم يتم العثور على عملية البيع الأصلية.");
+                }
+                else if (command.Quantity > 0)
+                {
+                    int alreadyReturned = uow.Returns.GetReturnedQuantity(command.SaleId);
+                    int remaining = sale.QuantitySold - alreadyReturned;
+                    if (command.Quantity > remaining)
+                        errors.Add($"الكمية المطلوب إرجاعها أكبر من المتاح للإرجاع! المتاح حاليًا هو: {remaining}");
+                }
+
+                uow.Rollback();
+            }
+
+            return errors.Count == 0 ? ValidationResult.Ok() : new ValidationResult { IsValid = false, Errors = errors };
+        }
+
         public ValidationResult ValidateTransfer(TransferFundsCommand command)
         {
             var errors = new List<string>();

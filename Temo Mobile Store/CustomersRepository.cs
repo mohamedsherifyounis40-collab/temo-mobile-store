@@ -47,7 +47,7 @@ namespace Temo_Mobile_Store
 
                 foreach (var cust in customers)
                 {
-                    decimal totalCredit = 0, totalCollected = 0;
+                    decimal totalCredit = 0, totalCollected = 0, totalReturned = 0;
                     using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Total) FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Credit'", conn))
                     {
                         cmd.Parameters.AddWithValue("@Id", cust.id);
@@ -60,8 +60,16 @@ namespace Temo_Mobile_Store
                         var res = cmd.ExecuteScalar();
                         totalCollected = (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
                     }
+                    // مرتجعات على بيع آجل بتقلل دين العميل مباشرة (مفيش كاش اتحصّل أصلاً هيترد)
+                    using (SqliteCommand cmd = new SqliteCommand(
+                        "SELECT SUM(R.RefundAmount) FROM Returns R JOIN Sales S ON R.SaleId = S.SaleID WHERE S.CustomerId = @Id AND S.PaymentType = 'Credit'", conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Id", cust.id);
+                        var res = cmd.ExecuteScalar();
+                        totalReturned = (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
+                    }
 
-                    dt.Rows.Add(cust.id, cust.name, cust.phone, totalCredit.ToString("N2"), totalCollected.ToString("N2"), (totalCredit - totalCollected).ToString("N2"));
+                    dt.Rows.Add(cust.id, cust.name, cust.phone, totalCredit.ToString("N2"), totalCollected.ToString("N2"), (totalCredit - totalCollected - totalReturned).ToString("N2"));
                 }
             }
             return dt;
@@ -104,6 +112,21 @@ namespace Temo_Mobile_Store
                     {
                         while (reader.Read())
                             dt.Rows.Add(reader["CreatedAt"], "تحصيل", "تحصيل عبر " + reader["PaymentMethod"], "-" + Convert.ToDecimal(reader["Amount"]).ToString("N2"));
+                    }
+                }
+                using (SqliteCommand cmd = new SqliteCommand(
+                    "SELECT R.ReturnDate, R.ProductName, R.Quantity, R.RefundAmount, R.Reason, S.PaymentType FROM Returns R JOIN Sales S ON R.SaleId = S.SaleID " +
+                    "WHERE S.CustomerId = @Id ORDER BY R.ReturnDate", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Id", customerId);
+                    using (SqliteDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string paymentType = reader["PaymentType"].ToString();
+                            string label = paymentType == "Credit" ? "مرتجع (تخفيض دين)" : "مرتجع (استرداد كاش)";
+                            dt.Rows.Add(reader["ReturnDate"], label, $"مرتجع {reader["Quantity"]} × {reader["ProductName"]} (سبب: {reader["Reason"]})", "-" + Convert.ToDecimal(reader["RefundAmount"]).ToString("N2"));
+                        }
                     }
                 }
             }
