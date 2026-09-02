@@ -18,7 +18,7 @@ namespace TemoStore.Data.Repositories
         public int Insert(ReturnRecord ret)
         {
             using (var cmd = new SqliteCommand(
-                "INSERT INTO Returns (SaleId, Barcode, ProductName, Quantity, RefundAmount, Reason, PaymentType, PaymentMethod, CustomerId, PerformedBy) " +
+                "INSERT INTO SalesReturns (SaleId, Barcode, ProductName, Quantity, RefundAmount, Reason, PaymentType, PaymentMethod, CustomerId, PerformedBy) " +
                 "VALUES (@SaleId, @Barcode, @ProductName, @Quantity, @RefundAmount, @Reason, @PaymentType, @PaymentMethod, @CustomerId, @PerformedBy)", _conn, _tx))
             {
                 cmd.Parameters.AddWithValue("@SaleId", ret.SaleId);
@@ -39,7 +39,7 @@ namespace TemoStore.Data.Repositories
 
         public int GetReturnedQuantity(int saleId)
         {
-            using var cmd = new SqliteCommand("SELECT COALESCE(SUM(Quantity), 0) FROM Returns WHERE SaleId = @SaleId", _conn, _tx);
+            using var cmd = new SqliteCommand("SELECT COALESCE(SUM(Quantity), 0) FROM SalesReturns WHERE SaleId = @SaleId", _conn, _tx);
             cmd.Parameters.AddWithValue("@SaleId", saleId);
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
@@ -49,7 +49,7 @@ namespace TemoStore.Data.Repositories
             var results = new List<ReturnRecord>();
             using var cmd = new SqliteCommand(
                 "SELECT ReturnId, SaleId, Barcode, ProductName, Quantity, RefundAmount, Reason, PaymentType, PaymentMethod, CustomerId, ReturnDate, PerformedBy " +
-                "FROM Returns WHERE SaleId = @SaleId ORDER BY ReturnId ASC", _conn, _tx);
+                "FROM SalesReturns WHERE SaleId = @SaleId ORDER BY ReturnId ASC", _conn, _tx);
             cmd.Parameters.AddWithValue("@SaleId", saleId);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -62,7 +62,7 @@ namespace TemoStore.Data.Repositories
             var results = new List<ReturnRecord>();
             using var cmd = new SqliteCommand(
                 "SELECT ReturnId, SaleId, Barcode, ProductName, Quantity, RefundAmount, Reason, PaymentType, PaymentMethod, CustomerId, ReturnDate, PerformedBy " +
-                "FROM Returns ORDER BY ReturnId DESC", _conn, _tx);
+                "FROM SalesReturns ORDER BY ReturnId DESC", _conn, _tx);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
                 results.Add(ReadReturn(reader));

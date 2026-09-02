@@ -62,7 +62,7 @@ namespace Temo_Mobile_Store
                     }
                     // مرتجعات على بيع آجل بتقلل دين العميل مباشرة (مفيش كاش اتحصّل أصلاً هيترد)
                     using (SqliteCommand cmd = new SqliteCommand(
-                        "SELECT SUM(R.RefundAmount) FROM Returns R JOIN Sales S ON R.SaleId = S.SaleID WHERE S.CustomerId = @Id AND S.PaymentType = 'Credit'", conn))
+                        "SELECT SUM(R.RefundAmount) FROM SalesReturns R JOIN Sales S ON R.SaleId = S.SaleID WHERE S.CustomerId = @Id AND S.PaymentType = 'Credit'", conn))
                     {
                         cmd.Parameters.AddWithValue("@Id", cust.id);
                         var res = cmd.ExecuteScalar();
@@ -115,7 +115,7 @@ namespace Temo_Mobile_Store
                     }
                 }
                 using (SqliteCommand cmd = new SqliteCommand(
-                    "SELECT R.ReturnDate, R.ProductName, R.Quantity, R.RefundAmount, R.Reason, S.PaymentType FROM Returns R JOIN Sales S ON R.SaleId = S.SaleID " +
+                    "SELECT R.ReturnDate, R.ProductName, R.Quantity, R.RefundAmount, R.Reason, S.PaymentType FROM SalesReturns R JOIN Sales S ON R.SaleId = S.SaleID " +
                     "WHERE S.CustomerId = @Id ORDER BY R.ReturnDate", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", customerId);

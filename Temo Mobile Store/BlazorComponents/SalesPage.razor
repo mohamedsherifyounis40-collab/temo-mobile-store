@@ -100,31 +100,6 @@
                         </div>
                     }
 
-                    @if (pendingReturnSaleId.HasValue)
-                    {
-                        <div class="add-customer-panel">
-                            <div class="card-title">↩️ مرتجع من عملية البيع رقم @pendingReturnSaleId — @returnSaleProductName (المتاح للإرجاع: @returnableQuantity)</div>
-                            @if (returnableQuantity <= 0)
-                            {
-                                <div class="muted">مفيش حاجة متاحة للإرجاع من العملية دي (اترجعت بالكامل قبل كده).</div>
-                            }
-                            else
-                            {
-                                <label class="field-label">الكمية</label>
-                                <input class="field-input" type="number" min="1" max="@returnableQuantity" @bind="returnQuantity" />
-                                <label class="field-label">سبب المرتجع</label>
-                                <input class="field-input" placeholder="مثال: عيب في المنتج / مقاس غلط..." @bind="returnReason" />
-                            }
-                            <div class="form-actions" style="margin-top:8px">
-                                @if (returnableQuantity > 0)
-                                {
-                                    <button class="btn btn-primary btn-sm" @onclick="ConfirmReturnSale">✅ تنفيذ المرتجع</button>
-                                }
-                                <button class="btn btn-outline btn-sm" @onclick="() => pendingReturnSaleId = null">تراجع</button>
-                            </div>
-                        </div>
-                    }
-
                     <table class="cart-table">
                         <thead>
                             <tr>
@@ -157,48 +132,11 @@
                                         {
                                             <td>
                                                 <button class="btn btn-outline btn-sm" @onclick="() => StartEditSale(rowSaleId)">✏️ تعديل</button>
-                                                <button class="btn btn-outline btn-sm" @onclick="() => RequestReturnSale(rowSaleId)">↩️ مرتجع</button>
                                                 <button class="btn btn-danger-outline btn-sm" @onclick="() => RequestCancelSale(rowSaleId)">❌ إلغاء</button>
                                             </td>
                                         }
                                     </tr>
                                 }
-                            }
-                        </tbody>
-                    </table>
-
-                    <div class="card-title" style="margin-top:16px">↩️ سجل المرتجعات</div>
-                    <table class="cart-table">
-                        <thead>
-                            <tr>
-                                <th>رقم البيع الأصلي</th>
-                                <th>المنتج</th>
-                                <th>الكمية</th>
-                                <th>المبلغ المرتجع</th>
-                                <th>السبب</th>
-                                <th>التاريخ والوقت</th>
-                                <th>بواسطة</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if (returnsHistory != null && returnsHistory.Count > 0)
-                            {
-                                foreach (var r in returnsHistory)
-                                {
-                                    <tr>
-                                        <td>@r.SaleId</td>
-                                        <td>@r.ProductName</td>
-                                        <td>@r.Quantity</td>
-                                        <td class="num">@r.RefundAmount.ToString("N2")</td>
-                                        <td class="muted">@r.Reason</td>
-                                        <td class="muted">@r.ReturnDate</td>
-                                        <td class="muted">@r.PerformedBy</td>
-                                    </tr>
-                                }
-                            }
-                            else
-                            {
-                                <tr><td colspan="7" class="muted">مفيش مرتجعات مسجّلة لسه.</td></tr>
                             }
                         </tbody>
                     </table>
@@ -425,6 +363,7 @@
     {
         (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
         (MainShell.PageKeys.SalesBlazor,    "المبيعات",   "🛒"),
+        (MainShell.PageKeys.ReturnsBlazor,   "المرتجعات",  "↩️"),
         (MainShell.PageKeys.InventoryBlazor,"المخزون",    "🗄️"),
         (MainShell.PageKeys.InventoryCountBlazor, "جرد المخزن", "📋"),
         (MainShell.PageKeys.MaintenanceBlazor,"الصيانة",    "🔧"),
@@ -444,7 +383,7 @@
         {
             var adminOnlyKeys = new HashSet<string> {
                 MainShell.PageKeys.CustomersBlazor, MainShell.PageKeys.SuppliersBlazor, MainShell.PageKeys.PurchasesBlazor, MainShell.PageKeys.ReportsBlazor,
-                MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCountBlazor, MainShell.PageKeys.AttendanceBlazor
+                MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCountBlazor, MainShell.PageKeys.AttendanceBlazor, MainShell.PageKeys.ReturnsBlazor
             };
             return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
         }
@@ -495,12 +434,6 @@
     private string editingSaleProductName = "";
     private int editQuantity = 1;
     private int? pendingCancelSaleId;
-    private int? pendingReturnSaleId;
-    private string returnSaleProductName = "";
-    private int returnableQuantity;
-    private int returnQuantity = 1;
-    private string returnReason = "";
-    private System.Collections.Generic.List<ReturnHistoryRow> returnsHistory = new();
 
     protected override void OnInitialized()
     {
@@ -736,11 +669,7 @@
         if (showHistory) LoadSalesHistory();
     }
 
-    private void LoadSalesHistory()
-    {
-        salesHistory = SalesRepository.GetSales();
-        returnsHistory = SalesRepository.GetReturnsHistory();
-    }
+    private void LoadSalesHistory() => salesHistory = SalesRepository.GetSales();
 
     private void StartEditSale(int saleId)
     {
@@ -831,62 +760,6 @@
         {
             errorMessage = ex.Message;
             pendingCancelSaleId = null;
-        }
-    }
-
-    private void RequestReturnSale(int saleId)
-    {
-        errorMessage = null;
-        editingSaleId = null;
-        pendingCancelSaleId = null;
-
-        var sale = SalesRepository.GetSaleById(saleId);
-        if (sale == null)
-        {
-            errorMessage = "لم يتم العثور على عملية البيع.";
-            return;
-        }
-
-        returnSaleProductName = sale.ProductName;
-        returnableQuantity = SalesRepository.GetReturnableQuantity(saleId);
-        returnQuantity = Math.Max(1, returnableQuantity);
-        returnReason = "";
-        pendingReturnSaleId = saleId;
-    }
-
-    private void ConfirmReturnSale()
-    {
-        if (!pendingReturnSaleId.HasValue) return;
-        int saleId = pendingReturnSaleId.Value;
-
-        if (returnQuantity <= 0)
-        {
-            errorMessage = "من فضلك أدخل كمية صحيحة.";
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(returnReason))
-        {
-            errorMessage = "من فضلك أدخل سبب المرتجع.";
-            return;
-        }
-
-        try
-        {
-            var result = AppServices.CoreEngine.Execute(new CreateReturnCommand
-            {
-                SaleId = saleId,
-                Quantity = returnQuantity,
-                Reason = returnReason.Trim(),
-                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
-            });
-            successMessage = $"تم تنفيذ المرتجع بنجاح - المبلغ المرتد: {result.RefundAmount:N2} ج.م.";
-            errorMessage = null;
-            pendingReturnSaleId = null;
-            LoadSalesHistory();
-        }
-        catch (Exception ex)
-        {
-            errorMessage = ex.Message;
         }
     }
 

@@ -56,8 +56,11 @@ namespace Temo_Mobile_Store.Database
                 // مرتجعات المبيعات - سجل مستقل عن Sales عمدًا (زي InventoryAdjustments مقابل
                 // Products بالظبط): عملية البيع الأصلية بتفضل ثابتة كسجل تاريخي، وكل حركة مرتجع
                 // (كلي أو جزئي) بتتوثّق هنا لوحدها. "الكمية المتاحة للإرجاع" = Sales.QuantitySold
-                // ناقص مجموع Quantity هنا لنفس SaleId.
-                ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS Returns (
+                // ناقص مجموع Quantity هنا لنفس SaleId. الاسم "SalesReturns" مش "Returns" عمدًا - فيه
+                // جدول قديم فاضي اسمه "Returns" (schema مختلف تمامًا: ReturnType/OriginalSaleInvoiceId/
+                // OriginalPurchaseId...) باقي من محاولة قديمة اتلخبطت ومحدش استخدمها (0 صفوف)،
+                // ومحتفظين بيه من غير لمس بدل ما نتصادم معاه بنفس الاسم.
+                ExecuteNonQuery(conn, @"CREATE TABLE IF NOT EXISTS SalesReturns (
                     ReturnId INTEGER PRIMARY KEY AUTOINCREMENT,
                     SaleId INTEGER NOT NULL,
                     Barcode TEXT,

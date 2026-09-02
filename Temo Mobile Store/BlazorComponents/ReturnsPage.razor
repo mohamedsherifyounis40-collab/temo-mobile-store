@@ -1,0 +1,376 @@
+@using System.Data
+@using System.Globalization
+@using TemoStore.Core.Commands
+@implements IDisposable
+@inject IJSRuntime JS
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">📱 TEMO<br />MOBILE STORE</div>
+        <nav class="sidebar-nav">
+            @foreach (var item in NavItems)
+            {
+                bool isCurrent = item.Key == MainShell.PageKeys.ReturnsBlazor;
+                <button class="nav-item @(isCurrent ? "active" : "")" @onclick="() => Navigate(item.Key, isCurrent)">
+                    <span class="nav-icon">@item.Icon</span> <span>@item.Text</span>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <div class="main-area">
+
+        <header class="topbar">
+            <GlobalSearch />
+            <div class="topbar-right">
+                <div class="topbar-datetime"><span>@nowText</span></div>
+                <LicenseBadge />
+                <NotificationBell />
+                <button class="icon-btn" title="@(currentTheme == "dark" ? "الوضع الفاتح" : "الوضع الداكن")" @onclick="ToggleTheme">@(currentTheme == "dark" ? "☀️" : "🌙")</button>
+                <button class="icon-btn" title="تسجيل خروج" @onclick="() => MainShell.Instance?.RequestLogout()">🚪</button>
+                <div class="topbar-user">
+                    <div class="avatar">@userInitial</div>
+                    <div>
+                        <div class="user-name">@userName</div>
+                        <div class="user-role">@userRole</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="page-body">
+
+            <div class="page-header">
+                <div>
+                    <h1>↩️ المرتجعات</h1>
+                    <div class="breadcrumb">المرتجعات &gt; مرتجعات المبيعات</div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-error">⚠️ @errorMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div class="alert alert-success">✅ @successMessage</div>
+            }
+
+            <div class="kpi-strip">
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-blue">↩️</span>
+                    <div>
+                        <div class="kpi-chip-value">@returnsHistory.Count</div>
+                        <div class="kpi-chip-label">إجمالي المرتجعات (آخر 200)</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-orange">💰</span>
+                    <div>
+                        <div class="kpi-chip-value">@returnsHistory.Sum(r => r.RefundAmount).ToString("N0") ج.م</div>
+                        <div class="kpi-chip-label">إجمالي المبالغ المرتدة</div>
+                    </div>
+                </div>
+                <div class="card kpi-chip">
+                    <span class="kpi-chip-icon accent-green">📅</span>
+                    <div>
+                        <div class="kpi-chip-value">@returnsHistory.Count(r => r.ReturnDate.StartsWith(DateTime.Now.ToString("yyyy-MM-dd")))</div>
+                        <div class="kpi-chip-label">مرتجعات النهارده</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🔍 ابحث عن عملية بيع لعمل مرتجع (برقم البيع)</div>
+                <div class="list-toolbar">
+                    <input class="field-input" style="max-width:220px" type="number" placeholder="رقم البيع" @bind="lookupSaleId" @onkeydown="OnLookupKeyDown" />
+                    <button class="btn btn-primary" @onclick="LookupSale">بحث</button>
+                </div>
+
+                @if (pendingReturnSaleId.HasValue)
+                {
+                    <div class="form-panel">
+                        <div class="form-panel-title">↩️ مرتجع من عملية البيع رقم @pendingReturnSaleId — @returnSaleProductName</div>
+                        <div class="return-invoice-meta muted">المتاح للإرجاع: @returnableQuantity</div>
+                        @if (returnableQuantity <= 0)
+                        {
+                            <div class="muted">مفيش حاجة متاحة للإرجاع من العملية دي (اترجعت بالكامل قبل كده).</div>
+                        }
+                        else
+                        {
+                            <div class="form-grid">
+                                <div>
+                                    <label class="field-label">الكمية</label>
+                                    <input class="field-input" type="number" min="1" max="@returnableQuantity" @bind="returnQuantity" />
+                                </div>
+                                <div>
+                                    <label class="field-label">سبب المرتجع</label>
+                                    <input class="field-input" placeholder="مثال: عيب في المنتج / مقاس غلط..." @bind="returnReason" />
+                                </div>
+                            </div>
+                        }
+                        <div class="form-actions" style="margin-top:10px">
+                            @if (returnableQuantity > 0)
+                            {
+                                <button class="btn btn-primary btn-sm" @onclick="ConfirmReturnSale">✅ تنفيذ المرتجع</button>
+                            }
+                            <button class="btn btn-outline btn-sm" @onclick="() => pendingReturnSaleId = null">تراجع</button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="card">
+                <div class="card-title">📋 سجل المبيعات (دوس على "مرتجع" لعملية بيع)</div>
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th>رقم البيع</th>
+                            <th>المنتج</th>
+                            <th>الكمية</th>
+                            <th>الإجمالي</th>
+                            <th>وسيلة الدفع</th>
+                            <th>التاريخ والوقت</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (salesHistory != null)
+                        {
+                            foreach (DataRow row in salesHistory.Rows)
+                            {
+                                int rowSaleId = Convert.ToInt32(row["رقم البيع"]);
+                                <tr>
+                                    <td>@rowSaleId</td>
+                                    <td>@row["المنتج"]</td>
+                                    <td>@row["الكمية المباعة"]</td>
+                                    <td class="num">@Convert.ToDecimal(row["الإجمالي"]).ToString("N2")</td>
+                                    <td class="muted">@row["وسيلة الدفع"]</td>
+                                    <td class="muted">@row["التاريخ والوقت ⏰"]</td>
+                                    <td>
+                                        <button class="btn btn-outline btn-sm" @onclick="() => RequestReturnSale(rowSaleId)">↩️ مرتجع</button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-title">↩️ سجل المرتجعات</div>
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th>رقم البيع الأصلي</th>
+                            <th>المنتج</th>
+                            <th>الكمية</th>
+                            <th>المبلغ المرتجع</th>
+                            <th>السبب</th>
+                            <th>التاريخ والوقت</th>
+                            <th>بواسطة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (returnsHistory.Count > 0)
+                        {
+                            foreach (var r in returnsHistory)
+                            {
+                                <tr>
+                                    <td>@r.SaleId</td>
+                                    <td>@r.ProductName</td>
+                                    <td>@r.Quantity</td>
+                                    <td class="num">@r.RefundAmount.ToString("N2")</td>
+                                    <td class="muted">@r.Reason</td>
+                                    <td class="muted">@r.ReturnDate</td>
+                                    <td class="muted">@r.PerformedBy</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="7" class="muted">مفيش مرتجعات مسجّلة لسه.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CultureInfo arCulture = new CultureInfo("ar-EG");
+
+    private static readonly (string Key, string Text, string Icon)[] AllNavItems = new (string, string, string)[]
+    {
+        (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
+        (MainShell.PageKeys.SalesBlazor,    "المبيعات",   "🛒"),
+        (MainShell.PageKeys.ReturnsBlazor,   "المرتجعات",  "↩️"),
+        (MainShell.PageKeys.InventoryBlazor,"المخزون",    "🗄️"),
+        (MainShell.PageKeys.InventoryCountBlazor, "جرد المخزن", "📋"),
+        (MainShell.PageKeys.MaintenanceBlazor,"الصيانة",    "🔧"),
+        (MainShell.PageKeys.CustomersBlazor,"العملاء",   "👥"),
+        (MainShell.PageKeys.SuppliersBlazor,"الموردين",   "🚚"),
+        (MainShell.PageKeys.PurchasesBlazor,"المشتريات", "🧾"),
+        (MainShell.PageKeys.TreasuryBlazor, "الخزينة",    "🏦"),
+        (MainShell.PageKeys.ReportsBlazor,  "التقارير",   "📊"),
+        (MainShell.PageKeys.AccountsBlazor, "الحسابات",   "📒"),
+        (MainShell.PageKeys.AttendanceBlazor,"الحضور والمرتبات", "🧑‍💼"),
+        (MainShell.PageKeys.SettingsBlazor, "الإعدادات",  "⚙️"),
+    };
+
+    private (string Key, string Text, string Icon)[] NavItems
+    {
+        get
+        {
+            var adminOnlyKeys = new HashSet<string> {
+                MainShell.PageKeys.CustomersBlazor, MainShell.PageKeys.SuppliersBlazor, MainShell.PageKeys.PurchasesBlazor, MainShell.PageKeys.ReportsBlazor,
+                MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCountBlazor, MainShell.PageKeys.AttendanceBlazor, MainShell.PageKeys.ReturnsBlazor
+            };
+            return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
+        }
+    }
+
+    private System.Timers.Timer? clockTimer;
+    private string nowText = "";
+    private string userName = "";
+    private string userRole = "";
+    private string userInitial = "?";
+
+    private string? errorMessage;
+    private string? successMessage;
+    private string currentTheme = "light";
+
+    private DataTable? salesHistory;
+    private System.Collections.Generic.List<ReturnHistoryRow> returnsHistory = new();
+
+    private int? lookupSaleId;
+    private int? pendingReturnSaleId;
+    private string returnSaleProductName = "";
+    private int returnableQuantity;
+    private int returnQuantity = 1;
+    private string returnReason = "";
+
+    protected override void OnInitialized()
+    {
+        userName = AuthManager.CurrentUsername ?? "مستخدم";
+        userRole = AuthManager.IsAdmin ? "مدير النظام" : "موظف";
+        userInitial = userName.Length > 0 ? userName.Substring(0, 1) : "?";
+
+        RefreshNow();
+        clockTimer = new System.Timers.Timer(30000);
+        clockTimer.Elapsed += (s, e) => InvokeAsync(() => { RefreshNow(); StateHasChanged(); });
+        clockTimer.Start();
+
+        LoadData();
+    }
+
+    public void Dispose() => clockTimer?.Dispose();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            currentTheme = ThemeManager.CurrentTheme;
+            await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        currentTheme = ThemeManager.ToggledTheme();
+        ThemeManager.SetTheme(currentTheme);
+        await JS.InvokeVoidAsync("temoApplyTheme", currentTheme);
+    }
+
+    private void RefreshNow() => nowText = DateTime.Now.ToString("dddd d MMMM yyyy - hh:mm tt", arCulture);
+
+    private void Navigate(string key, bool isCurrent)
+    {
+        if (!isCurrent)
+        {
+            MainShell.Instance?.OpenPageByKey(key);
+            return;
+        }
+
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        salesHistory = SalesRepository.GetSales();
+        returnsHistory = SalesRepository.GetReturnsHistory(200);
+    }
+
+    private void OnLookupKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") LookupSale();
+    }
+
+    private void LookupSale()
+    {
+        if (!lookupSaleId.HasValue)
+        {
+            errorMessage = "من فضلك أدخل رقم البيع.";
+            return;
+        }
+        RequestReturnSale(lookupSaleId.Value);
+    }
+
+    private void RequestReturnSale(int saleId)
+    {
+        errorMessage = null;
+
+        var sale = SalesRepository.GetSaleById(saleId);
+        if (sale == null)
+        {
+            errorMessage = "لم يتم العثور على عملية البيع.";
+            return;
+        }
+
+        returnSaleProductName = sale.ProductName;
+        returnableQuantity = SalesRepository.GetReturnableQuantity(saleId);
+        returnQuantity = Math.Max(1, returnableQuantity);
+        returnReason = "";
+        pendingReturnSaleId = saleId;
+    }
+
+    private void ConfirmReturnSale()
+    {
+        if (!pendingReturnSaleId.HasValue) return;
+        int saleId = pendingReturnSaleId.Value;
+
+        if (returnQuantity <= 0)
+        {
+            errorMessage = "من فضلك أدخل كمية صحيحة.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(returnReason))
+        {
+            errorMessage = "من فضلك أدخل سبب المرتجع.";
+            return;
+        }
+
+        try
+        {
+            var result = AppServices.CoreEngine.Execute(new CreateReturnCommand
+            {
+                SaleId = saleId,
+                Quantity = returnQuantity,
+                Reason = returnReason.Trim(),
+                PerformedBy = AuthManager.CurrentUsername ?? "unknown"
+            });
+            successMessage = $"تم تنفيذ المرتجع بنجاح - المبلغ المرتد: {result.RefundAmount:N2} ج.م.";
+            errorMessage = null;
+            pendingReturnSaleId = null;
+            LoadData();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}

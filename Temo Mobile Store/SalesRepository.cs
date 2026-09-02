@@ -217,7 +217,7 @@ namespace Temo_Mobile_Store
                     if (res == null || res == DBNull.Value) return 0;
                     quantitySold = Convert.ToInt32(res);
                 }
-                using (SqliteCommand cmd = new SqliteCommand("SELECT COALESCE(SUM(Quantity), 0) FROM Returns WHERE SaleId = @Id", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT COALESCE(SUM(Quantity), 0) FROM SalesReturns WHERE SaleId = @Id", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", saleId);
                     int alreadyReturned = Convert.ToInt32(cmd.ExecuteScalar());
@@ -234,7 +234,7 @@ namespace Temo_Mobile_Store
             {
                 conn.Open();
                 using (SqliteCommand cmd = new SqliteCommand(
-                    "SELECT ReturnId, SaleId, ProductName, Quantity, RefundAmount, Reason, ReturnDate, PerformedBy FROM Returns ORDER BY ReturnId DESC LIMIT @Limit", conn))
+                    "SELECT ReturnId, SaleId, ProductName, Quantity, RefundAmount, Reason, ReturnDate, PerformedBy FROM SalesReturns ORDER BY ReturnId DESC LIMIT @Limit", conn))
                 {
                     cmd.Parameters.AddWithValue("@Limit", limit);
                     using (SqliteDataReader reader = cmd.ExecuteReader())

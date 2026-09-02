@@ -37,6 +37,7 @@ namespace Temo_Mobile_Store
             // الشاشات القديمة اتشالت خالص والمفاتيح الجديدة (Blazor) بقت هي الأساسية.
             public const string Home = "Home";
             public const string SalesBlazor = "SalesBlazor";
+            public const string ReturnsBlazor = "ReturnsBlazor";
             public const string InventoryBlazor = "InventoryBlazor";
             public const string InventoryCountBlazor = "InventoryCountBlazor";
             public const string MaintenanceBlazor = "MaintenanceBlazor";
@@ -86,6 +87,7 @@ namespace Temo_Mobile_Store
             // المحتوى الدائم تحت أي نافذة تانية مفتوحة (راجع BuildHomeDashboardPage).
             (PageKeys.Home,           "الرئيسية",   "🏠"),
             (PageKeys.SalesBlazor,    "المبيعات",   "🛒"),
+            (PageKeys.ReturnsBlazor,  "المرتجعات",  "↩️"),
             (PageKeys.InventoryBlazor,"المخزون",    "🗄️"),
             (PageKeys.InventoryCountBlazor, "جرد المخزن", "📋"),
             (PageKeys.MaintenanceBlazor,"الصيانة",    "🔧"),
@@ -104,7 +106,7 @@ namespace Temo_Mobile_Store
         private static readonly HashSet<string> AdminOnlyPageKeys = new HashSet<string>
         {
             PageKeys.CustomersBlazor, PageKeys.SuppliersBlazor, PageKeys.PurchasesBlazor, PageKeys.ReportsBlazor,
-            PageKeys.AccountsBlazor, PageKeys.SettingsBlazor, PageKeys.InventoryCountBlazor, PageKeys.AttendanceBlazor
+            PageKeys.AccountsBlazor, PageKeys.SettingsBlazor, PageKeys.InventoryCountBlazor, PageKeys.AttendanceBlazor, PageKeys.ReturnsBlazor
         };
 
         // ==========================================================================
@@ -302,6 +304,8 @@ namespace Temo_Mobile_Store
                 BuildHomeDashboardPage();
             else if (pageKey == PageKeys.SalesBlazor)
                 BuildSalesBlazorPage();
+            else if (pageKey == PageKeys.ReturnsBlazor)
+                BuildReturnsBlazorPage();
             else if (pageKey == PageKeys.InventoryBlazor)
                 BuildInventoryBlazorPage();
             else if (pageKey == PageKeys.InventoryCountBlazor)
@@ -393,6 +397,12 @@ namespace Temo_Mobile_Store
         private void BuildSalesBlazorPage()
         {
             ShowPageInline(PageKeys.SalesBlazor, () => new SalesPageBlazorHost());
+        }
+
+        // شاشة المرتجعات المستقلة (Blazor Hybrid) - بنفس نمط SalesBlazor بالظبط
+        private void BuildReturnsBlazorPage()
+        {
+            ShowPageInline(PageKeys.ReturnsBlazor, () => new ReturnsPageBlazorHost());
         }
 
         // تجربة شاشة مخزون جديدة (Blazor Hybrid) - بتتعرض جوه نفس نافذة MainShell (ShowPageInline) بدل شاشة

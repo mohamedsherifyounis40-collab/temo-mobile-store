@@ -360,6 +360,7 @@
     {
         (MainShell.PageKeys.Home,           "الرئيسية",   "🏠"),
         (MainShell.PageKeys.SalesBlazor,    "المبيعات",   "🛒"),
+        (MainShell.PageKeys.ReturnsBlazor,   "المرتجعات",  "↩️"),
         (MainShell.PageKeys.InventoryBlazor,"المخزون",    "🗄️"),
         (MainShell.PageKeys.InventoryCountBlazor, "جرد المخزن", "📋"),
         (MainShell.PageKeys.MaintenanceBlazor,"الصيانة",    "🔧"),
@@ -379,7 +380,7 @@
         {
             var adminOnlyKeys = new HashSet<string> {
                 MainShell.PageKeys.CustomersBlazor, MainShell.PageKeys.SuppliersBlazor, MainShell.PageKeys.PurchasesBlazor, MainShell.PageKeys.ReportsBlazor,
-                MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCountBlazor, MainShell.PageKeys.AttendanceBlazor
+                MainShell.PageKeys.AccountsBlazor, MainShell.PageKeys.SettingsBlazor, MainShell.PageKeys.InventoryCountBlazor, MainShell.PageKeys.AttendanceBlazor, MainShell.PageKeys.ReturnsBlazor
             };
             return AuthManager.IsAdmin ? AllNavItems : AllNavItems.Where(x => !adminOnlyKeys.Contains(x.Key)).ToArray();
         }

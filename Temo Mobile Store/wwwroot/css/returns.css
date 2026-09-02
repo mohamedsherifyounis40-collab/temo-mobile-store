@@ -1,0 +1,10 @@
+/* شاشة المرتجعات (Blazor Hybrid) - تخصيصات خاصة بالشاشة دي بس، فوق list-template.css */
+
+.accent-blue { color: var(--color-accent); }
+.accent-green { color: var(--color-green); }
+.accent-orange { color: var(--color-orange); }
+.accent-red { color: var(--color-red); }
+.accent-purple { color: var(--color-purple); }
+
+.return-line-disabled { color: var(--color-text-muted); }
+.return-invoice-meta { margin: 10px 0; }
