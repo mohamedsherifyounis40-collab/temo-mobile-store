@@ -35,6 +35,7 @@ namespace TemoStore.Core.Entities
         public string? Imei { get; set; }
         public string SaleDate { get; set; } = "";
         public int SalesInvoiceId { get; set; }           // بيربط عدة أصناف تحت نفس رقم الفاتورة
+        public string Notes { get; set; } = "";            // ملاحظة اختيارية على مستوى الفاتورة (مسجّلة على كل أصنافها بنفس القيمة)
     }
 
     // صنف واحد جوه فاتورة بيع ممكن تحتوي على أكتر من صنف - نفس مبدأ PurchaseLine بالظبط

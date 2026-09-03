@@ -52,8 +52,8 @@
                 </div>
                 <div class="toolbar">
                     <button class="btn btn-primary" @onclick="ResetInvoice">➕ فاتورة جديدة</button>
-                    <button class="btn btn-outline" disabled title="قريبًا">🖨️ طباعة</button>
-                    <button class="btn btn-outline" disabled title="قريبًا">💾 حفظ وطباعة</button>
+                    <button class="btn btn-outline" title="طباعة آخر فاتورة" @onclick="PrintLastInvoice">🖨️ طباعة</button>
+                    <button class="btn btn-outline" disabled="@isSaving" title="تأكيد الفاتورة الحالية وطباعتها فورًا" @onclick="() => ConfirmInvoice(true)">💾 حفظ وطباعة</button>
                     <button class="btn btn-danger-outline" @onclick="ResetInvoice">✖ إلغاء</button>
                     <button class="btn btn-outline" @onclick="ToggleHistory">📋 @(showHistory ? "إخفاء سجل المبيعات" : "سجل المبيعات")</button>
                 </div>
@@ -278,7 +278,7 @@
 
             <div class="grid-bottom">
                 <div class="card notes-card">
-                    <div class="card-title">ملاحظات <span class="muted-tag">قريبًا (مش بتتحفظ حاليًا)</span></div>
+                    <div class="card-title">ملاحظات</div>
                     <textarea class="notes-input" placeholder="اكتب ملاحظة هنا..." @bind="notes"></textarea>
                 </div>
 
@@ -320,7 +320,7 @@
                         <div class="summary-row"><span>حالة الفاتورة</span><b>آجل - غير مدفوعة</b></div>
                     }
 
-                    <button class="btn btn-confirm" disabled="@isSaving" @onclick="ConfirmInvoice">
+                    <button class="btn btn-confirm" disabled="@isSaving" @onclick="() => ConfirmInvoice(false)">
                         ✅ @(isSaving ? "جارِ الحفظ..." : "تأكيد الفاتورة")
                     </button>
                 </div>
@@ -797,7 +797,7 @@
         return lines;
     }
 
-    private void ConfirmInvoice()
+    private void ConfirmInvoice(bool printAfter = false)
     {
         errorMessage = null;
         successMessage = null;
@@ -828,7 +828,8 @@
                 PaymentType = saleType,
                 PaymentMethod = saleType == "Cash" ? selectedPaymentMethod : null,
                 PerformedBy = AuthManager.CurrentUsername ?? "unknown",
-                AmountPaid = saleType == "Cash" ? EffectiveAmountPaid : null
+                AmountPaid = saleType == "Cash" ? EffectiveAmountPaid : null,
+                Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim()
             };
 
             var result = AppServices.CoreEngine.Execute(command);
@@ -849,6 +850,10 @@
             TaxRatePercent = 0;
             amountPaidManuallyEdited = false;
             selectedPaymentMethod = null;
+            notes = "";
+
+            if (printAfter)
+                PrintLastInvoice();
         }
         catch (Exception ex)
         {

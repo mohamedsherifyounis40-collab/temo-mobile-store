@@ -350,6 +350,7 @@ namespace Temo_Mobile_Store.Database
                 EnsureProductsImageColumn(conn);
                 EnsureSalesDiscountColumn(conn);
                 EnsureSalesTaxAndPaymentColumns(conn);
+                EnsureSalesNotesColumn(conn);
                 EnsurePurchaseItemsSkipInventoryColumn(conn);
                 EnsureStoreSettingsThemeColumn(conn);
                 RenamePaymentMethodSohoulaToMomken(conn);
@@ -1132,6 +1133,31 @@ namespace Temo_Mobile_Store.Database
                 ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN Tax REAL NOT NULL DEFAULT 0;");
             if (!amountPaidExists)
                 ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN AmountPaid REAL NOT NULL DEFAULT 0;");
+        }
+
+        // ==========================================================================
+        // ترحيل: عمود Notes لجدول Sales - ملاحظة نصية اختيارية على مستوى الفاتورة (بتتسجل
+        // على كل أصنافها بنفس القيمة، زي AmountPaid بالظبط) - كانت حقل واجهة "قريبًا" بس
+        // في شاشة المبيعات قبل كده، مش بتتحفظ فعليًا.
+        // ==========================================================================
+        private static void EnsureSalesNotesColumn(SqliteConnection conn)
+        {
+            bool columnExists = false;
+            using (SqliteCommand cmd = new SqliteCommand("PRAGMA table_info(Sales);", conn))
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader["name"].ToString(), "Notes", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!columnExists)
+                ExecuteNonQuery(conn, "ALTER TABLE Sales ADD COLUMN Notes TEXT NOT NULL DEFAULT '';");
         }
 
         // ==========================================================================

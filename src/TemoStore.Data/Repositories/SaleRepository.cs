@@ -18,7 +18,7 @@ namespace TemoStore.Data.Repositories
         public int Insert(SaleRecord sale)
         {
             using (var cmd = new SqliteCommand(
-                "INSERT INTO Sales (Barcode, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, AmountPaid, CustomerId, PaymentType, IMEI, PaymentMethod, SalesInvoiceId) VALUES (@Barcode, @ProductName, @CostPrice, @Price, @QuantitySold, @Total, @Discount, @Tax, @AmountPaid, @CustomerId, @PaymentType, @IMEI, @PaymentMethod, @SalesInvoiceId)", _conn, _tx))
+                "INSERT INTO Sales (Barcode, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, AmountPaid, CustomerId, PaymentType, IMEI, PaymentMethod, SalesInvoiceId, Notes) VALUES (@Barcode, @ProductName, @CostPrice, @Price, @QuantitySold, @Total, @Discount, @Tax, @AmountPaid, @CustomerId, @PaymentType, @IMEI, @PaymentMethod, @SalesInvoiceId, @Notes)", _conn, _tx))
             {
                 cmd.Parameters.AddWithValue("@Barcode", sale.Barcode);
                 cmd.Parameters.AddWithValue("@ProductName", sale.ProductName);
@@ -34,6 +34,7 @@ namespace TemoStore.Data.Repositories
                 cmd.Parameters.AddWithValue("@IMEI", (object?)sale.Imei ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@PaymentMethod", (object?)sale.PaymentMethod ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@SalesInvoiceId", sale.SalesInvoiceId == 0 ? (object)DBNull.Value : sale.SalesInvoiceId);
+                cmd.Parameters.AddWithValue("@Notes", sale.Notes);
                 cmd.ExecuteNonQuery();
             }
             using var cmdId = new SqliteCommand("SELECT last_insert_rowid();", _conn, _tx);
@@ -61,7 +62,7 @@ namespace TemoStore.Data.Repositories
         public IReadOnlyList<SaleRecord> GetByInvoiceId(int invoiceId)
         {
             var results = new List<SaleRecord>();
-            using var cmd = new SqliteCommand("SELECT SaleID, Barcode, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, AmountPaid, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId FROM Sales WHERE SalesInvoiceId = @InvoiceId ORDER BY SaleID ASC", _conn, _tx);
+            using var cmd = new SqliteCommand("SELECT SaleID, Barcode, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, AmountPaid, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId, Notes FROM Sales WHERE SalesInvoiceId = @InvoiceId ORDER BY SaleID ASC", _conn, _tx);
             cmd.Parameters.AddWithValue("@InvoiceId", invoiceId);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -83,7 +84,8 @@ namespace TemoStore.Data.Repositories
                     PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
                     SaleDate = reader["SaleDate"].ToString()!,
                     Imei = reader["IMEI"] == DBNull.Value ? null : reader["IMEI"].ToString(),
-                    SalesInvoiceId = reader["SalesInvoiceId"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SalesInvoiceId"])
+                    SalesInvoiceId = reader["SalesInvoiceId"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SalesInvoiceId"]),
+                    Notes = reader["Notes"] == DBNull.Value ? "" : reader["Notes"].ToString()!
                 });
             }
             return results;
@@ -91,7 +93,7 @@ namespace TemoStore.Data.Repositories
 
         public SaleRecord? GetById(int saleId)
         {
-            using var cmd = new SqliteCommand("SELECT Barcode, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, AmountPaid, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId FROM Sales WHERE SaleID = @Id", _conn, _tx);
+            using var cmd = new SqliteCommand("SELECT Barcode, ProductName, CostPrice, Price, QuantitySold, Total, Discount, Tax, AmountPaid, CustomerId, PaymentType, PaymentMethod, SaleDate, IMEI, SalesInvoiceId, Notes FROM Sales WHERE SaleID = @Id", _conn, _tx);
             cmd.Parameters.AddWithValue("@Id", saleId);
             using var reader = cmd.ExecuteReader();
             if (!reader.Read()) return null;
@@ -112,7 +114,8 @@ namespace TemoStore.Data.Repositories
                 PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? null : reader["PaymentMethod"].ToString(),
                 SaleDate = reader["SaleDate"].ToString()!,
                 Imei = reader["IMEI"] == DBNull.Value ? null : reader["IMEI"].ToString(),
-                SalesInvoiceId = reader["SalesInvoiceId"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SalesInvoiceId"])
+                SalesInvoiceId = reader["SalesInvoiceId"] == DBNull.Value ? 0 : Convert.ToInt32(reader["SalesInvoiceId"]),
+                Notes = reader["Notes"] == DBNull.Value ? "" : reader["Notes"].ToString()!
             };
         }
 

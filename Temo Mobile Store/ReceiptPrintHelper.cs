@@ -247,6 +247,7 @@ namespace Temo_Mobile_Store
             InfoLine("الكاشير", receipt.CashierName);
             InfoLine("العميل", string.IsNullOrWhiteSpace(receipt.CustomerName) ? "عميل نقدي" : receipt.CustomerName);
             InfoLine("هاتف العميل", receipt.CustomerPhone);
+            InfoLine("ملاحظات", receipt.Notes);
 
             yPos += isThermal ? 4 : 6;
             Dashed(yPos);

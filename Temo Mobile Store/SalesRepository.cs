@@ -52,6 +52,7 @@ namespace Temo_Mobile_Store
         public string CustomerName;
         public string CustomerPhone;
         public string CashierName;
+        public string Notes;
     }
 
     public class SaleRecord
@@ -310,7 +311,7 @@ namespace Temo_Mobile_Store
                 var items = new System.Collections.Generic.List<ReceiptData>();
                 using (SqliteCommand cmd = new SqliteCommand(@"
                     SELECT S.SaleID, S.Barcode, S.ProductName, S.Price, S.QuantitySold, S.Total, S.Discount,
-                           S.PaymentType, S.PaymentMethod, S.SaleDate, S.IMEI, C.CustomerName, C.Phone,
+                           S.PaymentType, S.PaymentMethod, S.SaleDate, S.IMEI, S.Notes, C.CustomerName, C.Phone,
                            (SELECT CreatedBy FROM JournalEntries WHERE SourceType = 'Sale' AND SourceId = @InvoiceId ORDER BY JournalEntryId LIMIT 1) AS CashierName
                     FROM Sales S
                     LEFT JOIN Customers C ON S.CustomerId = C.CustomerId
@@ -338,6 +339,7 @@ namespace Temo_Mobile_Store
                                 CustomerName = reader["CustomerName"] == DBNull.Value ? null : reader["CustomerName"].ToString(),
                                 CustomerPhone = reader["Phone"] == DBNull.Value ? null : reader["Phone"].ToString(),
                                 CashierName = reader["CashierName"] == DBNull.Value ? null : reader["CashierName"].ToString(),
+                                Notes = reader["Notes"] == DBNull.Value ? null : reader["Notes"].ToString(),
                             });
                         }
                     }

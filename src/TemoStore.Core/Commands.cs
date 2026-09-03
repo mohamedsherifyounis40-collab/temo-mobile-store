@@ -16,6 +16,7 @@ namespace TemoStore.Core.Commands
         public string? PaymentMethod { get; set; }
         public required string PerformedBy { get; set; }
         public decimal? AmountPaid { get; set; }              // اختياري - للبيع الكاش بس (حاسبة فكة). لو مش مُرسلة = المبلغ المطلوب بالظبط
+        public string? Notes { get; set; }                    // ملاحظة اختيارية على مستوى الفاتورة
     }
 
     public class SaleResult

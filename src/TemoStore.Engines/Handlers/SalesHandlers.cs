@@ -98,7 +98,8 @@ namespace TemoStore.Engines.Handlers
                     PaymentType = command.PaymentType,
                     PaymentMethod = command.PaymentType == "Cash" ? command.PaymentMethod : null,
                     Imei = line.Imei,
-                    SalesInvoiceId = invoiceId // أول صنف بيتسجل بـ 0 مؤقتًا، وبنرجع نظبطه تحت
+                    SalesInvoiceId = invoiceId, // أول صنف بيتسجل بـ 0 مؤقتًا، وبنرجع نظبطه تحت
+                    Notes = command.Notes ?? ""
                 });
 
                 if (invoiceId == 0)
