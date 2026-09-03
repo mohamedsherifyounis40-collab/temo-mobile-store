@@ -107,7 +107,7 @@ namespace Temo_Mobile_Store
             sb.Append(BuildFooterItem("عدد الحركات", report.MovementCount.ToString(CultureInfo.InvariantCulture) + " حركة"));
             sb.Append(BuildFooterItem("إجمالي الوارد", Money(report.TotalIn), "footer-in"));
             sb.Append(BuildFooterItem("إجمالي المنصرف", Money(report.TotalOut), "footer-out"));
-            sb.Append(BuildFooterItem("الصافي", Money(report.NetTotal)));
+            sb.Append(BuildFooterItem("الصافي", Money(report.NetTotal), report.NetTotal < 0 ? "footer-out" : "footer-in"));
             sb.Append("</div>");
 
             sb.Append("<div class=\"generated-note\">تم إنشاء التقرير تلقائيًا الساعة ").Append(DateTime.Now.ToString("hh:mm tt", ArCulture))
@@ -186,6 +186,12 @@ namespace Temo_Mobile_Store
                 "شراء" => "badge-purchase",
                 "صيانة" => "badge-maintenance",
                 "مرتجع" => "badge-return",
+                "مصروف" => "badge-expense",
+                "سداد مورد" => "badge-supplier",
+                "تحصيل من عميل" => "badge-collection",
+                "تحويل" => "badge-transfer",
+                "مرتبات" => "badge-payroll",
+                "حركة يدوية" => "badge-manual",
                 _ => "badge-sale"
             };
             return $"<span class=\"type-badge {cls}\"><span class=\"type-dot\"></span>{Enc(type)}</span>";
@@ -250,6 +256,12 @@ namespace Temo_Mobile_Store
                 .badge-purchase { background:#EAF1FD; color:#2D6CDF; }
                 .badge-maintenance { background:#FEF3E2; color:#B45309; }
                 .badge-return { background:#FDECEC; color:#B42318; }
+                .badge-expense { background:#F3F0FC; color:#6D28D9; }
+                .badge-supplier { background:#FEF3E2; color:#92400E; }
+                .badge-collection { background:#E0F7F5; color:#0F766E; }
+                .badge-transfer { background:#F1F2F4; color:#4B5563; }
+                .badge-payroll { background:#EEF2FF; color:#4338CA; }
+                .badge-manual { background:#F1F2F4; color:#374151; }
 
                 .amount-cell { font-weight:bold; direction:ltr; unicode-bidi:embed; }
                 .amount-in { color:#157347; } .amount-out { color:#B42318; }

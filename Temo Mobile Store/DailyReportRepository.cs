@@ -30,7 +30,7 @@ namespace Temo_Mobile_Store
     public class DailyMovementRow
     {
         public DateTime Timestamp;
-        public string Type = "";           // بيع / شراء / صيانة / مرتجع
+        public string Type = "";           // بيع / شراء / صيانة / مرتجع / مصروف / سداد مورد / تحصيل من عميل / تحويل / مرتبات
         public string Description = "";
         public string? SerialOrImei;
         public string PaymentMethod = "";
@@ -74,6 +74,7 @@ namespace Temo_Mobile_Store
         private const int AccountInventory = 1200;
         private const int AccountCustomers = 1300;
         private const int AccountSuppliers = 2100;
+        private const int AccountMaintenanceRevenue = 4200;
 
         public static DailyReportData GetReport(DateTime date)
         {
@@ -129,6 +130,8 @@ namespace Temo_Mobile_Store
                 report.Movements.AddRange(GetReturnMovements(conn, dateStr));
                 report.Movements.AddRange(GetPurchaseMovements(conn, dateStr));
                 report.Movements.AddRange(GetMaintenanceMovements(conn, dateStr));
+                report.Movements.AddRange(GetExpenseMovements(conn, dateStr));
+                report.Movements.AddRange(GetTreasuryMovements(conn, dateStr));
                 report.Movements.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
             }
 
@@ -351,6 +354,125 @@ namespace Temo_Mobile_Store
                 });
             }
             return rows;
+        }
+
+        private static List<DailyMovementRow> GetExpenseMovements(SqliteConnection conn, string dateStr)
+        {
+            var rows = new List<DailyMovementRow>();
+            using var cmd = new SqliteCommand(@"
+                SELECT E.ExpenseID, E.ExpenseDate, E.Amount, E.PaymentMethod, A.AccountName,
+                       (SELECT CreatedBy FROM JournalEntries WHERE SourceType = 'Expense' AND SourceId = E.ExpenseID ORDER BY JournalEntryId LIMIT 1) AS Employee
+                FROM Expenses E
+                LEFT JOIN AccountsTree A ON A.AccountCode = E.AccountCode
+                WHERE date(E.ExpenseDate) = date(@D)
+                ORDER BY E.ExpenseDate", conn);
+            cmd.Parameters.AddWithValue("@D", dateStr);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                rows.Add(new DailyMovementRow
+                {
+                    Timestamp = DateTime.Parse(reader["ExpenseDate"].ToString()!),
+                    Type = "مصروف",
+                    Description = reader["AccountName"] == DBNull.Value ? "مصروف عمومي" : reader["AccountName"].ToString()!,
+                    SerialOrImei = null,
+                    PaymentMethod = reader["PaymentMethod"] == DBNull.Value ? "نقدي" : reader["PaymentMethod"].ToString()!,
+                    Employee = reader["Employee"] == DBNull.Value ? "" : reader["Employee"].ToString() ?? "",
+                    Amount = -Convert.ToDecimal(reader["Amount"]),
+                });
+            }
+            return rows;
+        }
+
+        // باقي حركات الخزينة (CashMovements) اللي مش بيع/شراء/صيانة - سداد مورد، تحصيل من
+        // عميل، تحويل بين وسائل، مرتبات/سلف موظفين. كل عملية في النظام بتعدي من
+        // ICashDrawerEngine.Credit/Debit فبتتسجل هنا (ما عدا المصروفات العمومية - دي بالذات
+        // بتتعامل مباشرة مع الرصيد من غير صف CashMovements، عشان كده ليها Query منفصل فوق).
+        // بنستبعد أي صف مرتبط ببيع/شراء (SaleId/PurchaseId) أو صيانة (AccountCode=4200)
+        // عشان دول متغطّيين من الـ Queries التانية فوق بالفعل، وميتكرروش هنا.
+        private static List<DailyMovementRow> GetTreasuryMovements(SqliteConnection conn, string dateStr)
+        {
+            var rows = new List<DailyMovementRow>();
+            using var cmd = new SqliteCommand(@"
+                SELECT CM.CreatedAt, CM.MovementType, CM.PaymentMethod, CM.Amount, CM.Description,
+                       CM.CustomerId, CM.SupplierId, CM.EmployeeId, CM.LinkedMovementId,
+                       C.CustomerName, S.SupplierName
+                FROM CashMovements CM
+                LEFT JOIN Customers C ON CM.CustomerId = C.CustomerId
+                LEFT JOIN Suppliers S ON CM.SupplierId = S.SupplierId
+                WHERE date(CM.CreatedAt) = date(@D)
+                  AND CM.SaleId IS NULL AND CM.PurchaseId IS NULL
+                  AND (CM.AccountCode IS NULL OR CM.AccountCode != @MaintCode)
+                ORDER BY CM.CreatedAt", conn);
+            cmd.Parameters.AddWithValue("@D", dateStr);
+            cmd.Parameters.AddWithValue("@MaintCode", AccountMaintenanceRevenue);
+
+            var pending = new List<(DateTime Time, string MovementType, string PaymentMethod, decimal Amount, string Description,
+                int? CustomerId, int? SupplierId, int? EmployeeId, bool IsLinkedTransfer, string? CustomerName, string? SupplierName)>();
+            using (var reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    pending.Add((
+                        DateTime.Parse(reader["CreatedAt"].ToString()!),
+                        reader["MovementType"].ToString() ?? "",
+                        reader["PaymentMethod"].ToString() ?? "",
+                        Convert.ToDecimal(reader["Amount"]),
+                        reader["Description"] == DBNull.Value ? "" : reader["Description"].ToString() ?? "",
+                        reader["CustomerId"] == DBNull.Value ? null : Convert.ToInt32(reader["CustomerId"]),
+                        reader["SupplierId"] == DBNull.Value ? null : Convert.ToInt32(reader["SupplierId"]),
+                        reader["EmployeeId"] == DBNull.Value ? null : Convert.ToInt32(reader["EmployeeId"]),
+                        reader["LinkedMovementId"] != DBNull.Value,
+                        reader["CustomerName"] == DBNull.Value ? null : reader["CustomerName"].ToString(),
+                        reader["SupplierName"] == DBNull.Value ? null : reader["SupplierName"].ToString()));
+                }
+            }
+
+            foreach (var m in pending)
+            {
+                string type;
+                string description;
+                string[] sourceTypes;
+                if (m.SupplierId != null) { type = "سداد مورد"; description = m.SupplierName ?? m.Description; sourceTypes = new[] { "SupplierPayment" }; }
+                else if (m.CustomerId != null) { type = "تحصيل من عميل"; description = m.CustomerName ?? m.Description; sourceTypes = new[] { "CustomerPayment" }; }
+                else if (m.EmployeeId != null) { type = "مرتبات"; description = m.Description; sourceTypes = new[] { "EmployeeAdvance", "EmployeePayment" }; }
+                else if (m.IsLinkedTransfer) { type = "تحويل"; description = m.Description; sourceTypes = new[] { "Transfer" }; }
+                // حركة قبض/صرف يدوية عامة (AddMovementCommand) - مش مربوطة بعميل/مورد/موظف
+                // ومش نص تحويل مرتبط، بس ممكن يكون ليها بند حساب اختياري (قيد SourceType='Movement')
+                else { type = "حركة يدوية"; description = string.IsNullOrWhiteSpace(m.Description) ? "حركة قبض/صرف" : m.Description; sourceTypes = new[] { "Movement" }; }
+
+                string employee = GetEmployeeByNearestJournalEntry(conn, sourceTypes, dateStr, m.Time);
+                decimal signedAmount = m.MovementType == "صرف" ? -m.Amount : m.Amount;
+
+                rows.Add(new DailyMovementRow
+                {
+                    Timestamp = m.Time,
+                    Type = type,
+                    Description = description,
+                    SerialOrImei = null,
+                    PaymentMethod = m.PaymentMethod,
+                    Employee = employee,
+                    Amount = signedAmount,
+                });
+            }
+            return rows;
+        }
+
+        // بيدوّر على أقرب قيد محاسبي (بالوقت) من نوع/أنواع معينة في نفس اليوم - مستخدم هنا
+        // لأن CashMovements معندهاش عمود "مين نفّذ العملية" مباشرة، والربط بمصدر واحد
+        // (SourceId) مش كافي لوحده لو نفس المورد/العميل/الموظف عليه أكتر من عملية في نفس اليوم
+        private static string GetEmployeeByNearestJournalEntry(SqliteConnection conn, string[] sourceTypes, string dateStr, DateTime movementTime)
+        {
+            string placeholders = string.Join(",", sourceTypes.Select((_, i) => $"@T{i}"));
+            using var cmd = new SqliteCommand(
+                $@"SELECT CreatedBy FROM JournalEntries
+                   WHERE SourceType IN ({placeholders}) AND date(CreatedAt) = date(@D)
+                   ORDER BY ABS(strftime('%s', CreatedAt) - strftime('%s', @T)) LIMIT 1", conn);
+            for (int i = 0; i < sourceTypes.Length; i++) cmd.Parameters.AddWithValue($"@T{i}", sourceTypes[i]);
+            cmd.Parameters.AddWithValue("@D", dateStr);
+            cmd.Parameters.AddWithValue("@T", movementTime.ToString("yyyy-MM-dd HH:mm:ss"));
+            var res = cmd.ExecuteScalar();
+            return (res != null && res != DBNull.Value) ? res.ToString()! : "";
         }
 
         // بيرجّع (اسم الموظف، طريقة الدفع) لآخر قيد محاسبي مرتبط بمصدر معين - طريقة الدفع
