@@ -48,7 +48,7 @@ namespace Temo_Mobile_Store
                 foreach (var cust in customers)
                 {
                     decimal totalCredit = 0, totalCollected = 0, totalReturned = 0;
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Total) FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Credit'", conn))
+                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Total - Discount + Tax) FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Credit'", conn))
                     {
                         cmd.Parameters.AddWithValue("@Id", cust.id);
                         var res = cmd.ExecuteScalar();
@@ -83,7 +83,7 @@ namespace Temo_Mobile_Store
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleDate, ProductName, Total FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Credit' ORDER BY SaleDate", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleDate, ProductName, (Total - Discount + Tax) AS Total FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Credit' ORDER BY SaleDate", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", customerId);
                     using (SqliteDataReader reader = cmd.ExecuteReader())
@@ -96,7 +96,7 @@ namespace Temo_Mobile_Store
                 // ده بيع متسدد بالكامل وقت حصوله فمالوش أي أثر على "المتبقي عليه" في
                 // GetCustomersWithBalances (اللي لسه بيحسب بس من البيع الآجل والتحصيل)،
                 // هنا بس عشان يظهر في كشف الحساب كمرجع تاريخي لو حصلت أي مشكلة بعدين.
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleDate, ProductName, Total, PaymentMethod FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Cash' ORDER BY SaleDate", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT SaleDate, ProductName, (Total - Discount + Tax) AS Total, PaymentMethod FROM Sales WHERE CustomerId = @Id AND PaymentType = 'Cash' ORDER BY SaleDate", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", customerId);
                     using (SqliteDataReader reader = cmd.ExecuteReader())
