@@ -118,8 +118,10 @@ namespace TemoStore.Engines.Validation
                         {
                             foreach (var imei in line.Imeis)
                             {
-                                if (uow.Products.ImeiExists(imei))
-                                    errors.Add($"رقم الـIMEI \"{imei}\" مسجل بالفعل في النظام من قبل.");
+                                // ممنوع بس لو الرقم ده لسه InStock فعلًا (تكرار حقيقي) - لو اتباع
+                                // قبل كده ورجع تاني (استرجاع/شراء مستعمل) بيتقبل عادي
+                                if (uow.Products.GetImeiStatus(imei) == "InStock")
+                                    errors.Add($"رقم الـIMEI \"{imei}\" موجود بالفعل بالمخزون حاليًا (لسه متباعش).");
                             }
                         }
                     }

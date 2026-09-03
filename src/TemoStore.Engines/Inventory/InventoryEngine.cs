@@ -100,18 +100,21 @@ namespace TemoStore.Engines.Inventory
         }
 
         // بيضيف جهاز جديد بالـ IMEI يدويًا (مش من فاتورة شراء) - لو الباركود موجود بيزوّد
-        // كميته، لو مش موجود بينشئ منتج جديد. بيرمي DuplicateImeiException لو الرقم مسجل قبل كده.
-        // بيستخدم UpsertOnPurchase نفسه (زي مسار الشراء) لأن سلوكه مطابق تمامًا للمنطق
-        // القديم هنا: لو الباركود موجود بيزوّد الكمية+1 ويحدّث السعر ويفرض IsSerialized=1
-        // من غير ما يلمس الاسم/سعر البيع القديمين، ولو مش موجود بينشئ صنف جديد بالكامل.
+        // كميته، لو مش موجود بينشئ منتج جديد. بيرمي DuplicateImeiException بس لو الرقم ده
+        // لسه InStock فعلًا (تكرار حقيقي). لو الرقم اتباع قبل كده ورجع تاني (استرجاع/شراء
+        // جهاز مستعمل من نفس العميل)، بيتقبل عادي وبيعيد تفعيل نفس صف الوحدة القديم
+        // (UpsertProductUnit) بدل ما يتمنع للأبد بسبب سجل بيع قديم. بيستخدم UpsertOnPurchase
+        // نفسه (زي مسار الشراء) لأن سلوكه مطابق تمامًا للمنطق القديم هنا: لو الباركود موجود
+        // بيزوّد الكمية+1 ويحدّث السعر ويفرض IsSerialized=1 من غير ما يلمس الاسم/سعر البيع
+        // القديمين، ولو مش موجود بينشئ صنف جديد بالكامل.
         public void AddDeviceManually(string barcode, string productName, decimal costPrice, decimal salePrice, string imei, IUnitOfWork uow)
         {
-            if (uow.Products.ImeiExists(imei))
+            if (uow.Products.GetImeiStatus(imei) == "InStock")
                 throw new DuplicateImeiException(imei);
 
             string finalBarcode = string.IsNullOrEmpty(barcode) ? ("NEW-" + DateTime.Now.Ticks) : barcode;
             uow.Products.UpsertOnPurchase(finalBarcode, productName, costPrice, salePrice, 1, true);
-            uow.Products.InsertProductUnit(finalBarcode, imei, null);
+            uow.Products.UpsertProductUnit(finalBarcode, imei, null);
         }
 
         // بيحذف وحدة جهاز واحدة بالـ IMEI بتاعها. ممنوع تحذف وحدة اتباعت بالفعل - محتاجة

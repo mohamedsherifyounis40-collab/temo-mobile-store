@@ -40,9 +40,12 @@ namespace TemoStore.Core.Abstractions
         void AddQuantity(string barcode, int qty);
         void UpsertOnPurchase(string barcode, string productName, decimal unitCost, decimal salePrice, int qty, bool isSerialized);
         void InsertProductUnit(string barcode, string imei, int? purchaseId = null);
+        // زي InsertProductUnit بالظبط، لكن لو رقم الـIMEI ده اتباع قبل كده ورجع تاني (استرجاع/
+        // شراء جهاز مستعمل)، بيعيد تفعيل نفس صف الوحدة القديم بدل محاولة إدخال صف جديد
+        // (IMEI عمود UNIQUE) - عشان يفضل مرتبط بسجل البيع الأصلي التاريخي للمراجعة.
+        void UpsertProductUnit(string barcode, string imei, int? purchaseId = null);
         void MarkImeiSold(string imei, int saleId);
         void MarkImeiInStock(string imei);
-        bool ImeiExists(string imei);
         string GetImeiStatus(string imei);
         (string Barcode, string Status)? GetProductUnitByImei(string imei);
         void DeleteProductUnit(string imei);

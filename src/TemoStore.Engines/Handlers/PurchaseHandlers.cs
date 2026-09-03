@@ -85,7 +85,7 @@ namespace TemoStore.Engines.Handlers
                 if (line.IsSerialized && line.Imeis != null)
                 {
                     foreach (var imei in line.Imeis)
-                        uow.Products.InsertProductUnit(finalBarcode, imei, purchaseId);
+                        uow.Products.UpsertProductUnit(finalBarcode, imei, purchaseId);
                 }
             }
         }
@@ -159,13 +159,14 @@ namespace TemoStore.Engines.Handlers
             PurchaseReversal.Reverse(uow, _inventory, _cashDrawer, _accounting, _dateClosure, command.PurchaseId, command.PerformedBy);
 
             // فحص تكرار الـIMEI بعد ما الفاتورة القديمة اتشالت (اللي ممكن تكون هي نفسها
-            // فرّغت نفس الأرقام دي لو المستخدم مغيرش فيها) - IMEI عمود UNIQUE في الجدول،
-            // فمن غير الفحص ده هنا هيطلع Exception خام من قاعدة البيانات بدل رسالة واضحة
+            // فرّغت نفس الأرقام دي لو المستخدم مغيرش فيها) - ممنوع بس لو الرقم لسه InStock
+            // فعلًا (تكرار حقيقي مع وحدة تانية)؛ لو اتباع قبل كده ورجع تاني بيتقبل عادي
+            // ويتعاد تفعيله (UpsertProductUnit تحت)
             foreach (var line in command.Lines)
             {
                 if (!line.IsSerialized || line.Imeis == null) continue;
                 foreach (var imei in line.Imeis)
-                    if (uow.Products.ImeiExists(imei))
+                    if (uow.Products.GetImeiStatus(imei) == "InStock")
                         throw new DuplicateImeiException(imei);
             }
 
@@ -187,7 +188,7 @@ namespace TemoStore.Engines.Handlers
                 uow.Products.UpsertOnPurchase(finalBarcode, line.ProductName, line.UnitCost, line.SalePrice, line.Qty, line.IsSerialized);
                 if (line.IsSerialized && line.Imeis != null)
                     foreach (var imei in line.Imeis)
-                        uow.Products.InsertProductUnit(finalBarcode, imei, command.PurchaseId);
+                        uow.Products.UpsertProductUnit(finalBarcode, imei, command.PurchaseId);
             }
 
             if (command.PayCashNow)

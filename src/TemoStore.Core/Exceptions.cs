@@ -26,11 +26,12 @@ namespace TemoStore.Core.Exceptions
         }
     }
 
-    // بترمي لما رقم IMEI يكون مسجّل بالفعل في النظام من قبل
+    // بترمي لما رقم IMEI يكون موجود بالفعل بالمخزون حاليًا (InStock) - تكرار حقيقي.
+    // لو الرقم اتباع قبل كده ورجع تاني (استرجاع/شراء مستعمل)، ده مش بيترمي (متقبّل).
     public class DuplicateImeiException : Exception
     {
         public string Imei { get; }
-        public DuplicateImeiException(string imei) : base($"رقم الـIMEI \"{imei}\" مسجل بالفعل في النظام من قبل. راجع القايمة وشيله أو صحّحه.")
+        public DuplicateImeiException(string imei) : base($"رقم الـIMEI \"{imei}\" موجود بالفعل بالمخزون حاليًا (لسه متباعش). راجع القايمة وشيله أو صحّحه.")
         {
             Imei = imei;
         }

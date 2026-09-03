@@ -94,6 +94,24 @@ namespace TemoStore.Data.Repositories
             cmd.ExecuteNonQuery();
         }
 
+        public void UpsertProductUnit(string barcode, string imei, int? purchaseId = null)
+        {
+            string existingStatus = GetImeiStatus(imei);
+            if (string.IsNullOrEmpty(existingStatus))
+            {
+                InsertProductUnit(barcode, imei, purchaseId);
+                return;
+            }
+
+            using var cmd = new SqliteCommand(
+                "UPDATE ProductUnits SET Barcode = @B, Status = 'InStock', SaleId = NULL, PurchaseId = @P, CreatedAt = @C WHERE IMEI = @IMEI", _conn, _tx);
+            cmd.Parameters.AddWithValue("@B", barcode);
+            cmd.Parameters.AddWithValue("@P", (object?)purchaseId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@C", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            cmd.Parameters.AddWithValue("@IMEI", imei);
+            cmd.ExecuteNonQuery();
+        }
+
         public void MarkImeiSold(string imei, int saleId)
         {
             using var cmd = new SqliteCommand("UPDATE ProductUnits SET Status = 'Sold', SaleId = @SaleId WHERE IMEI = @IMEI", _conn, _tx);
@@ -107,13 +125,6 @@ namespace TemoStore.Data.Repositories
             using var cmd = new SqliteCommand("UPDATE ProductUnits SET Status = 'InStock', SaleId = NULL WHERE IMEI = @IMEI", _conn, _tx);
             cmd.Parameters.AddWithValue("@IMEI", imei);
             cmd.ExecuteNonQuery();
-        }
-
-        public bool ImeiExists(string imei)
-        {
-            using var cmd = new SqliteCommand("SELECT COUNT(*) FROM ProductUnits WHERE IMEI = @IMEI", _conn, _tx);
-            cmd.Parameters.AddWithValue("@IMEI", imei);
-            return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
         }
 
         public string GetImeiStatus(string imei)
