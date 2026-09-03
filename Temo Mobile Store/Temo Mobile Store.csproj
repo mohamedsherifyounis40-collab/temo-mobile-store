@@ -25,6 +25,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.WindowsForms" Version="10.0.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="ZXing.Net.Bindings.Windows.Compatibility" Version="0.16.14" />
   </ItemGroup>

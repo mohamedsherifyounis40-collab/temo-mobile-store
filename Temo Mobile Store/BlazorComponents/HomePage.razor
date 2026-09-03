@@ -47,9 +47,15 @@
                     <div class="breadcrumb">الرئيسية &gt; لوحة التحكم</div>
                 </div>
                 <div class="toolbar">
-                    <button class="btn btn-outline" @onclick="PrintDailySummary">🖨️ طباعة ملخص اليوم</button>
+                    <input class="field-input" style="width:auto" type="date" value="@reportDate.ToString("yyyy-MM-dd")" max="@DateTime.Now.ToString("yyyy-MM-dd")" @onchange="OnReportDateChanged" />
+                    <button class="btn btn-outline" disabled="@isBuildingReport" @onclick="PrintDailyReport">🖨️ طباعة</button>
+                    <button class="btn btn-outline" disabled="@isBuildingReport" title="حفظ التقرير PDF" @onclick="SaveDailyReportPdf">💾 PDF</button>
                 </div>
             </div>
+            @if (!string.IsNullOrEmpty(summaryActionMessage))
+            {
+                <div class="muted" style="font-size:12px; margin-top:-8px; margin-bottom:10px; color:@(summaryActionIsError ? "var(--color-red)" : "var(--color-green)")">@summaryActionMessage</div>
+            }
 
             <div class="kpi-row">
                 <div class="card kpi-card">
@@ -472,13 +478,74 @@
         return result;
     }
 
-    private void PrintDailySummary()
+    private DateTime reportDate = DateTime.Now.Date;
+    private bool isBuildingReport;
+    private string? summaryActionMessage;
+    private bool summaryActionIsError;
+
+    private void OnReportDateChanged(ChangeEventArgs e)
     {
-        DailySummaryPrintHelper.Print(
-            MainShell.Instance,
-            todaySales, todayPurchases, todayExpenses, todayProfit,
-            invoiceCount, maintenanceCount,
-            methodBalances, totalBalance);
+        if (DateTime.TryParse(e.Value?.ToString(), out var picked))
+            reportDate = picked.Date > DateTime.Now.Date ? DateTime.Now.Date : picked.Date;
+    }
+
+    private async Task PrintDailyReport()
+    {
+        summaryActionMessage = null;
+        summaryActionIsError = false;
+        isBuildingReport = true;
+        try
+        {
+            var report = DailyReportRepository.GetReport(reportDate);
+            string html = DailyReportHtmlBuilder.Build(report);
+            string? error = await DailyReportPdfExporter.PrintAsync(html);
+            if (error != null)
+            {
+                summaryActionIsError = true;
+                summaryActionMessage = error;
+            }
+        }
+        catch (Exception ex)
+        {
+            summaryActionIsError = true;
+            summaryActionMessage = "حصل خطأ أثناء تجهيز التقرير: " + ex.Message;
+        }
+        finally
+        {
+            isBuildingReport = false;
+        }
+    }
+
+    private async Task SaveDailyReportPdf()
+    {
+        summaryActionMessage = null;
+        summaryActionIsError = false;
+        isBuildingReport = true;
+        try
+        {
+            var report = DailyReportRepository.GetReport(reportDate);
+            string html = DailyReportHtmlBuilder.Build(report);
+            var (success, filePath, error) = await DailyReportPdfExporter.SaveAsPdfAsync(html);
+            if (success)
+            {
+                summaryActionIsError = false;
+                summaryActionMessage = $"تم حفظ التقرير في: {filePath}";
+            }
+            else
+            {
+                summaryActionIsError = true;
+                summaryActionMessage = error;
+            }
+        }
+        catch (Exception ex)
+        {
+            summaryActionIsError = true;
+            summaryActionMessage = "حصل خطأ أثناء تجهيز التقرير: " + ex.Message;
+        }
+        finally
+        {
+            isBuildingReport = false;
+        }
     }
 
     private void LoadDashboard()
