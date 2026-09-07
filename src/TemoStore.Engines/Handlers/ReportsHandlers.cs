@@ -7,20 +7,23 @@ namespace TemoStore.Engines.Handlers
 {
     // ==========================================================================
     // إقفال اليوم الفعلي - أول Command حقيقي لعملية كانت بالكامل SQL خام في
-    // ReportsPageControl.cs (BtnCloseDay_Click/BtnReopenDay_Click). القرار المحاسبي
-    // القديم اتحافظ عليه بالظبط: تحديث PaymentMethodBalances مباشرة من غير قيد
-    // محاسبي للإقفال نفسه (تأكيد عدّ فعلي مش حدث اقتصادي جديد)، والفرق (Difference)
-    // بيتسجل صفر دايمًا لأن مفيش مقارنة متوقع/فعلي أصلًا - نفس القرار القديم بالظبط.
+    // ReportsPageControl.cs (BtnCloseDay_Click/BtnReopenDay_Click). بيحسب المتوقع
+    // (افتتاحي + وارد - منصرف) فعليًا، ويقارنه بالفعلي المعدود، ولو فيه فرق حقيقي
+    // (عجز أو زيادة) بيسجله كحركة + قيد محاسبي واضح على حساب 5700 "عجز وزيادة
+    // الخزينة" - بدل ما يتحرق بصمت زي ما كان بيحصل قبل كده (راجع فحص 2026-09-07).
+    // الرصيد الفعلي المعدود يفضل هو مصدر الحقيقة النهائي دايمًا (SetBalance).
     // ==========================================================================
     public class CloseDayCommandHandler : ICommandHandler<CloseDayCommand, int>
     {
         private readonly IUnitOfWorkFactory _uowFactory;
         private readonly IDateClosureRepository _dateClosure;
+        private readonly IAccountingEngine _accounting;
 
-        public CloseDayCommandHandler(IUnitOfWorkFactory uowFactory, IDateClosureRepository dateClosure)
+        public CloseDayCommandHandler(IUnitOfWorkFactory uowFactory, IDateClosureRepository dateClosure, IAccountingEngine accounting)
         {
             _uowFactory = uowFactory;
             _dateClosure = dateClosure;
+            _accounting = accounting;
         }
 
         public int Handle(CloseDayCommand command)
@@ -45,11 +48,43 @@ namespace TemoStore.Engines.Handlers
 
                 decimal opening = uow.Closures.GetLastActualClosingBalance(method) ?? uow.CashDrawer.GetBalance(method);
                 decimal totalIn = uow.Closures.GetTodayMovementsTotal(method, "قبض", today);
-                decimal totalOut = uow.Closures.GetTodayMovementsTotal(method, "صرف", today);
-                if (method == "نقدي")
-                    totalOut += uow.Closures.GetTodayExpensesTotal(today);
+                // كل وسيلة بتاخد مصروفاتها هي بس - مش كل مصروفات اليوم مجمّعة على نقدي
+                decimal totalOut = uow.Closures.GetTodayMovementsTotal(method, "صرف", today) + uow.Closures.GetTodayExpensesTotal(method, today);
 
-                int closureId = uow.Closures.InsertClosure(today, method, opening, totalIn, totalOut, actual, DateTime.Now);
+                decimal expected = opening + totalIn - totalOut;
+                decimal difference = Math.Round(actual - expected, 2);
+
+                int? adjustmentMovementId = null;
+                if (Math.Abs(difference) > 0.01m)
+                {
+                    decimal diffAmount = Math.Abs(difference);
+                    string diffType = difference > 0 ? "قبض" : "صرف";
+                    string diffLabel = difference > 0 ? "زيادة" : "عجز";
+
+                    adjustmentMovementId = uow.CashDrawer.InsertMovement(new CashMovementRecord
+                    {
+                        MovementType = diffType,
+                        PaymentMethod = method,
+                        Amount = diffAmount,
+                        Description = $"فرق إقفال يومي ({diffLabel}) - {today:yyyy-MM-dd}",
+                        AccountCode = AccountCodes.CashShortageOrOverage
+                    });
+
+                    var lines = difference > 0
+                        ? new List<JournalLineRequest>
+                        {
+                            new() { AccountCode = AccountCodes.ForPaymentMethod(method), Debit = diffAmount, Credit = 0 },
+                            new() { AccountCode = AccountCodes.CashShortageOrOverage, Debit = 0, Credit = diffAmount }
+                        }
+                        : new List<JournalLineRequest>
+                        {
+                            new() { AccountCode = AccountCodes.CashShortageOrOverage, Debit = diffAmount, Credit = 0 },
+                            new() { AccountCode = AccountCodes.ForPaymentMethod(method), Debit = 0, Credit = diffAmount }
+                        };
+                    _accounting.Post(new JournalEntryRequest { SourceType = "DayCloseAdjustment", SourceId = adjustmentMovementId, Description = $"فرق إقفال يومي ({method} - {diffLabel})", Lines = lines }, command.PerformedBy, uow);
+                }
+
+                int closureId = uow.Closures.InsertClosure(today, method, opening, totalIn, totalOut, expected, actual, difference, DateTime.Now, adjustmentMovementId);
 
                 if (method == "نقدي" && command.CashDenominationCounts != null)
                 {

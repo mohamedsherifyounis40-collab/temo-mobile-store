@@ -256,7 +256,7 @@
                                 <thead>
                                     <tr>
                                         <th>التاريخ</th><th>الوسيلة</th><th>رصيد افتتاحي</th><th>إجمالي وارد</th><th>إجمالي منصرف</th>
-                                        <th>ختامي فعلي</th><th>وقت الإقفال</th>
+                                        <th>المتوقع</th><th>ختامي فعلي</th><th>الفرق</th><th>وقت الإقفال</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -264,12 +264,16 @@
                                     {
                                         <tr class="row-clickable @(selectedClosureId == r.Id ? "row-selected" : "")" @onclick="() => SelectClosure(r.Id)">
                                             <td>@r.Date</td><td>@r.Method</td><td>@r.Opening</td><td>@r.TotalIn</td><td>@r.TotalOut</td>
-                                            <td>@r.ActualClosing</td><td class="muted">@r.ClosedAt</td>
+                                            <td>@r.Expected</td><td>@r.ActualClosing</td>
+                                            <td style="@(r.HasDifference ? (r.IsSurplus ? "color:var(--color-green);font-weight:700" : "color:var(--color-red);font-weight:700") : "")">
+                                                @r.Difference @(r.HasDifference ? (r.IsSurplus ? "(زيادة)" : "(عجز)") : "")
+                                            </td>
+                                            <td class="muted">@r.ClosedAt</td>
                                         </tr>
                                     }
                                     @if (closuresLogRows.Count == 0)
                                     {
-                                        <tr><td colspan="7" class="empty-row">مفيش أيام مقفولة بعد</td></tr>
+                                        <tr><td colspan="9" class="empty-row">مفيش أيام مقفولة بعد</td></tr>
                                     }
                                 </tbody>
                             </table>
@@ -443,7 +447,7 @@
     private void SetOtherActual(string method, string v) => otherMethodsActual[method] = v;
 
     // ---------- سجل إقفال الأيام ----------
-    private class ClosureLogRow { public int Id; public string Date = ""; public string Method = ""; public string Opening = ""; public string TotalIn = ""; public string TotalOut = ""; public string ActualClosing = ""; public string ClosedAt = ""; }
+    private class ClosureLogRow { public int Id; public string Date = ""; public string Method = ""; public string Opening = ""; public string TotalIn = ""; public string TotalOut = ""; public string Expected = ""; public string ActualClosing = ""; public string Difference = ""; public bool HasDifference; public bool IsSurplus; public string ClosedAt = ""; }
     private List<ClosureLogRow> closuresLogRows = new();
     private int? selectedClosureId;
     private class DenomDetailRow { public string Value = ""; public string Count = ""; public string Total = ""; }
@@ -752,6 +756,7 @@
         var dt = ReportsRepository.GetClosuresLog();
         foreach (DataRow r in dt.Rows)
         {
+            decimal difference = Convert.ToDecimal(r["الفرق"]);
             closuresLogRows.Add(new ClosureLogRow
             {
                 Id = Convert.ToInt32(r["Id"]),
@@ -760,7 +765,11 @@
                 Opening = Convert.ToDecimal(r["رصيد افتتاحي"]).ToString("N2"),
                 TotalIn = Convert.ToDecimal(r["إجمالي وارد"]).ToString("N2"),
                 TotalOut = Convert.ToDecimal(r["إجمالي منصرف"]).ToString("N2"),
+                Expected = Convert.ToDecimal(r["المتوقع"]).ToString("N2"),
                 ActualClosing = Convert.ToDecimal(r["ختامي فعلي"]).ToString("N2"),
+                Difference = difference.ToString("N2"),
+                HasDifference = Math.Abs(difference) > 0.01m,
+                IsSurplus = difference > 0,
                 ClosedAt = r["وقت الإقفال"].ToString() ?? ""
             });
         }

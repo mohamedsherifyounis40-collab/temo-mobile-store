@@ -35,27 +35,31 @@ namespace TemoStore.Data.Repositories
             return res != null && res != DBNull.Value ? Convert.ToDecimal(res) : 0;
         }
 
-        public decimal GetTodayExpensesTotal(DateTime date)
+        public decimal GetTodayExpensesTotal(string paymentMethod, DateTime date)
         {
-            using var cmd = new SqliteCommand("SELECT SUM(Amount) FROM Expenses WHERE ExpenseDate LIKE @Date", _conn, _tx);
+            using var cmd = new SqliteCommand("SELECT SUM(Amount) FROM Expenses WHERE PaymentMethod = @Method AND ExpenseDate LIKE @Date", _conn, _tx);
+            cmd.Parameters.AddWithValue("@Method", paymentMethod);
             cmd.Parameters.AddWithValue("@Date", date.ToString("yyyy-MM-dd") + "%");
             var res = cmd.ExecuteScalar();
             return res != null && res != DBNull.Value ? Convert.ToDecimal(res) : 0;
         }
 
-        public int InsertClosure(DateTime date, string paymentMethod, decimal opening, decimal totalIn, decimal totalOut, decimal actual, DateTime closedAt)
+        public int InsertClosure(DateTime date, string paymentMethod, decimal opening, decimal totalIn, decimal totalOut, decimal expected, decimal actual, decimal difference, DateTime closedAt, int? adjustmentMovementId)
         {
             using (var cmd = new SqliteCommand(@"INSERT INTO DailyClosures
                 (ClosureDate, PaymentMethod, OpeningBalance, TotalIn, TotalOut, ExpectedClosingBalance, ActualClosingBalance, Difference, ClosedAt, AdjustmentMovementId)
-                VALUES (@Date, @Method, @Opening, @TotalIn, @TotalOut, @Actual, @Actual, 0, @ClosedAt, NULL)", _conn, _tx))
+                VALUES (@Date, @Method, @Opening, @TotalIn, @TotalOut, @Expected, @Actual, @Difference, @ClosedAt, @AdjustmentId)", _conn, _tx))
             {
                 cmd.Parameters.AddWithValue("@Date", date.ToString("yyyy-MM-dd"));
                 cmd.Parameters.AddWithValue("@Method", paymentMethod);
                 cmd.Parameters.AddWithValue("@Opening", opening);
                 cmd.Parameters.AddWithValue("@TotalIn", totalIn);
                 cmd.Parameters.AddWithValue("@TotalOut", totalOut);
+                cmd.Parameters.AddWithValue("@Expected", expected);
                 cmd.Parameters.AddWithValue("@Actual", actual);
+                cmd.Parameters.AddWithValue("@Difference", difference);
                 cmd.Parameters.AddWithValue("@ClosedAt", closedAt.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.Parameters.AddWithValue("@AdjustmentId", (object?)adjustmentMovementId ?? DBNull.Value);
                 cmd.ExecuteNonQuery();
             }
 

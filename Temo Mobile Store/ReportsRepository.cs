@@ -176,19 +176,11 @@ namespace Temo_Mobile_Store
             {
                 conn.Open();
 
-                decimal expensesTotal = 0;
-                using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM Expenses WHERE ExpenseDate LIKE @Today", conn))
-                {
-                    cmd.Parameters.AddWithValue("@Today", today + "%");
-                    var r = cmd.ExecuteScalar();
-                    expensesTotal = (r != null && r != DBNull.Value) ? Convert.ToDecimal(r) : 0;
-                }
-
                 foreach (string method in paymentMethods)
                 {
                     decimal opening = GetMethodOpeningBalance(conn, method);
 
-                    decimal methodIn = 0, methodOut = 0;
+                    decimal methodIn = 0, methodOut = 0, methodExpenses = 0;
                     using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM CashMovements WHERE PaymentMethod = @Method AND MovementType = 'قبض' AND MovementDate = @Today", conn))
                     {
                         cmd.Parameters.AddWithValue("@Method", method);
@@ -203,9 +195,17 @@ namespace Temo_Mobile_Store
                         var r = cmd.ExecuteScalar();
                         methodOut = (r != null && r != DBNull.Value) ? Convert.ToDecimal(r) : 0;
                     }
+                    // كل وسيلة بتاخد مصروفاتها هي بس - مش كل مصروفات اليوم مجمّعة على نقدي
+                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM Expenses WHERE PaymentMethod = @Method AND ExpenseDate LIKE @Today", conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Method", method);
+                        cmd.Parameters.AddWithValue("@Today", today + "%");
+                        var r = cmd.ExecuteScalar();
+                        methodExpenses = (r != null && r != DBNull.Value) ? Convert.ToDecimal(r) : 0;
+                    }
 
                     decimal totalIn = methodIn;
-                    decimal totalOut = methodOut + (method == "نقدي" ? expensesTotal : 0);
+                    decimal totalOut = methodOut + methodExpenses;
                     decimal recordedBalance = GetCurrentMethodBalance(conn, method);
 
                     result[method] = (opening, totalIn, totalOut, recordedBalance);
@@ -243,8 +243,8 @@ namespace Temo_Mobile_Store
             DataTable dt = new DataTable();
             dt.Columns.AddRange(new DataColumn[] {
                 new DataColumn("Id"), new DataColumn("التاريخ"), new DataColumn("الوسيلة"), new DataColumn("رصيد افتتاحي"),
-                new DataColumn("إجمالي وارد"), new DataColumn("إجمالي منصرف"),
-                new DataColumn("ختامي فعلي"), new DataColumn("وقت الإقفال")
+                new DataColumn("إجمالي وارد"), new DataColumn("إجمالي منصرف"), new DataColumn("المتوقع"),
+                new DataColumn("ختامي فعلي"), new DataColumn("الفرق"), new DataColumn("وقت الإقفال")
             });
 
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
@@ -256,8 +256,8 @@ namespace Temo_Mobile_Store
                     while (reader.Read())
                     {
                         dt.Rows.Add(reader["Id"], reader["ClosureDate"], reader["PaymentMethod"], reader["OpeningBalance"],
-                            reader["TotalIn"], reader["TotalOut"],
-                            reader["ActualClosingBalance"], reader["ClosedAt"]);
+                            reader["TotalIn"], reader["TotalOut"], reader["ExpectedClosingBalance"],
+                            reader["ActualClosingBalance"], reader["Difference"], reader["ClosedAt"]);
                     }
                 }
             }

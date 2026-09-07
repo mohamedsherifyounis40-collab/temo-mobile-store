@@ -110,8 +110,9 @@ namespace Temo_Mobile_Store
             services.AddSingleton<ICommandHandler<ReopenDayCommand, int>, ReopenDayCommandHandler>();
 
             // CoreEngine نفسه - محتاج IServiceProvider عشان يلاقي الـ Handler المناسب
-            // لأي Command وقت التشغيل (راجع CoreEngine.Execute)
-            services.AddSingleton<ICoreEngine>(sp => new CoreEngine(sp));
+            // لأي Command وقت التشغيل (راجع CoreEngine.Execute)، وIAuditEngine عشان
+            // يسجّل كل عملية ناجحة تلقائيًا (راجع فحص 2026-09-07)
+            services.AddSingleton<ICoreEngine>(sp => new CoreEngine(sp, sp.GetRequiredService<IAuditEngine>()));
 
             _provider = services.BuildServiceProvider();
         }

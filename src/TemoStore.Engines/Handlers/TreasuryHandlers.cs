@@ -103,11 +103,12 @@ namespace TemoStore.Engines.Handlers
             if (!validation.IsValid)
                 throw new ValidationException(validation.Errors);
 
-            // لو بند المصروف نفسه حساب وسيلة الدفع (نقدي/فوري/...)، القيد بيتسجل مدين
-            // ودائن على نفس الحساب فيلغي نفسه في الدفتر بينما الرصيد السريع للخزينة بيتحرك
-            // فعليًا - فرق بيتراكم بصمت من غير أي رسالة خطأ (راجع تسوية خزينة 2026-09-02)
-            if (command.AccountCode == AccountCodes.ForPaymentMethod(command.PaymentMethod))
-                throw new InvalidOperationException("بند المصروف المختار هو نفسه وسيلة الدفع - اختر بند مصروف حقيقي (إيجار/مرتبات/...) يمثّل الطرف التاني الفعلي للحركة.");
+            // لو بند المصروف نفسه أي حساب وسيلة دفع (نقدي/فوري/...) - سواء كانت نفس
+            // وسيلة الدفع المستخدمة (بيلغي نفسه في الدفتر) أو وسيلة تانية (بيسجل قيد
+            // غلط تمامًا على حساب متاعش أي علاقة بالحركة) - فرق بيتراكم بصمت من غير
+            // أي رسالة خطأ (راجع تسوية خزينة 2026-09-02 وفحص 2026-09-07)
+            if (AccountCodes.IsPaymentMethodAccount(command.AccountCode))
+                throw new InvalidOperationException("بند المصروف المختار هو حساب وسيلة دفع - اختر بند مصروف حقيقي (إيجار/مرتبات/...) يمثّل الطرف التاني الفعلي للحركة.");
 
             using var uow = _uowFactory.Create();
 
@@ -149,8 +150,8 @@ namespace TemoStore.Engines.Handlers
 
         public bool Handle(UpdateExpenseCommand command)
         {
-            if (command.AccountCode == AccountCodes.ForPaymentMethod(command.PaymentMethod))
-                throw new InvalidOperationException("بند المصروف المختار هو نفسه وسيلة الدفع - اختر بند مصروف حقيقي يمثّل الطرف التاني الفعلي للحركة.");
+            if (AccountCodes.IsPaymentMethodAccount(command.AccountCode))
+                throw new InvalidOperationException("بند المصروف المختار هو حساب وسيلة دفع - اختر بند مصروف حقيقي يمثّل الطرف التاني الفعلي للحركة.");
 
             using var uow = _uowFactory.Create();
 
@@ -326,8 +327,8 @@ namespace TemoStore.Engines.Handlers
 
         public PaymentResult Handle(AddMovementCommand command)
         {
-            if (command.AccountCode.HasValue && command.AccountCode.Value == AccountCodes.ForPaymentMethod(command.Method))
-                throw new InvalidOperationException("الحساب المختار هو نفسه وسيلة الدفع - اختر حساب تاني (عميل/مورد/مصروف) يمثّل الطرف التاني الفعلي للحركة.");
+            if (command.AccountCode.HasValue && AccountCodes.IsPaymentMethodAccount(command.AccountCode.Value))
+                throw new InvalidOperationException("الحساب المختار هو حساب وسيلة دفع - اختر حساب تاني (عميل/مورد/مصروف) يمثّل الطرف التاني الفعلي للحركة.");
 
             using var uow = _uowFactory.Create();
 
@@ -385,8 +386,8 @@ namespace TemoStore.Engines.Handlers
 
         public bool Handle(UpdateMovementCommand command)
         {
-            if (command.AccountCode.HasValue && command.AccountCode.Value == AccountCodes.ForPaymentMethod(command.NewMethod))
-                throw new InvalidOperationException("الحساب المختار هو نفسه وسيلة الدفع - اختر حساب تاني (عميل/مورد/مصروف) يمثّل الطرف التاني الفعلي للحركة.");
+            if (command.AccountCode.HasValue && AccountCodes.IsPaymentMethodAccount(command.AccountCode.Value))
+                throw new InvalidOperationException("الحساب المختار هو حساب وسيلة دفع - اختر حساب تاني (عميل/مورد/مصروف) يمثّل الطرف التاني الفعلي للحركة.");
 
             using var uow = _uowFactory.Create();
 

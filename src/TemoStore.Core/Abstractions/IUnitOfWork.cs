@@ -203,9 +203,10 @@ namespace TemoStore.Core.Abstractions
         decimal? GetLastActualClosingBalance(string paymentMethod);
         // CashMovements.MovementDate = date (مطابقة نصية تامة "yyyy-MM-dd")
         decimal GetTodayMovementsTotal(string paymentMethod, string movementType, DateTime date);
-        // Expenses.ExpenseDate فيه وقت كمان، فلازم LIKE مش مطابقة تامة
-        decimal GetTodayExpensesTotal(DateTime date);
-        int InsertClosure(DateTime date, string paymentMethod, decimal opening, decimal totalIn, decimal totalOut, decimal actual, DateTime closedAt);
+        // Expenses.ExpenseDate فيه وقت كمان، فلازم LIKE مش مطابقة تامة - ولازم تتفلتر
+        // بوسيلة الدفع (كل وسيلة ليها مصروفاتها بس)، مش كل مصروفات اليوم مجمّعة على نقدي
+        decimal GetTodayExpensesTotal(string paymentMethod, DateTime date);
+        int InsertClosure(DateTime date, string paymentMethod, decimal opening, decimal totalIn, decimal totalOut, decimal expected, decimal actual, decimal difference, DateTime closedAt, int? adjustmentMovementId);
         void InsertDenominationLine(int closureId, decimal denominationValue, int count);
         IReadOnlyList<ClosureRow> GetClosuresForDate(DateTime date);
         void DeleteDenominationsForClosure(int closureId);

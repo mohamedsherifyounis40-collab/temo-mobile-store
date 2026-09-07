@@ -20,6 +20,7 @@ namespace TemoStore.Engines.Handlers
         public const int Salaries = 5400;
         public const int EmployeeAdvances = 1400;
         public const int InventoryAdjustment = 5600;
+        public const int CashShortageOrOverage = 5700;    // "عجز وزيادة الخزينة" - فرق الجرد الفعلي عن المتوقع
 
         public static int ForPaymentMethod(string method) => method switch
         {
@@ -31,6 +32,14 @@ namespace TemoStore.Engines.Handlers
             "إنستاباي" => 1150,
             _ => 1100
         };
+
+        private static readonly HashSet<int> PaymentMethodAccountCodes = new() { 1100, 1110, 1120, 1130, 1140, 1150 };
+
+        // بيتأكد إن الحساب المختار كـ"طرف تاني" لحركة يدوية/مصروف مش حساب وسيلة دفع
+        // خالص (نقدي/فوري/أمان/...) - سواء كانت نفس الوسيلة المستخدمة في الحركة (كان
+        // هيلغي نفسه في الدفتر) أو وسيلة تانية (كان هيسجل قيد على حساب غلط تمامًا،
+        // زي ما لقينا فعليًا في فحص 2026-09-07 لعشرات الحركات القديمة)
+        public static bool IsPaymentMethodAccount(int accountCode) => PaymentMethodAccountCodes.Contains(accountCode);
     }
 
     // ==========================================================================
