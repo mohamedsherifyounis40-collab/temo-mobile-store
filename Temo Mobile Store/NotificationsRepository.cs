@@ -46,8 +46,9 @@ namespace Temo_Mobile_Store
 
                     using (SqliteCommand cmd = new SqliteCommand(@"
                         SELECT C.CustomerName,
-                               (COALESCE((SELECT SUM(Total) FROM Sales WHERE CustomerId = C.CustomerId AND PaymentType = 'Credit'), 0)
-                                - COALESCE((SELECT SUM(Amount) FROM CashMovements WHERE CustomerId = C.CustomerId AND MovementType = 'قبض'), 0)) AS Balance
+                               (COALESCE((SELECT SUM(Total - Discount + Tax) FROM Sales WHERE CustomerId = C.CustomerId AND PaymentType = 'Credit'), 0)
+                                - COALESCE((SELECT SUM(Amount) FROM CashMovements WHERE CustomerId = C.CustomerId AND MovementType = 'قبض'), 0)
+                                - COALESCE((SELECT SUM(R.RefundAmount) FROM SalesReturns R JOIN Sales S ON R.SaleId = S.SaleID WHERE S.CustomerId = C.CustomerId AND S.PaymentType = 'Credit'), 0)) AS Balance
                         FROM Customers C", conn))
                     using (SqliteDataReader reader = cmd.ExecuteReader())
                     {
