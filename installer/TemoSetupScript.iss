@@ -41,9 +41,14 @@ Name: "desktopicon"; Description: "إنشاء أيقونة على سطح الم�
 ; ==========================================================================
 ; المسار هنا نسبي لمكان السكريبت نفسه ({#SourcePath}) عشان يشتغل صح أيًا كان
 ; مكان المشروع على الجهاز، بدل ما يتقفل على "D:\..." بس.
+;
+; لازم يبقى المصدر مجلد publish\win-x64 (نتيجة dotnet publish الفعلية) مش مجلد
+; bin\Release\net10.0-windows نفسه. المجلد ده لوحده ناتج build عادي (framework-
+; dependent) ومحتاج .NET متثبت على الجهاز، وده كان بيسبب رسالة "لازم تنصب
+; .NET" عند العميل رغم إن التطبيق self-contained أصلاً.
 ; ==========================================================================
 [Files]
-Source: "{#SourcePath}\..\Temo Mobile Store\bin\Release\net10.0-windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "TemoStoreDB.db,TemoStoreDB.db-shm,TemoStoreDB.db-wal,license.dat,remote_server_log.txt"
+Source: "{#SourcePath}\..\Temo Mobile Store\bin\Release\net10.0-windows\publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "TemoStoreDB.db,TemoStoreDB.db-shm,TemoStoreDB.db-wal,license.dat,remote_server_log.txt"
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
