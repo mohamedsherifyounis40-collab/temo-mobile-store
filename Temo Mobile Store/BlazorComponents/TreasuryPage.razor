@@ -271,16 +271,20 @@
                 </div>
 
                 <div class="card">
-                    <div class="card-title">💵 سجل الحركات</div>
+                    <div class="card-title" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                        <span>💵 سجل الحركات</span>
+                        <input class="field-input" style="width:220px; margin:0;" placeholder="🔍 فلترة بالاسم أو البيان..." value="@movementPersonFilter" @oninput="e => movementPersonFilter = e.Value?.ToString() ?? string.Empty" />
+                    </div>
                     <div class="data-table-wrap">
                         <table class="data-table">
-                            <thead><tr><th>التاريخ</th><th>الوصف</th><th>المرجع</th><th>المبلغ</th><th>الوسيلة</th><th>النوع</th>@if (AuthManager.IsAdmin){<th>إجراءات</th>}</tr></thead>
+                            <thead><tr><th>التاريخ</th><th>الوصف</th><th>الشخص</th><th>المرجع</th><th>المبلغ</th><th>الوسيلة</th><th>النوع</th>@if (AuthManager.IsAdmin){<th>إجراءات</th>}</tr></thead>
                             <tbody>
-                                @foreach (var m in movements)
+                                @foreach (var m in FilteredMovements)
                                 {
                                     <tr>
                                         <td class="muted">@m.Date</td>
                                         <td>@m.Description</td>
+                                        <td>@m.Person</td>
                                         <td class="muted">@m.Reference</td>
                                         <td>@m.Amount</td>
                                         <td>@m.Method</td>
@@ -294,9 +298,9 @@
                                         }
                                     </tr>
                                 }
-                                @if (movements.Count == 0)
+                                @if (FilteredMovements.Count == 0)
                                 {
-                                    <tr><td colspan="7" class="empty-row">مفيش حركات مسجّلة</td></tr>
+                                    <tr><td colspan="8" class="empty-row">مفيش حركات مسجّلة</td></tr>
                                 }
                             </tbody>
                         </table>
@@ -388,12 +392,18 @@
     private class BalanceRow { public required string Method; public decimal Balance; }
     private class AccountOption { public string Code = ""; public required string Name; }
     private class ExpenseRow { public int Id; public required string Date; public int AccountCode; public required string Method; public required string Amount; public required string AccountName; }
-    private class MovementRow { public int Id; public required string Date; public required string Type; public required string Method; public required string Amount; public string Reference = ""; public string Description = ""; }
+    private class MovementRow { public int Id; public required string Date; public required string Type; public required string Method; public required string Amount; public string Reference = ""; public string Description = ""; public string Person = ""; }
 
     private List<BalanceRow> balances = new();
     private List<AccountOption> accounts = new();
     private List<ExpenseRow> expenses = new();
     private List<MovementRow> movements = new();
+
+    private string movementPersonFilter = "";
+    private List<MovementRow> FilteredMovements => string.IsNullOrWhiteSpace(movementPersonFilter)
+        ? movements
+        : movements.Where(m => m.Person.Contains(movementPersonFilter, StringComparison.OrdinalIgnoreCase)
+            || m.Description.Contains(movementPersonFilter, StringComparison.OrdinalIgnoreCase)).ToList();
 
     private string opType = "Expense";
 
@@ -567,7 +577,8 @@
                 Method = row["الوسيلة"].ToString() ?? "",
                 Amount = Convert.ToDecimal(row["المبلغ"]).ToString("N2"),
                 Reference = row["المرجع"]?.ToString() ?? "",
-                Description = row["الوصف"]?.ToString() ?? ""
+                Description = row["الوصف"]?.ToString() ?? "",
+                Person = row["الشخص"]?.ToString() ?? ""
             });
         }
         movements.Reverse();

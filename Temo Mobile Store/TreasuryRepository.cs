@@ -94,16 +94,34 @@ namespace Temo_Mobile_Store
         public static DataTable GetCashMovements()
         {
             DataTable dt = new DataTable();
-            dt.Columns.AddRange(new DataColumn[] { new DataColumn("Id"), new DataColumn("النوع"), new DataColumn("الوسيلة"), new DataColumn("المبلغ"), new DataColumn("المرجع"), new DataColumn("الوصف"), new DataColumn("التاريخ والوقت") });
+            dt.Columns.AddRange(new DataColumn[] { new DataColumn("Id"), new DataColumn("النوع"), new DataColumn("الوسيلة"), new DataColumn("المبلغ"), new DataColumn("المرجع"), new DataColumn("الوصف"), new DataColumn("الشخص"), new DataColumn("التاريخ والوقت") });
+
+            // بنجيب اسم العميل/المورد/الموظف المرتبط بالحركة (لو موجود) عشان يظهر كعمود
+            // "الشخص" في سجل الحركات ويتفلتر عليه - CashMovements نفسها بتخزّن الـ ID بس
+            // (راجع CustomerEngine/SupplierEngine.RecordPayment)، الاسم مش متسجل فيها مباشرة.
+            string query = @"
+                SELECT CM.Id, CM.MovementType, CM.PaymentMethod, CM.Amount, CM.ReferenceNumber, CM.Description, CM.CreatedAt,
+                       C.CustomerName, S.SupplierName, E.FullName AS EmployeeName
+                FROM CashMovements CM
+                LEFT JOIN Customers C ON CM.CustomerId = C.CustomerId
+                LEFT JOIN Suppliers S ON CM.SupplierId = S.SupplierId
+                LEFT JOIN Employees E ON CM.EmployeeId = E.EmployeeId
+                ORDER BY CM.Id DESC";
 
             using (SqliteConnection conn = new SqliteConnection(AuthManager.ConnectionString))
             {
                 conn.Open();
-                using (SqliteCommand cmd = new SqliteCommand("SELECT Id, MovementType, PaymentMethod, Amount, ReferenceNumber, Description, CreatedAt FROM CashMovements ORDER BY Id DESC", conn))
+                using (SqliteCommand cmd = new SqliteCommand(query, conn))
                 using (SqliteDataReader reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
-                        dt.Rows.Add(reader["Id"], reader["MovementType"], reader["PaymentMethod"], reader["Amount"], reader["ReferenceNumber"], reader["Description"], reader["CreatedAt"]);
+                    {
+                        string person = reader["CustomerName"] != DBNull.Value ? reader["CustomerName"].ToString()!
+                            : reader["SupplierName"] != DBNull.Value ? reader["SupplierName"].ToString()!
+                            : reader["EmployeeName"] != DBNull.Value ? reader["EmployeeName"].ToString()!
+                            : "";
+                        dt.Rows.Add(reader["Id"], reader["MovementType"], reader["PaymentMethod"], reader["Amount"], reader["ReferenceNumber"], reader["Description"], person, reader["CreatedAt"]);
+                    }
                 }
             }
             return dt;
