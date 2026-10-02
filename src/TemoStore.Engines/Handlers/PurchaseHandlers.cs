@@ -44,7 +44,7 @@ namespace TemoStore.Engines.Handlers
             ApplyLines(uow, purchaseId, command.Lines);
 
             if (command.PayCashNow)
-                _cashDrawer.Debit(command.CashMethod!, totalAmount, $"سداد كاش فوري لفاتورة شراء رقم {purchaseId}", uow, purchaseId: purchaseId, accountCode: AccountCodes.Suppliers);
+                _cashDrawer.Debit(command.CashMethod!, totalAmount, $"سداد كاش فوري لفاتورة شراء رقم {purchaseId}", uow, purchaseId: purchaseId, supplierId: command.SupplierId, accountCode: AccountCodes.Suppliers);
 
             var lines = new List<JournalLineRequest>
             {
@@ -123,7 +123,7 @@ namespace TemoStore.Engines.Handlers
             if (cashMovement != null)
             {
                 cashDrawer.Credit(cashMovement.PaymentMethod, cashMovement.Amount,
-                    $"قيد عكسي - استرجاع سداد كاش فوري لفاتورة شراء رقم {purchaseId}", uow, purchaseId: purchaseId, accountCode: AccountCodes.Suppliers);
+                    $"قيد عكسي - استرجاع سداد كاش فوري لفاتورة شراء رقم {purchaseId}", uow, purchaseId: purchaseId, supplierId: purchase.SupplierId, accountCode: AccountCodes.Suppliers);
             }
 
             return purchase.TotalAmount;
@@ -192,7 +192,7 @@ namespace TemoStore.Engines.Handlers
             }
 
             if (command.PayCashNow)
-                _cashDrawer.Debit(command.CashMethod!, totalAmount, $"سداد كاش فوري لفاتورة شراء رقم {command.PurchaseId} (بعد تعديل)", uow, purchaseId: command.PurchaseId, accountCode: AccountCodes.Suppliers);
+                _cashDrawer.Debit(command.CashMethod!, totalAmount, $"سداد كاش فوري لفاتورة شراء رقم {command.PurchaseId} (بعد تعديل)", uow, purchaseId: command.PurchaseId, supplierId: command.SupplierId, accountCode: AccountCodes.Suppliers);
 
             var lines = new List<JournalLineRequest>
             {

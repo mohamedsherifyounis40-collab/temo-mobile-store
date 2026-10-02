@@ -118,7 +118,13 @@ namespace TemoStore.Data.Repositories
 
         public CashMovementRecord? FindByPurchaseId(int purchaseId)
         {
-            using var cmd = new SqliteCommand("SELECT Id FROM CashMovements WHERE PurchaseId = @Id AND MovementType = 'صرف'", _conn, _tx);
+            // الفاتورة ممكن تكون اتعدلت قبل كده (صرف أصلي + قبض عكسي + صرف جديد)، فالسداد
+            // القائم فعلًا هو آخر صرف - وبس لو لسه ماتعكسش (عدد الصرف أكبر من عدد القبض)
+            using var cmd = new SqliteCommand(
+                "SELECT Id FROM CashMovements WHERE PurchaseId = @Id AND MovementType = 'صرف' " +
+                "AND (SELECT COUNT(*) FROM CashMovements WHERE PurchaseId = @Id AND MovementType = 'صرف') > " +
+                "(SELECT COUNT(*) FROM CashMovements WHERE PurchaseId = @Id AND MovementType = 'قبض') " +
+                "ORDER BY Id DESC LIMIT 1", _conn, _tx);
             cmd.Parameters.AddWithValue("@Id", purchaseId);
             var res = cmd.ExecuteScalar();
             return res == null ? null : GetMovementById(Convert.ToInt32(res));

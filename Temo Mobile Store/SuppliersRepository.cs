@@ -77,7 +77,7 @@ namespace Temo_Mobile_Store
                         var res = cmd.ExecuteScalar();
                         totalPurchases = (res != null && res != DBNull.Value) ? Convert.ToDecimal(res) : 0;
                     }
-                    using (SqliteCommand cmd = new SqliteCommand("SELECT SUM(Amount) FROM CashMovements WHERE SupplierId = @Id AND MovementType = 'صرف'", conn))
+                    using (SqliteCommand cmd = new SqliteCommand("SELECT COALESCE(SUM(CASE WHEN MovementType = 'صرف' THEN Amount ELSE -Amount END), 0) FROM CashMovements WHERE SupplierId = @Id", conn))
                     {
                         cmd.Parameters.AddWithValue("@Id", sup.id);
                         var res = cmd.ExecuteScalar();
@@ -107,13 +107,17 @@ namespace Temo_Mobile_Store
                             dt.Rows.Add(reader["PurchaseDate"], "فاتورة شراء", "فاتورة رقم " + reader["PurchaseId"], reader["TotalAmount"], Convert.ToInt32(reader["PurchaseId"]));
                     }
                 }
-                using (SqliteCommand cmd = new SqliteCommand("SELECT CreatedAt, Amount, PaymentMethod FROM CashMovements WHERE SupplierId = @Id AND MovementType = 'صرف' ORDER BY CreatedAt", conn))
+                using (SqliteCommand cmd = new SqliteCommand("SELECT CreatedAt, Amount, PaymentMethod, MovementType FROM CashMovements WHERE SupplierId = @Id ORDER BY CreatedAt", conn))
                 {
                     cmd.Parameters.AddWithValue("@Id", supplierId);
                     using (SqliteDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
-                            dt.Rows.Add(reader["CreatedAt"], "سداد", "سداد عبر " + reader["PaymentMethod"], "-" + Convert.ToDecimal(reader["Amount"]).ToString("N2"), DBNull.Value);
+                        {
+                            bool isRefund = reader["MovementType"].ToString() == "قبض";
+                            decimal amt = Convert.ToDecimal(reader["Amount"]);
+                            dt.Rows.Add(reader["CreatedAt"], isRefund ? "استرجاع سداد" : "سداد", (isRefund ? "استرجاع عبر " : "سداد عبر ") + reader["PaymentMethod"], (isRefund ? "" : "-") + amt.ToString("N2"), DBNull.Value);
+                        }
                     }
                 }
             }

@@ -31,7 +31,7 @@ namespace TemoStore.Data.Repositories
                 var res = cmd.ExecuteScalar();
                 totalPurchases = res != null && res != DBNull.Value ? Convert.ToDecimal(res) : 0;
             }
-            using (var cmd = new SqliteCommand("SELECT SUM(Amount) FROM CashMovements WHERE SupplierId = @Id AND MovementType = 'صرف'", _conn, _tx))
+            using (var cmd = new SqliteCommand("SELECT COALESCE(SUM(CASE WHEN MovementType = 'صرف' THEN Amount ELSE -Amount END), 0) FROM CashMovements WHERE SupplierId = @Id", _conn, _tx))
             {
                 cmd.Parameters.AddWithValue("@Id", supplierId);
                 var res = cmd.ExecuteScalar();
@@ -50,12 +50,16 @@ namespace TemoStore.Data.Repositories
                 while (reader.Read())
                     list.Add(new SupplierStatementLine { Date = reader["PurchaseDate"].ToString()!, Type = "فاتورة شراء", Details = "فاتورة رقم " + reader["PurchaseId"], Amount = Convert.ToDecimal(reader["TotalAmount"]) });
             }
-            using (var cmd = new SqliteCommand("SELECT CreatedAt, Amount, PaymentMethod FROM CashMovements WHERE SupplierId = @Id AND MovementType = 'صرف' ORDER BY CreatedAt", _conn, _tx))
+            using (var cmd = new SqliteCommand("SELECT CreatedAt, Amount, PaymentMethod, MovementType FROM CashMovements WHERE SupplierId = @Id ORDER BY CreatedAt", _conn, _tx))
             {
                 cmd.Parameters.AddWithValue("@Id", supplierId);
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
-                    list.Add(new SupplierStatementLine { Date = reader["CreatedAt"].ToString()!, Type = "سداد", Details = "سداد عبر " + reader["PaymentMethod"], Amount = -Convert.ToDecimal(reader["Amount"]) });
+                {
+                    bool isRefund = reader["MovementType"].ToString() == "قبض";
+                    decimal amt = Convert.ToDecimal(reader["Amount"]);
+                    list.Add(new SupplierStatementLine { Date = reader["CreatedAt"].ToString()!, Type = isRefund ? "استرجاع سداد" : "سداد", Details = (isRefund ? "استرجاع عبر " : "سداد عبر ") + reader["PaymentMethod"], Amount = isRefund ? amt : -amt });
+                }
             }
             return list;
         }
