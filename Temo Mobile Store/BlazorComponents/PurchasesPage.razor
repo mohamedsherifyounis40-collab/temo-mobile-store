@@ -71,6 +71,16 @@
             {
                 <div class="card">
                     <div class="card-title">📋 سجل المشتريات (دوس على "تعديل" أو "إلغاء" لفاتورة شراء)</div>
+
+                    @if (pendingCancelPurchaseId.HasValue)
+                    {
+                        <div class="add-customer-panel">
+                            <div class="card-title">⚠️ متأكد من إلغاء فاتورة الشراء رقم @pendingCancelPurchaseId؟ هيترجع المخزون، وأي مبلغ اتسدد كاش هيرجع للخزينة تلقائيًا.</div>
+                            <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmCancelPurchase">✅ تأكيد الإلغاء</button>
+                            <button class="btn btn-outline btn-sm" @onclick="() => pendingCancelPurchaseId = null">تراجع</button>
+                        </div>
+                    }
+
                     <table class="cart-table">
                         <thead>
                             <tr>
@@ -108,15 +118,6 @@
                             }
                         </tbody>
                     </table>
-
-                    @if (pendingCancelPurchaseId.HasValue)
-                    {
-                        <div class="add-customer-panel">
-                            <div class="card-title">⚠️ متأكد من إلغاء فاتورة الشراء رقم @pendingCancelPurchaseId؟ هيترجع المخزون، وأي مبلغ اتسدد كاش هيرجع للخزينة تلقائيًا.</div>
-                            <button class="btn btn-danger-outline btn-sm" @onclick="ConfirmCancelPurchase">✅ تأكيد الإلغاء</button>
-                            <button class="btn btn-outline btn-sm" @onclick="() => pendingCancelPurchaseId = null">تراجع</button>
-                        </div>
-                    }
                 </div>
             }
 
