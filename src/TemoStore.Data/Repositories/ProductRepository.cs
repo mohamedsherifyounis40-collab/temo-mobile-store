@@ -61,9 +61,10 @@ namespace TemoStore.Data.Repositories
             if (productExists)
             {
                 using var cmd = new SqliteCommand(
-                    "UPDATE Products SET Quantity = Quantity + @Q, Price = @U, IsSerialized = CASE WHEN @IsSerialized = 1 THEN 1 ELSE IsSerialized END WHERE Barcode = @B", _conn, _tx);
+                    "UPDATE Products SET Quantity = Quantity + @Q, Price = @U, SalePrice = CASE WHEN @S > SalePrice THEN @S ELSE SalePrice END, IsSerialized = CASE WHEN @IsSerialized = 1 THEN 1 ELSE IsSerialized END WHERE Barcode = @B", _conn, _tx);
                 cmd.Parameters.AddWithValue("@Q", qty);
                 cmd.Parameters.AddWithValue("@U", unitCost);
+                cmd.Parameters.AddWithValue("@S", salePrice);
                 cmd.Parameters.AddWithValue("@IsSerialized", isSerialized ? 1 : 0);
                 cmd.Parameters.AddWithValue("@B", barcode);
                 cmd.ExecuteNonQuery();
